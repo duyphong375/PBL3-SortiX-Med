@@ -218,15 +218,15 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
               : bin1Theme.stationBadge
           }`}>
             <span className="shrink-0">{isJammed ? "⚠️" : "🎛️"}</span>
-            <span className="truncate">{isJammed ? "2. ZONE A: KẸT PHÔI!" : "2. SERVO 1 (IO18 • 270mm • 45%)"}</span>
+            <span className="truncate">{isJammed ? "2. ZONE A: KẸT PHÔI!" : "2. SERVO 1 (GPIO6 • 200mm • 45%)"}</span>
           </div>
           <div className={`rounded-lg border py-1.5 px-2 flex items-center justify-center gap-1.5 shadow-sm font-mono min-w-0 ${bin2Theme.stationBadge}`}>
             <span className="shrink-0">🎛️</span>
-            <span className="truncate">3. SERVO 2 (IO19 • 430mm • 72%)</span>
+            <span className="truncate">3. SERVO 2 (GPIO24 • 400mm • 72%)</span>
           </div>
           <div className={`rounded-lg border py-1.5 px-2 flex items-center justify-center gap-1.5 shadow-sm font-mono min-w-0 ${bin3Theme.stationBadge}`}>
             <span className="shrink-0">📥</span>
-            <span className="truncate">4. MÁNG 3 (600mm • 100%)</span>
+            <span className="truncate">4. MÁNG 3 (540mm • 100%)</span>
           </div>
         </div>
 
@@ -419,7 +419,7 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
                       Máng 1: {bin1Brands.length > 0 ? bin1Brands.map((b) => CATALOG_BRANDS[b]?.name || b).join(", ") : "Bơm kim tiêm / Dao mổ"}
                     </span>
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono block">
-                      Servo 1 (GPIO 18) • 270mm (45%)
+                      Servo 1 (MG996R - GPIO6) • 200mm (45%)
                     </span>
                   </div>
                 </div>
@@ -511,7 +511,7 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
                       Máng 2: {bin2Brands.length > 0 ? bin2Brands.map((b) => CATALOG_BRANDS[b]?.name || b).join(", ") : "Kẹp PT / Dao mổ"}
                     </span>
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono block">
-                      Servo 2 (GPIO 19) • 432mm (72%)
+                      Servo 2 (MG996R - GPIO24) • 400mm (72%)
                     </span>
                   </div>
                 </div>

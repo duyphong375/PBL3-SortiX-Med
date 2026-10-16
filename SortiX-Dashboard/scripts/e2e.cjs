@@ -3,11 +3,26 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
 
 const root = path.resolve(__dirname, "..");
 const frontendRoot = path.join(root, "frontend");
 const baseUrl = process.env.SORTIX_E2E_URL || "http://127.0.0.1:3100";
+const e2eSessionSecret = process.env.AUTH_SESSION_SECRET || "sortix-e2e-session-secret-2026-auth";
+
+function createTestToken(role = "admin") {
+  const claims = {
+    id: role === "admin" ? "admin-001" : "usr-001",
+    role,
+    username: role === "admin" ? "admin1" : "user1",
+    exp: Math.floor(Date.now() / 1000) + 3600,
+  };
+  const payload = Buffer.from(JSON.stringify(claims), "utf8").toString("base64url");
+  const sig = crypto.createHmac("sha256", e2eSessionSecret).update(payload).digest("base64url");
+  return `${payload}.${sig}`;
+}
+
 const dataFiles = [
   "users.json",
   "history.json",
@@ -82,7 +97,7 @@ async function main() {
     try {
       server = spawn(process.execPath, [nextBin, "start", "-p", "3100"], {
         cwd: frontendRoot,
-        env: { ...process.env, PORT: "3100" },
+        env: { ...process.env, PORT: "3100", AUTH_SESSION_SECRET: e2eSessionSecret },
         stdio: ["ignore", "pipe", "pipe"],
       });
       server.stdout.on("data", (chunk) => { serverOutput += chunk.toString(); });
@@ -109,8 +124,20 @@ async function main() {
     assert.equal(syncBefore.response.status, 200, "sync snapshot should be available");
     assert.equal(syncBefore.body.success, true, "sync snapshot should be successful");
 
+    const anonSync = await request("/api/sync", {
+      method: "POST",
+      body: JSON.stringify({ type: "update_state", state: {} }),
+    });
+    assert.equal(anonSync.response.status, 401, "anonymous user must be rejected from mutating sync");
+
+    const adminToken = createTestToken("admin");
+    const userToken = createTestToken("user");
+    const adminHeaders = { Authorization: `Bearer ${adminToken}` };
+    const userHeaders = { Authorization: `Bearer ${userToken}` };
+
     const invalidSync = await request("/api/sync", {
       method: "POST",
+      headers: adminHeaders,
       body: JSON.stringify({ type: "update_state", state: { speed: "invalid" } }),
     });
     assert.equal(invalidSync.response.status, 400, "invalid sync input must be rejected by Zod");
@@ -137,6 +164,7 @@ async function main() {
 
     const updated = await request("/api/sync", {
       method: "POST",
+      headers: adminHeaders,
       body: JSON.stringify({
         type: "update_state",
         state: {
@@ -168,6 +196,7 @@ async function main() {
     };
     const synced = await request("/api/sync", {
       method: "POST",
+      headers: adminHeaders,
       body: JSON.stringify({
         type: "sync_records",
         records: [record],
@@ -189,11 +218,19 @@ async function main() {
     });
     assert.ok([400, 422].includes(invalidJam.response.status), "unsafe jam duration must be rejected");
 
-    const clear = await request("/api/sync", {
+    const forbiddenClear = await request("/api/sync", {
       method: "POST",
+      headers: userHeaders,
       body: JSON.stringify({ type: "clear_history", senderId: "e2e-client" }),
     });
-    assert.equal(clear.response.status, 200, "clear history should succeed");
+    assert.equal(forbiddenClear.response.status, 403, "regular user must not clear history");
+
+    const clear = await request("/api/sync", {
+      method: "POST",
+      headers: adminHeaders,
+      body: JSON.stringify({ type: "clear_history", senderId: "e2e-client" }),
+    });
+    assert.equal(clear.response.status, 200, "clear history should succeed for admin");
     const afterClear = await request("/api/sync");
     assert.equal(afterClear.body.history.length, 0, "all clients should observe cleared history");
 

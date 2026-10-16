@@ -16,7 +16,7 @@
     "cap:sync": "npm run cap:sync --workspace=frontend",
     "cap:open": "npm run cap:open --workspace=frontend",
     "test:e2e": "node scripts/e2e.cjs",
-    "test": "node tests/history.test.cjs && node tests/api_schemas.test.cjs && node tests/users.test.cjs && node tests/estop_safety.test.cjs && node tests/jam_detection.test.cjs && node tests/simulation_mode_guard.test.cjs && node tests/jam_simulation_audio.test.cjs && node tests/bin_full.test.cjs && node tests/temperature_warning.test.cjs && node tests/device_offline.test.cjs && node tests/shift_summary.test.cjs && node tests/bin_sliders_sync.test.cjs && node tests/mqtt_disconnected.test.cjs && node tests/temperature_gauge_simulation_vs_real.test.cjs && node tests/daily_report_sync.test.cjs && node tests/cross_device_sync.test.cjs && node tests/http_telemetry_history.test.cjs"
+    "test": "node --test tests/*.test.cjs"
 
   },
   "dependencies": {

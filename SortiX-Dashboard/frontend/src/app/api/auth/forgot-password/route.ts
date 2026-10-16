@@ -56,18 +56,27 @@ export async function POST(request: Request) {
     // 3. Lưu mã OTP vào database/file users.json
     NextUsersStore.setResetOtp(user.username, otp, expiresAt);
 
-    // 4. Trả về phản hồi kèm demo_otp để Frontend hiển thị Toast Notification
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Đã tạo mã OTP thành công! Mã có hiệu lực trong vòng 5 phút.",
-        demo_otp: otp,
-        expires_at: expiresAt,
-        username: user.username,
-        email: user.email,
-      },
-      { status: 200 }
-    );
+    // Mask email for privacy
+    const maskedEmail = user.email.replace(/^(.)(.*)(.@.*)$/, (_, first, middle, last) => `${first}${"*".repeat(Math.max(1, middle.length))}${last}`);
+
+    const allowDemoOtp = process.env.NODE_ENV !== "production" && process.env.ENABLE_DEMO_OTP === "true";
+
+    // 4. Trả về phản hồi; chỉ đính kèm demo_otp khi được cấu hình ENABLE_DEMO_OTP=true trong môi trường non-production
+    const responsePayload: Record<string, unknown> = {
+      success: true,
+      message: allowDemoOtp
+        ? "Đã tạo mã OTP demo thành công! Mã có hiệu lực trong vòng 5 phút."
+        : "Mã OTP xác thực đã được gửi đến email đăng ký của bạn. Vui lòng kiểm tra hộp thư.",
+      expires_at: expiresAt,
+      username: user.username,
+      email: maskedEmail,
+    };
+
+    if (allowDemoOtp) {
+      responsePayload.demo_otp = otp;
+    }
+
+    return NextResponse.json(responsePayload, { status: 200 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Lỗi xử lý yêu cầu OTP";
     return NextResponse.json({ success: false, message }, { status: 500 });

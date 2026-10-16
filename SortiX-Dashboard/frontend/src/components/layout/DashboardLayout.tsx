@@ -1726,10 +1726,10 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         if (angle === 0) {
           conveyor.setArm1Active(false);
           setTelemetry((prev) => ({ ...prev, arm1_active: false }));
-          logHardwareTestAction("TẮT / Thu tay gạt Servo 1 (0°)", "GPIO 18 (LEDC PWM)", user?.username || "admin1", "actuator", "success");
+          logHardwareTestAction("TẮT / Thu tay gạt Servo 1 (0°)", "GPIO 6 (LEDC PWM)", user?.username || "admin1", "actuator", "success");
           if (!isSim) {
             mqtt.publishCommand("trigger_servo_1", 0);
-            toast.info("[THỰC TẾ] Đã TẮT / trả Servo 1 (GPIO 18) về vị trí nghỉ 0°");
+            toast.info("[THỰC TẾ] Đã TẮT / trả Servo 1 (GPIO 6) về vị trí nghỉ 0°");
           } else {
             toast.info("[MÔ PHỎNG] Đã TẮT / trả tay gạt Máng 1 về 0°");
           }
@@ -1739,7 +1739,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         // BẬT tay gạt Máng 1
         conveyor.setArm1Active(true);
         setTelemetry((prev) => ({ ...prev, arm1_active: true }));
-        logHardwareTestAction(`BẬT / Gạt Servo 1 góc ${angle}°`, "GPIO 18 (LEDC PWM)", user?.username || "admin1", "actuator", "success");
+        logHardwareTestAction(`BẬT / Gạt Servo 1 góc ${angle}°`, "GPIO 6 (LEDC PWM)", user?.username || "admin1", "actuator", "success");
         industrialAudio.playClick();
         setTimeout(() => {
           conveyor.setArm1Active(false);
@@ -1748,7 +1748,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
 
         if (!isSim) {
           mqtt.publishCommand("trigger_servo_1", angle);
-          toast.success(`[THỰC TẾ] Đã BẬT gạt Servo 1 (GPIO 18) góc ${angle}°`);
+          toast.success(`[THỰC TẾ] Đã BẬT gạt Servo 1 (GPIO 6) góc ${angle}°`);
         } else {
           toast.info(`[MÔ PHỎNG] Đã BẬT tay gạt Máng 1 góc ${angle}°`);
         }
@@ -1756,10 +1756,10 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         if (angle === 0) {
           conveyor.setArm2Active(false);
           setTelemetry((prev) => ({ ...prev, arm2_active: false }));
-          logHardwareTestAction("TẮT / Thu tay gạt Servo 2 (0°)", "GPIO 19 (LEDC PWM)", user?.username || "admin1", "actuator", "success");
+          logHardwareTestAction("TẮT / Thu tay gạt Servo 2 (0°)", "GPIO 24 (LEDC PWM)", user?.username || "admin1", "actuator", "success");
           if (!isSim) {
             mqtt.publishCommand("trigger_servo_2", 0);
-            toast.info("[THỰC TẾ] Đã TẮT / trả Servo 2 (GPIO 19) về vị trí nghỉ 0°");
+            toast.info("[THỰC TẾ] Đã TẮT / trả Servo 2 (GPIO 24) về vị trí nghỉ 0°");
           } else {
             toast.info("[MÔ PHỎNG] Đã TẮT / trả tay gạt Máng 2 về 0°");
           }
@@ -1769,7 +1769,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         // BẬT tay gạt Máng 2
         conveyor.setArm2Active(true);
         setTelemetry((prev) => ({ ...prev, arm2_active: true }));
-        logHardwareTestAction(`BẬT / Gạt Servo 2 góc ${angle}°`, "GPIO 19 (LEDC PWM)", user?.username || "admin1", "actuator", "success");
+        logHardwareTestAction(`BẬT / Gạt Servo 2 góc ${angle}°`, "GPIO 24 (LEDC PWM)", user?.username || "admin1", "actuator", "success");
         industrialAudio.playClick();
         setTimeout(() => {
           conveyor.setArm2Active(false);
@@ -1778,7 +1778,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
 
         if (!isSim) {
           mqtt.publishCommand("trigger_servo_2", angle);
-          toast.success(`[THỰC TẾ] Đã BẬT gạt Servo 2 (GPIO 19) góc ${angle}°`);
+          toast.success(`[THỰC TẾ] Đã BẬT gạt Servo 2 (GPIO 24) góc ${angle}°`);
         } else {
           toast.info(`[MÔ PHỎNG] Đã BẬT tay gạt Máng 2 góc ${angle}°`);
         }
@@ -1786,25 +1786,25 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         if (value === 0) {
           industrialAudio.stopContinuousEmergencyAlarm();
           industrialAudio.silenceAll();
-          logHardwareTestAction("TẮT / Ngắt Còi cảnh báo", "GPIO 21 (Buzzer Alert)", user?.username || "admin1", "alarm", "success");
+          logHardwareTestAction("TẮT / Ngắt Đèn LED & Báo động", "GPIO 10 (LED Status Indicator)", user?.username || "admin1", "alarm", "success");
           if (!isSim) {
             mqtt.publishCommand("trigger_buzzer", 0);
-            toast.info("[THỰC TẾ] Đã TẮT Còi cảnh báo (GPIO 21)");
+            toast.info("[THỰC TẾ] Đã TẮT Đèn LED / Cảnh báo (GPIO 10)");
           } else {
-            toast.info("[MÔ PHỎNG] Đã TẮT Còi cảnh báo");
+            toast.info("[MÔ PHỎNG] Đã TẮT Đèn LED / Cảnh báo");
           }
           return;
         }
 
-        // BẬT còi cảnh báo hú liên tục cho đến khi người dùng bấm TẮT
-        logHardwareTestAction("BẬT / Hú Còi cảnh báo (Liên tục)", "GPIO 21 (Buzzer Alert)", user?.username || "admin1", "alarm", "success");
+        // BẬT Đèn LED / Báo động
+        logHardwareTestAction("BẬT Đèn LED & Báo động", "GPIO 10 (LED Status Indicator)", user?.username || "admin1", "alarm", "success");
         industrialAudio.startContinuousEmergencyAlarm();
 
         if (!isSim) {
           mqtt.publishCommand("trigger_buzzer", 1);
-          toast.success("[THỰC TẾ] Đã BẬT Còi cảnh báo Buzzer (GPIO 21) hú liên tục tới ESP32");
+          toast.success("[THỰC TẾ] Đã BẬT Đèn LED Báo Trạng Thái (GPIO 10) tới ESP32");
         } else {
-          toast.info("[MÔ PHỎNG] Đã BẬT Còi cảnh báo Buzzer (Hú liên tục)");
+          toast.info("[MÔ PHỎNG] Đã BẬT Đèn LED Báo Trạng Thái (GPIO 10)");
         }
       }
     },

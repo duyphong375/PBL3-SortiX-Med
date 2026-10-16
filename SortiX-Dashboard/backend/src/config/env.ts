@@ -46,7 +46,8 @@ export const ENV = {
   SMTP_USER: process.env.SMTP_USER?.trim() || "",
   SMTP_PASS: process.env.SMTP_PASS || "",
   ALERT_EMAIL_TO: process.env.ALERT_EMAIL_TO?.trim() || "",
-  MQTT_BROKER_URL: process.env.MQTT_BROKER_URL?.trim() || "mqtt://broker.emqx.io:1883",
+  MQTT_BROKER_URL: process.env.MQTT_BROKER_URL?.trim() || "mqtt://127.0.0.1:1883",
   MQTT_USERNAME: process.env.MQTT_USERNAME?.trim() || "",
   MQTT_PASSWORD: process.env.MQTT_PASSWORD || "",
+  MQTT_CONTROL_SECRET: process.env.MQTT_CONTROL_SECRET?.trim() || "sortix_sec_control_2026",
 };

@@ -243,6 +243,10 @@ const server = http.createServer(async (req, res) => {
 
     // AI Copilot Chat Telegram Forward Endpoint
     if (pathname === "/api/chat/telegram" && (method === "POST" || method === "GET")) {
+      if (!authUser.isAuthenticated) {
+        sendJson(res, 401, { success: false, message: "401 Unauthorized: Vui lòng đăng nhập để sử dụng tính năng này" });
+        return;
+      }
       let body: { text?: string; title?: string } = {};
       if (method === "POST") {
         body = (await parseJsonBody(req)) as { text?: string; title?: string };
@@ -253,8 +257,15 @@ const server = http.createServer(async (req, res) => {
         };
       }
       const text = body?.text || "";
-      const token = ENV.TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || "8817192749:AAGj_mpc8ak7GgQy3-1TxhTJOslupGnSOjw";
-      const chatId = ENV.TELEGRAM_CHAT_ID || process.env.TELEGRAM_CHAT_ID || "5032117647";
+      const token = ENV.TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || "";
+      const chatId = ENV.TELEGRAM_CHAT_ID || process.env.TELEGRAM_CHAT_ID || "";
+      if (!token || !chatId) {
+        sendJson(res, 503, {
+          success: false,
+          message: "Cấu hình Telegram Bot chưa sẵn sàng. Vui lòng thiết lập TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID trong biến môi trường (.env)."
+        });
+        return;
+      }
       if (!text.trim()) {
         sendJson(res, 400, { success: false, message: "Nội dung tin nhắn không được để trống" });
         return;
@@ -528,19 +539,27 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === "/api/sync" && method === "POST") {
+      if (!authUser.isAuthenticated) {
+        sendJson(res, 401, { success: false, error: "401 Unauthorized: Vui lòng đăng nhập để thực hiện đồng bộ" });
+        return;
+      }
       const body = await parseJsonBody(req);
-      const { type, state, records, binCounts, item, senderId } = (body as any) || {};
+      const { type, state, records, binCounts, brandCounts, item, senderId } = (body as any) || {};
       if (type === "update_state" && state) {
         const updated = SyncService.updateState(state, senderId);
         sendJson(res, 200, { success: true, state: updated });
         return;
       }
       if (type === "sync_records" && Array.isArray(records)) {
-        SyncService.syncRecords(records, binCounts, senderId);
+        SyncService.syncRecords(records, binCounts, brandCounts, senderId);
         sendJson(res, 200, { success: true, state: SyncService.getState() });
         return;
       }
       if (type === "clear_history") {
+        if (authUser.role !== "admin") {
+          sendJson(res, 403, { success: false, error: "Truy cập bị từ chối: Thao tác xóa lịch sử yêu cầu quyền Quản trị viên (Admin)" });
+          return;
+        }
         SyncService.clearHistory(senderId);
         sendJson(res, 200, { success: true, state: SyncService.getState() });
         return;

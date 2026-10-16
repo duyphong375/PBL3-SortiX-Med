@@ -19,7 +19,6 @@ import {
   OctagonAlert,
   Boxes,
   Thermometer,
-  ClipboardCheck,
   FlaskConical,
   Layers,
   Sparkles,
@@ -48,7 +47,6 @@ interface ConfigAndDiagnosticsProps {
   onSimulateDeviceOffline?: () => void;
   isDeviceOffline?: boolean;
   onReconnectDevice?: () => void;
-  onSimulateShiftSummary?: () => void;
   onSimulateMqttDisconnect?: () => void;
   onReconnectMqtt?: () => void;
   isMqttAlertActive?: boolean;
@@ -79,7 +77,6 @@ export const ConfigAndDiagnostics: React.FC<ConfigAndDiagnosticsProps> = ({
   onSimulateDeviceOffline,
   isDeviceOffline = false,
   onReconnectDevice,
-  onSimulateShiftSummary,
   onSimulateMqttDisconnect,
   onReconnectMqtt,
   isMqttAlertActive = false,
@@ -148,6 +145,10 @@ export const ConfigAndDiagnostics: React.FC<ConfigAndDiagnosticsProps> = ({
       default_bin: 3,
       apply_mode: "when_line_empty",
       timestamp: new Date().toISOString(),
+      servo_routes: config.servo_routes || {
+        "1": { io: "GPIO6", angle: 45 },
+        "2": { io: "GPIO24", angle: 45 },
+      },
     };
 
     const res = await onSaveConfig(updatedConfig);
@@ -300,7 +301,7 @@ export const ConfigAndDiagnostics: React.FC<ConfigAndDiagnosticsProps> = ({
               <label className={`text-xs font-bold flex items-center justify-between ${bin1ConfigTheme.widgetTitleText}`}>
                 <span className="flex items-center gap-2">
                   <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${bin1ConfigTheme.dotClass}`} />
-                  KHAY 1 (Gạt Servo 1 - GPIO 18):
+                  KHAY 1 (Gạt Servo 1 - GPIO 6):
                 </span>
                 <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">45% vị trí băng tải</span>
               </label>
@@ -334,7 +335,7 @@ export const ConfigAndDiagnostics: React.FC<ConfigAndDiagnosticsProps> = ({
               <label className={`text-xs font-bold flex items-center justify-between ${bin2ConfigTheme.widgetTitleText}`}>
                 <span className="flex items-center gap-2">
                   <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${bin2ConfigTheme.dotClass}`} />
-                  KHAY 2 (Gạt Servo 2 - GPIO 19):
+                  KHAY 2 (Gạt Servo 2 - GPIO 24):
                 </span>
                 <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">72% vị trí băng tải</span>
               </label>
@@ -689,18 +690,6 @@ export const ConfigAndDiagnostics: React.FC<ConfigAndDiagnosticsProps> = ({
                     >
                       <WifiOff className={`h-4 w-4 ${isMqttAlertActive ? "text-emerald-600 dark:text-emerald-400 animate-bounce" : "text-rose-600 dark:text-rose-400"}`} />
                       <span>{isMqttAlertActive ? "Khôi phục kết nối MQTT" : "Ngắt kết nối MQTT Client"}</span>
-                    </button>
-                  )}
-
-                  {/* Báo cáo ca */}
-                  {onSimulateShiftSummary && (
-                    <button
-                      type="button"
-                      onClick={onSimulateShiftSummary}
-                      className="flex items-center justify-center gap-2 rounded-xl border-2 border-emerald-500/40 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-950/25 dark:text-emerald-300 dark:hover:bg-emerald-900/40 py-2.5 px-3 text-xs font-bold uppercase tracking-wider transition-all shadow-sm active:scale-95"
-                    >
-                      <ClipboardCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                      <span>Giả lập báo cáo ngày</span>
                     </button>
                   )}
                 </div>

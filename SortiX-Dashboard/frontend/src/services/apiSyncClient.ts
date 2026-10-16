@@ -47,15 +47,34 @@ async function waitBeforeRetry(delayMs: number, signal?: AbortSignal): Promise<v
   });
 }
 
+function getStoredAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem("pbl3_auth_user");
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    const headers: Record<string, string> = {};
+    if (parsed?.sessionToken) headers["Authorization"] = `Bearer ${parsed.sessionToken}`;
+    return headers;
+  } catch {
+    return {};
+  }
+}
+
 async function requestSync(
   input: RequestInfo | URL,
   init: RequestInit,
   signal?: AbortSignal,
 ): Promise<Response> {
+  const authHeaders = getStoredAuthHeaders();
+  const mergedHeaders: HeadersInit = {
+    ...authHeaders,
+    ...(init.headers as Record<string, string> || {}),
+  };
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      const response = await fetchWithTimeout(input, { ...init, signal }, 8000);
+      const response = await fetchWithTimeout(input, { ...init, headers: mergedHeaders, signal }, 8000);
       if (response.ok || (response.status < 500 && response.status !== 408 && response.status !== 429)) {
         return response;
       }

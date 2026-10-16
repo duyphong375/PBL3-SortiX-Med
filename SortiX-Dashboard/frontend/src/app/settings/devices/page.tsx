@@ -114,61 +114,46 @@ export default function SettingsDevicesPage() {
   const rawBrokerUrl = process.env.NEXT_PUBLIC_MQTT_BROKER_URL || "wss://broker.emqx.io:8084/mqtt";
   const maskedBrokerUrl = rawBrokerUrl.replace(/(wss?:\/\/)([^/@:]+@)?([^/:]+)/, "$1***.emqx.io");
 
-  // Detailed GPIO Pinout Matrix
+  // Detailed GPIO Pinout Matrix - Chuẩn hóa WeAct Studio ESP32-C5-A-N8R8
   const gpioList: GpioPinSpec[] = useMemo(() => [
     // Nhóm 1: Cơ cấu chấp hành & Tải công suất
     {
-      pin: "GPIO 18",
+      pin: "GPIO 6",
       name: "Servo Gạt 1 (Khay 1)",
       category: "actuators",
       categoryLabel: "Cơ cấu chấp hành",
       ioType: "LEDC PWM (50Hz / 500-2500µs)",
-      voltage: "3.3V Logic → Shifter 5VDC",
-      physicalLocation: "Vị trí 45% thân băng chuyền (Cách cổng vào 27cm)",
-      description: "Gạt phân loại phôi nhóm 1 (Bơm tiêm / Panh kẹp) vào máng trượt Khay 1",
+      voltage: "3.3V Logic → Nuôi 5V từ Buck XL4015",
+      physicalLocation: "Dãy Trái Pin 7 • Trạm gạt Khay 1 (Cách S1 200mm)",
+      description: "Cánh tay gạt TowerPro MG996R phân loại phôi nhóm 1 (Bơm tiêm / Dao mổ) vào Khay 1",
       isActive: Boolean(telemetry.arm1_active),
       activeLabel: "KÍCH HOẠT (Góc 45°)",
       inactiveLabel: "NGHỈ (Góc 0°)",
       colorScheme: "cyan",
     },
     {
-      pin: "GPIO 19",
+      pin: "GPIO 24",
       name: "Servo Gạt 2 (Khay 2)",
       category: "actuators",
       categoryLabel: "Cơ cấu chấp hành",
       ioType: "LEDC PWM (50Hz / 500-2500µs)",
-      voltage: "3.3V Logic → Shifter 5VDC",
-      physicalLocation: "Vị trí 72% thân băng chuyền (Cách cổng vào 43cm)",
-      description: "Gạt phân loại phôi nhóm 2 (Kẹp phẫu thuật / Dao mổ) vào máng trượt Khay 2",
+      voltage: "3.3V Logic → Nuôi 5V từ Buck XL4015",
+      physicalLocation: "Dãy Phải Pin 4 • Trạm gạt Khay 2 (Cách S1 400mm)",
+      description: "Cánh tay gạt TowerPro MG996R phân loại phôi nhóm 2 (Kẹp phẫu thuật / Kéo) vào Khay 2",
       isActive: Boolean(telemetry.arm2_active),
       activeLabel: "KÍCH HOẠT (Góc 45°)",
       inactiveLabel: "NGHỈ (Góc 0°)",
       colorScheme: "indigo",
     },
     {
-      pin: "GPIO 21",
-      name: "Còi cảnh báo âm thanh (Buzzer)",
+      pin: "GPIO 8 & GPIO 9",
+      name: "Driver Cầu H L298N (Động cơ 12V)",
       category: "actuators",
       categoryLabel: "Cơ cấu chấp hành",
-      ioType: "Digital Output (Optocoupler)",
-      voltage: "3.3V Logic → 24VDC Active Buzzer",
-      physicalLocation: "Hộp điều khiển tủ điện trung tâm",
-      description: "Phát âm thanh báo động khi dừng khẩn cấp E-Stop, kẹt phôi hoặc khay chứa đạt 50 SP",
-      isActive: Boolean(telemetry.estop_pressed || isMqttAlertActive),
-      activeLabel: "BÁO ĐỘNG (HIGH)",
-      inactiveLabel: "TẮT (LOW)",
-      colorScheme: "purple",
-      isError: Boolean(telemetry.estop_pressed || isMqttAlertActive),
-    },
-    {
-      pin: "GPIO 4",
-      name: "Động cơ Băng Tải Chính",
-      category: "actuators",
-      categoryLabel: "Cơ cấu chấp hành",
-      ioType: "MCPWM High-Frequency (20kHz)",
-      voltage: "3.3V Logic → H-Bridge BTS7960 24VDC",
-      physicalLocation: "Trục ru-lô chủ động đầu băng chuyền (10x60cm)",
-      description: "Điều tốc băng tải DC 24V theo chu trình phân loại liên tục",
+      ioType: "Digital Output / PWM (IN1: GPIO8, IN2: GPIO9)",
+      voltage: "3.3V Logic → Tải Motor 12VDC",
+      physicalLocation: "Dãy Trái Pin 9 (IN1) & Pin 10 (IN2)",
+      description: "Điều khiển đảo chiều và tốc độ động cơ DC giảm tốc JGB37-520 12V 66RPM kéo băng tải",
       isActive: Boolean(telemetry.conveyor_running),
       activeLabel: `RUN (${telemetry.conveyor_speed ?? 60}%)`,
       inactiveLabel: "STOP",
@@ -178,13 +163,13 @@ export default function SettingsDevicesPage() {
     // Nhóm 2: Cảm biến quang & Bộ đếm định vị
     {
       pin: "GPIO 0",
-      name: "Cảm biến quang S1 (Đầu vào)",
+      name: "Cảm biến vật cản hồng ngoại IR S1",
       category: "sensors",
       categoryLabel: "Cảm biến & Encoder",
-      ioType: "Digital Input (Pull-Up, Interrupt)",
-      voltage: "3.3V Logic (NPN NO qua điện trở chia áp)",
-      physicalLocation: "Cổng vào băng tải (Khu vực Camera AI YOLOv8)",
-      description: "Phát hiện vật mẫu y tế tiến vào khu vực quét thị giác máy tính",
+      ioType: "Digital Input (Active Low, Pull-Up)",
+      voltage: "3.3V Logic (Module LM393 nuôi 3.3V Dãy Trái Pin 1)",
+      physicalLocation: "Dãy Trái Pin 5 • Cổng quét đầu vào buồng Camera AI",
+      description: "Phát hiện vật phẩm y tế tiến vào khu vực chụp ảnh và kích hoạt đếm xung định vị",
       isActive: Boolean(telemetry.s1_entry),
       activeLabel: "BLOCKED (Có phôi)",
       inactiveLabel: "CLEAR (Trống)",
@@ -192,137 +177,122 @@ export default function SettingsDevicesPage() {
     },
     {
       pin: "GPIO 1",
-      name: "Cảm biến quang S2 (Đồng bộ gạt 1)",
+      name: "Encoder Động cơ - Kênh A (Pulse)",
       category: "sensors",
       categoryLabel: "Cảm biến & Encoder",
-      ioType: "Digital Input (Pull-Up, Falling Edge)",
-      voltage: "3.3V Logic",
-      physicalLocation: "Trước tay gạt Servo 1 (Khu vực Jam Zone A)",
-      description: "Đồng bộ kích hoạt gạt Khay 1 và giám sát kẹt tắc phôi vùng A",
-      isActive: Boolean(telemetry.s2_sorter1),
-      activeLabel: "BLOCKED (Có phôi)",
-      inactiveLabel: "CLEAR (Trống)",
-      colorScheme: "indigo",
-    },
-    {
-      pin: "GPIO 2",
-      name: "Cảm biến quang S3 (Đồng bộ gạt 2)",
-      category: "sensors",
-      categoryLabel: "Cảm biến & Encoder",
-      ioType: "Digital Input (Pull-Up, Falling Edge)",
-      voltage: "3.3V Logic",
-      physicalLocation: "Trước tay gạt Servo 2 (Khu vực Jam Zone B)",
-      description: "Đồng bộ kích hoạt gạt Khay 2 và giám sát kẹt tắc phôi vùng B",
-      isActive: Boolean(telemetry.s3_sorter2),
-      activeLabel: "BLOCKED (Có phôi)",
-      inactiveLabel: "CLEAR (Trống)",
-      colorScheme: "amber",
-    },
-    {
-      pin: "GPIO 3",
-      name: "Encoder PCNT (Bộ đếm xung tốc độ)",
-      category: "sensors",
-      categoryLabel: "Cảm biến & Encoder",
-      ioType: "PCNT Hardware Channel 0",
-      voltage: "3.3V Logic (Encoder quang 600 P/R)",
-      physicalLocation: "Trục quay ru-lô băng tải",
-      description: "Đếm xung cơ học để tính toán chính xác quãng đường phôi di chuyển (mm/s)",
+      ioType: "External Interrupt / PCNT (Đếm xung cạnh lên/xuống)",
+      voltage: "3.3V Logic (Đĩa từ 11 PPR, ngõ ra ~3960 xung/vòng)",
+      physicalLocation: "Dãy Trái Pin 6 • Nối đuôi động cơ JGB37-520",
+      description: "Đếm xung định vị phôi chính xác theo chiều dài băng chuyền (~31.5 xung/mm)",
       isActive: Boolean(telemetry.conveyor_running && (telemetry.encoder_count ?? 0) > 0),
       activeLabel: `${telemetry.encoder_count ?? 0} xung`,
       inactiveLabel: "0 xung (Đứng yên)",
       colorScheme: "emerald",
     },
-
-    // Nhóm 3: Đèn tháp trạng thái công nghiệp
     {
-      pin: "GPIO 22",
-      name: "Đèn Tháp ĐỎ (Red Indicator)",
-      category: "indicators",
-      categoryLabel: "Đèn tháp & Báo động",
-      ioType: "Digital Output (Relay 24V)",
-      voltage: "3.3V Logic → Relay 24VDC",
-      physicalLocation: "Đỉnh trụ đèn tháp tín hiệu 3 tầng",
-      description: "Báo sự cố khẩn cấp: Dừng khẩn E-Stop, Kẹt phôi, Quá nhiệt hoặc Mất kết nối",
-      isActive: Boolean(telemetry.estop_pressed || isMqttAlertActive),
-      activeLabel: "NHẤP NHÁY (CRITICAL)",
-      inactiveLabel: "TẮT",
-      colorScheme: "rose",
-      isError: Boolean(telemetry.estop_pressed || isMqttAlertActive),
+      pin: "GPIO 4",
+      name: "Encoder Động cơ - Kênh B (Direction)",
+      category: "sensors",
+      categoryLabel: "Cảm biến & Encoder",
+      ioType: "Digital Input (Pha lệch góc 90 độ)",
+      voltage: "3.3V Logic",
+      physicalLocation: "Dãy Phải Pin 8 • Nối đuôi động cơ JGB37-520",
+      description: "Xác định chiều quay động cơ và khử trôi xung nhiễu (Quadrature decoding)",
+      isActive: Boolean(telemetry.conveyor_running),
+      activeLabel: "FORWARD",
+      inactiveLabel: "IDLE",
+      colorScheme: "emerald",
     },
     {
-      pin: "GPIO 23",
-      name: "Đèn Tháp VÀNG (Yellow Indicator)",
-      category: "indicators",
-      categoryLabel: "Đèn tháp & Báo động",
-      ioType: "Digital Output (Relay 24V)",
-      voltage: "3.3V Logic → Relay 24VDC",
-      physicalLocation: "Tầng giữa trụ đèn tháp tín hiệu",
-      description: "Báo cảnh báo: Khay chứa phôi đầy >= 90% hoặc đang chờ lấy mẫu",
-      isActive: false,
-      activeLabel: "SÁNG (WARNING)",
-      inactiveLabel: "TẮT",
+      pin: "GPIO 5",
+      name: "Cảm biến ánh sáng quang trở LDR",
+      category: "sensors",
+      categoryLabel: "Cảm biến & Encoder",
+      ioType: "Digital Input (Module LM393 DO)",
+      voltage: "3.3V Logic (Nuôi từ Dãy Trái Pin 1)",
+      physicalLocation: "Dãy Phải Pin 9 • Trong buồng quét Camera AI",
+      description: "Giám sát ngưỡng chiếu sáng buồng chụp để đảm bảo độ tin cậy nhận diện YOLOv8",
+      isActive: Boolean(telemetry.ldr_active),
+      activeLabel: "LIGHT OK",
+      inactiveLabel: "DARK",
       colorScheme: "amber",
     },
     {
-      pin: "GPIO 24",
-      name: "Đèn Tháp XANH (Green Indicator)",
+      pin: "GPIO 23",
+      name: "Nút nhấn Khởi Động (Start Button)",
+      category: "sensors",
+      categoryLabel: "Cảm biến & Encoder",
+      ioType: "Digital Input (Active Low, Pull-Up 10k + C3 0.1uF)",
+      voltage: "3.3V Logic (Nút nhấn tự nhả PBS-110)",
+      physicalLocation: "Dãy Phải Pin 5 • Mặt trước hộp điều khiển máy",
+      description: "Nút cứng kích hoạt chu trình phân loại và tái khởi động an toàn sau E-Stop",
+      isActive: Boolean(telemetry.start_btn_pressed),
+      activeLabel: "PRESSED",
+      inactiveLabel: "RELEASED",
+      colorScheme: "purple",
+    },
+
+    // Nhóm 3: Đèn hiển thị & Cảnh báo
+    {
+      pin: "GPIO 10",
+      name: "Đèn LED Báo Trạng Thái Hệ Thống",
       category: "indicators",
-      categoryLabel: "Đèn tháp & Báo động",
-      ioType: "Digital Output (Relay 24V)",
-      voltage: "3.3V Logic → Relay 24VDC",
-      physicalLocation: "Tầng dưới trụ đèn tháp tín hiệu",
-      description: "Báo hệ thống hoạt động bình thường, băng tải đang chạy ổn định",
-      isActive: Boolean(telemetry.conveyor_running && !telemetry.estop_pressed),
-      activeLabel: "SÁNG (NORMAL RUN)",
-      inactiveLabel: "TẮT",
+      categoryLabel: "Đèn báo & Cảnh báo",
+      ioType: "Digital Output (Active High qua trở 220Ω)",
+      voltage: "3.3V Logic (LED tròn phi 5mm siêu sáng Xanh lá)",
+      physicalLocation: "Dãy Trái Pin 11 • Mặt trước tủ điện máy",
+      description: "Sáng liên tục khi băng tải đang chạy, chớp nháy cảnh báo khi kẹt phôi/dừng khẩn cấp",
+      isActive: Boolean(telemetry.conveyor_running || telemetry.estop_pressed),
+      activeLabel: telemetry.estop_pressed ? "ALERT (FLASH)" : "RUNNING (ON)",
+      inactiveLabel: "IDLE (OFF)",
       colorScheme: "emerald",
     },
 
-    // Nhóm 4: Giao tiếp & Mạch an toàn cứng
+    // Nhóm 4: Giao tiếp & Mạch an toàn lực
     {
-      pin: "GPIO 10",
-      name: "Nút Dừng Khẩn Cấp E-STOP (Fail-Safe)",
+      pin: "Mạch Cắt Nguồn 12V",
+      name: "Nút Dừng Khẩn Cấp E-STOP (Fail-Safe NC)",
       category: "bus",
       categoryLabel: "An toàn & Bus giao tiếp",
-      ioType: "Hardware NMI (NC - Thường đóng)",
-      voltage: "3.3V (Mở mạch khi nhấn nút)",
-      physicalLocation: "Bảng điều khiển khẩn cấp mặt trước khung máy",
-      description: "Mạch ngắt cứng cấp nguồn khẩn cấp, thời gian phản hồi phần cứng < 5ms",
+      ioType: "Hardware NC (Tiếp điểm Thường Đóng ZB2-BE102C)",
+      voltage: "12VDC Bus Cắt Trực Tiếp",
+      physicalLocation: "Nút nấm đỏ phi 22mm trên nắp máy",
+      description: "Cắt trực tiếp đường nguồn 12V nuôi motor và buck 5V servo, đảm bảo dừng tuyệt đối khi sự cố",
       isActive: Boolean(telemetry.estop_pressed),
-      activeLabel: "KÍCH HOẠT (MỞ MẠCH ⚠️)",
-      inactiveLabel: "AN TOÀN (ĐÓNG MẠCH)",
+      activeLabel: "KÍCH HOẠT (CẮT NGUỒN ⚠️)",
+      inactiveLabel: "AN TOÀN (CẤP ĐIỆN)",
       colorScheme: "rose",
       isError: Boolean(telemetry.estop_pressed),
     },
     {
-      pin: "GPIO 43 / 44",
-      name: "UART0 Serial Console (TX/RX)",
+      pin: "GPIO 13 & GPIO 14",
+      name: "Cổng USB Type-C Native (D- / D+)",
       category: "bus",
       categoryLabel: "An toàn & Bus giao tiếp",
-      ioType: "UART Asynchronous (115200 8N1)",
-      voltage: "3.3V TTL qua cổng USB-C",
-      physicalLocation: "Cổng lập trình & debug bo mạch chủ ESP32",
-      description: "Truyền nhận log hệ điều hành FreeRTOS và nạp firmware nhúng",
+      ioType: "USB-CDC / JTAG Console Hardware",
+      voltage: "Cổng Type-C Native trên bo WeAct ESP32-C5",
+      physicalLocation: "Dãy Phải Pin 14 (D-) & Pin 13 (D+)",
+      description: "Dành riêng cho nạp firmware tốc độ cao, debug JTAG và giám sát USB-CDC, không dùng làm GPIO xuất",
       isActive: true,
-      activeLabel: "READY (115200 bps)",
+      activeLabel: "DEDICATED",
       inactiveLabel: "OFFLINE",
       colorScheme: "cyan",
     },
     {
-      pin: "GPIO 8 / 9",
-      name: "I2C Bus (SDA / SCL)",
+      pin: "GPIO 11 & GPIO 12",
+      name: "Cổng Type-C UART Debug (TX0 / RX0)",
       category: "bus",
       categoryLabel: "An toàn & Bus giao tiếp",
-      ioType: "I2C Fast Mode (400kHz)",
-      voltage: "3.3V Logic (Trở kéo 4.7kΩ)",
-      physicalLocation: "Khoang cảm biến môi trường buồng máy",
-      description: "Giao tiếp cảm biến đo nhiệt độ/độ ẩm SHT30 và module thời gian thực RTC DS3231",
+      ioType: "UART0 Console (115200 8N1 qua CH343)",
+      voltage: "3.3V TTL",
+      physicalLocation: "Dãy Phải Pin 2 (TX0) & Pin 3 (RX0)",
+      description: "Cổng serial console hiển thị log FreeRTOS / ESP-IDF thời gian thực",
       isActive: true,
-      activeLabel: "CONNECTED (0x44)",
+      activeLabel: "READY (115200 bps)",
       inactiveLabel: "DISCONNECTED",
       colorScheme: "indigo",
     },
-  ], [telemetry, isMqttAlertActive]);
+  ], [telemetry]);
 
   const filteredGpios = useMemo(() => {
     if (selectedCategory === "all") return gpioList;
@@ -396,16 +366,16 @@ export default function SettingsDevicesPage() {
               <span className="font-bold text-slate-900 dark:text-white">ESP32-C5-WROOM-1</span>
             </div>
             <div className="flex justify-between text-slate-600 dark:text-slate-400">
-              <span>ROM / SRAM:</span>
-              <span className="text-slate-700 dark:text-slate-300">384KB / 400KB</span>
+              <span>Flash / PSRAM:</span>
+              <span className="text-slate-700 dark:text-slate-300">8MB Flash / 8MB PSRAM</span>
             </div>
             <div className="flex justify-between text-slate-600 dark:text-slate-400">
-              <span>Flash:</span>
-              <span className="text-slate-700 dark:text-slate-300">8MB Quad-SPI</span>
+              <span>Bo phát triển:</span>
+              <span className="text-slate-700 dark:text-slate-300">WeAct Studio C5-A-N8R8</span>
             </div>
             <div className="flex justify-between text-slate-600 dark:text-slate-400">
               <span>Firmware:</span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">v2.4.1-industrial</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold">SortiX ESP-IDF v5.x</span>
             </div>
           </div>
         </div>
@@ -418,25 +388,25 @@ export default function SettingsDevicesPage() {
               Cơ khí & Kích thước
             </span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-bold">
-              10 x 60 cm
+              Băng tải 66 RPM
             </span>
           </div>
           <div className="space-y-1 text-xs font-mono">
             <div className="flex justify-between text-slate-600 dark:text-slate-400">
-              <span>Kích thước:</span>
-              <span className="font-bold text-slate-900 dark:text-white">100mm × 600mm</span>
+              <span>Chiều dài:</span>
+              <span className="font-bold text-slate-900 dark:text-white">540mm hành trình</span>
             </div>
             <div className="flex justify-between text-slate-600 dark:text-slate-400">
               <span>Động cơ chính:</span>
-              <span className="text-slate-700 dark:text-slate-300">DC 24V Geared</span>
+              <span className="text-slate-700 dark:text-slate-300">JGB37-520 12V (Encoder)</span>
             </div>
             <div className="flex justify-between text-slate-600 dark:text-slate-400">
-              <span>Mạch công suất:</span>
-              <span className="text-slate-700 dark:text-slate-300">BTS7960 H-Bridge 43A</span>
+              <span>Driver cầu H:</span>
+              <span className="text-slate-700 dark:text-slate-300">L298N (IN1: IO8, IN2: IO9)</span>
             </div>
             <div className="flex justify-between text-slate-600 dark:text-slate-400">
               <span>Tay gạt phân loại:</span>
-              <span className="text-cyan-600 dark:text-cyan-400 font-bold">2 × Servo MG996R</span>
+              <span className="text-cyan-600 dark:text-cyan-400 font-bold">2 × MG996R (IO6, IO24)</span>
             </div>
           </div>
         </div>
@@ -446,28 +416,28 @@ export default function SettingsDevicesPage() {
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Power className="h-4 w-4 text-amber-500" />
-              Nguồn cấp & Tủ điện
+              Nguồn cấp & An toàn
             </span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">
-              24VDC / 5A
+              12VDC Tổ Ong
             </span>
           </div>
           <div className="space-y-1 text-xs font-mono">
             <div className="flex justify-between text-slate-600 dark:text-slate-400">
               <span>Nguồn cấp chính:</span>
-              <span className="font-bold text-slate-900 dark:text-white">MeanWell 24VDC</span>
+              <span className="font-bold text-slate-900 dark:text-white">Bộ nguồn tổ ong 12V</span>
             </div>
             <div className="flex justify-between text-slate-600 dark:text-slate-400">
-              <span>Hạ áp Logic:</span>
-              <span className="text-slate-700 dark:text-slate-300">Buck DC-DC 5V / 3A</span>
+              <span>Khối hạ áp Servo:</span>
+              <span className="text-slate-700 dark:text-slate-300">Buck XL4015 5V / 5A</span>
             </div>
             <div className="flex justify-between text-slate-600 dark:text-slate-400">
-              <span>Cấp bảo vệ:</span>
-              <span className="text-slate-700 dark:text-slate-300">IP54 Công nghiệp</span>
+              <span>Bảo vệ ngược cực:</span>
+              <span className="text-slate-700 dark:text-slate-300">Diode Schottky MBR1045</span>
             </div>
             <div className="flex justify-between text-slate-600 dark:text-slate-400">
-              <span>Mạch ngắt E-Stop:</span>
-              <span className="text-rose-600 dark:text-rose-400 font-bold">Hardware Cutoff &lt;5ms</span>
+              <span>Khóa E-Stop:</span>
+              <span className="text-rose-600 dark:text-rose-400 font-bold">Tiếp điểm NC cắt bus 12V</span>
             </div>
           </div>
         </div>

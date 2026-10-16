@@ -72,10 +72,10 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 truncate">
               <h4 className="text-xs font-bold tracking-tight text-slate-900 dark:text-white truncate">
-                Kiểm thử 3 Tải Chấp Hành
+                Kiểm thử Tải Chấp Hành
               </h4>
               <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono hidden sm:inline">
-                (2 Servo • 1 Còi)
+                (2 Servo • 1 Đèn LED)
               </span>
             </div>
           </div>
@@ -143,7 +143,7 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
                   </span>
                 </div>
                 <span className="text-[9px] font-mono font-bold px-1 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25 shrink-0">
-                  GPIO 18
+                  GPIO 6
                 </span>
               </div>
 
@@ -190,7 +190,7 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
                 onClick={() => handleToggleServo1(true)}
                 className={`py-1 px-1.5 text-[10px] font-bold rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 ${
                   arm1Active
-                    ? "bg-amber-500 text-slate-950 font-black shadow-xs shadow-amber-500/40"
+                    ? "bg-amber-500 text-white font-black shadow-xs shadow-amber-500/40"
                     : "text-slate-500 hover:text-amber-600 dark:hover:text-amber-400"
                 }`}
               >
@@ -220,7 +220,7 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
                   </span>
                 </div>
                 <span className="text-[9px] font-mono font-bold px-1 py-0.2 rounded bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/25 shrink-0">
-                  GPIO 19
+                  GPIO 24
                 </span>
               </div>
 
@@ -277,11 +277,11 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
             </div>
           </div>
 
-          {/* TẢI 3: CÒI CẢNH BÁO BUZZER */}
+          {/* TẢI 3: ĐÈN LED BÁO TRẠNG THÁI */}
           <div
             className={`rounded-xl border p-2 flex flex-col justify-between gap-1.5 transition-all ${
               activeBuzzer
-                ? "border-rose-500/60 bg-rose-500/15 dark:bg-rose-950/30 shadow-xs shadow-rose-500/10"
+                ? "border-emerald-500/60 bg-emerald-500/15 dark:bg-emerald-950/30 shadow-xs shadow-emerald-500/10"
                 : "border-slate-200/90 dark:border-white/[0.06] bg-white/95 dark:bg-[#161a26]"
             }`}
           >
@@ -289,15 +289,15 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
             <div>
               <div className="flex items-center justify-between gap-1 mb-1">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="flex h-4.5 w-4.5 items-center justify-center rounded bg-rose-500/20 text-rose-700 dark:text-rose-400 font-mono text-[9px] font-black shrink-0 border border-rose-500/30">
-                    📢
+                  <span className="flex h-4.5 w-4.5 items-center justify-center rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-mono text-[9px] font-black shrink-0 border border-emerald-500/30">
+                    LED
                   </span>
                   <span className="text-[11px] font-bold text-slate-900 dark:text-white truncate">
-                    Còi cảnh báo
+                    Đèn LED Trạng Thái
                   </span>
                 </div>
-                <span className="text-[9px] font-mono font-bold px-1 py-0.2 rounded bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/25 shrink-0">
-                  GPIO 21
+                <span className="text-[9px] font-mono font-bold px-1 py-0.2 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 shrink-0">
+                  GPIO 10
                 </span>
               </div>
 
@@ -308,18 +308,18 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
                   <span
                     className={`h-2 w-2 rounded-full shrink-0 ${
                       activeBuzzer
-                        ? "bg-rose-500 shadow-[0_0_6px_#f43f5e] animate-ping"
+                        ? "bg-emerald-500 shadow-[0_0_6px_#10b981] animate-pulse"
                         : "bg-slate-300 dark:bg-slate-600"
                     }`}
                   />
                   <span
                     className={
                       activeBuzzer
-                        ? "text-rose-600 dark:text-rose-400 font-bold"
+                        ? "text-emerald-600 dark:text-emerald-400 font-bold"
                         : "text-slate-500 dark:text-slate-400"
                     }
                   >
-                    {activeBuzzer ? "BẬT (Đang hú liên tục)" : "TẮT (Im lặng)"}
+                    {activeBuzzer ? "BẬT (Sáng)" : "TẮT (Tối)"}
                   </span>
                 </span>
               </div>
@@ -344,12 +344,12 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
                 onClick={() => handleToggleBuzzer(true)}
                 className={`py-1 px-1.5 text-[10px] font-bold rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 ${
                   activeBuzzer
-                    ? "bg-rose-600 text-white font-black shadow-xs shadow-rose-500/40"
-                    : "text-slate-500 hover:text-rose-600 dark:hover:text-rose-400"
+                    ? "bg-emerald-600 text-white font-black shadow-xs shadow-emerald-500/40"
+                    : "text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400"
                 }`}
               >
-                <Volume2 className="h-2.5 w-2.5" />
-                <span>BẬT (Hú)</span>
+                <Power className="h-2.5 w-2.5" />
+                <span>BẬT (Sáng)</span>
               </button>
             </div>
           </div>

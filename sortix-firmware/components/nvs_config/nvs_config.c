@@ -1,4 +1,5 @@
 #include "nvs_config.h"
+#include "app_config.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_log.h"
@@ -9,14 +10,14 @@ static const char *TAG = "NVS_CONFIG";
 #define NVS_BLOB_KEY    "sys_cfg"
 
 static sortix_sys_config_t s_config = {
-    .wifi_ssid = "SortiX-Lab",
-    .wifi_pass = "sortix1234",
-    .mqtt_broker_uri = "mqtt://192.168.1.100:1883",
-    .http_telemetry_url = "http://192.168.1.100:5000/api/telemetry",
-    .device_id = "sorter_01",
+    .wifi_ssid = DEFAULT_WIFI_SSID,
+    .wifi_pass = DEFAULT_WIFI_PASS,
+    .mqtt_broker_uri = DEFAULT_MQTT_BROKER_URI,
+    .http_telemetry_url = DEFAULT_HTTP_TELEMETRY_URL,
+    .device_id = SORTIX_DEVICE_ID,
     .active_config_version = 1,
-    .fallback_policy = 0,               // PAUSE_AND_HOLD (Safe default)
-    .counts_per_mm = 31.5f,
+    .fallback_policy = SORTIX_FALLBACK_POLICY,
+    .counts_per_mm = CALIB_ENCODER_COUNTS_PER_MM,
     .dist_s1_servo1_mm = 200.0f,
     .dist_s1_servo2_mm = 400.0f,
     .dist_s1_end_mm = 540.0f
@@ -51,6 +52,10 @@ esp_err_t nvs_config_init(void)
         nvs_close(handle);
     } else {
         ESP_LOGI(TAG, "No NVS namespace '%s', using default config", NVS_NAMESPACE);
+    }
+
+    if (strcmp(s_config.wifi_pass, DEFAULT_WIFI_PASS) == 0) {
+        ESP_LOGW(TAG, "SECURITY NOTICE: System is running with default Wi-Fi password ('%s'). Update via NVS before field deployment.", DEFAULT_WIFI_PASS);
     }
 
     return ESP_OK;

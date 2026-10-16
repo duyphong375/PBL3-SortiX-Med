@@ -221,7 +221,7 @@ export function LiveHealthAndBinWidget({
                     </TooltipTrigger>
                     <TooltipContent side="top">
                       <p className="font-mono text-xs">
-                        Gạt Servo 1 (IO23) • Góc: 45° • Cảm biến quang S2
+                        Gạt Servo 1 (GPIO6 • MG996R) • Góc: 45° • Trạm 200mm
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -326,7 +326,7 @@ export function LiveHealthAndBinWidget({
                     </TooltipTrigger>
                     <TooltipContent side="top">
                       <p className="font-mono text-xs">
-                        Gạt Servo 2 (IO24) • Cảm biến phản xạ S3
+                        Gạt Servo 2 (GPIO24 • MG996R) • Góc: 45° • Trạm 400mm
                       </p>
                     </TooltipContent>
                   </Tooltip>

@@ -281,7 +281,7 @@ export const UserService = {
     return { success: true, data: { id: targetId }, message: result.message };
   },
 
-  forgotPassword(rawInput: unknown): ServiceResult<{ demo_otp: string; expires_at: string; username: string; email: string }> {
+  forgotPassword(rawInput: unknown): ServiceResult<{ demo_otp?: string; expires_at: string; username: string; email: string }> {
     const parseResult = ForgotPasswordSchema.safeParse(rawInput);
     if (!parseResult.success) {
       const errorMsg = parseResult.error.issues.map((i) => i.message).join(", ");
@@ -311,10 +311,24 @@ export const UserService = {
 
     UserModel.setResetOtp(user.username, otp, expiresAt);
 
+    const maskedEmail = user.email.replace(/^(.)(.*)(.@.*)$/, (_, first, middle, last) => `${first}${"*".repeat(Math.max(1, middle.length))}${last}`);
+    const allowDemoOtp = process.env.NODE_ENV !== "production" && process.env.ENABLE_DEMO_OTP === "true";
+
+    const responseData: { demo_otp?: string; expires_at: string; username: string; email: string } = {
+      expires_at: expiresAt,
+      username: user.username,
+      email: maskedEmail,
+    };
+    if (allowDemoOtp) {
+      responseData.demo_otp = otp;
+    }
+
     return {
       success: true,
-      data: { demo_otp: otp, expires_at: expiresAt, username: user.username, email: user.email },
-      message: "Đã tạo mã OTP thành công! Mã có hiệu lực trong vòng 5 phút.",
+      data: responseData,
+      message: allowDemoOtp
+        ? "Đã tạo mã OTP demo thành công! Mã có hiệu lực trong vòng 5 phút."
+        : "Mã OTP xác thực đã được gửi đến email đăng ký của bạn. Vui lòng kiểm tra hộp thư.",
     };
   },
 

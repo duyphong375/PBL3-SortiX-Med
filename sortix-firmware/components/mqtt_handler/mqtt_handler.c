@@ -70,10 +70,21 @@ static void handle_incoming_control(const char *data, int data_len)
         return;
     }
 
+    cJSON *token = cJSON_GetObjectItem(root, "auth_token");
+    if (token == NULL) {
+        token = cJSON_GetObjectItem(root, "token");
+    }
+    const char *token_str = cJSON_IsString(token) ? token->valuestring : "";
+    if (strcmp(token_str, SORTIX_CONTROL_SECRET) != 0) {
+        ESP_LOGW(TAG, "SECURITY ALERT: Rejected unauthenticated control command (invalid or missing auth_token)!");
+        cJSON_Delete(root);
+        return;
+    }
+
     cJSON *cmd = cJSON_GetObjectItem(root, "command");
     if (cJSON_IsString(cmd)) {
         const char *cmd_str = cmd->valuestring;
-        ESP_LOGI(TAG, "Dashboard control command received: '%s'", cmd_str);
+        ESP_LOGI(TAG, "Authenticated control command received: '%s'", cmd_str);
 
         if (strcmp(cmd_str, "START") == 0) {
             state_machine_process_event(SYSTEM_EVENT_START);
@@ -90,12 +101,52 @@ static void handle_incoming_control(const char *data, int data_len)
 
 static void handle_incoming_estop_release(const char *data, int data_len)
 {
-    ESP_LOGI(TAG, "Received safety ESTOP_RELEASE topic event");
+    bool authorized = false;
+    if (data != NULL && data_len > 0) {
+        cJSON *root = cJSON_ParseWithLength(data, data_len);
+        if (root != NULL) {
+            cJSON *token = cJSON_GetObjectItem(root, "auth_token");
+            if (token == NULL) {
+                token = cJSON_GetObjectItem(root, "token");
+            }
+            if (cJSON_IsString(token) && strcmp(token->valuestring, SORTIX_CONTROL_SECRET) == 0) {
+                authorized = true;
+            }
+            cJSON_Delete(root);
+        }
+    }
+
+    if (!authorized) {
+        ESP_LOGW(TAG, "SECURITY ALERT: Rejected unauthenticated ESTOP_RELEASE (invalid or missing auth_token)!");
+        return;
+    }
+
+    ESP_LOGI(TAG, "Authenticated safety ESTOP_RELEASE topic event accepted");
     state_machine_process_event(SYSTEM_EVENT_ESTOP_RELEASE);
 }
 
 static void handle_incoming_config_set(const char *data, int data_len)
 {
+    cJSON *root = cJSON_ParseWithLength(data, data_len);
+    if (root == NULL) {
+        ESP_LOGE(TAG, "Failed to parse config JSON payload");
+        return;
+    }
+
+    cJSON *token = cJSON_GetObjectItem(root, "auth_token");
+    if (token == NULL) {
+        token = cJSON_GetObjectItem(root, "token");
+    }
+    const char *token_str = cJSON_IsString(token) ? token->valuestring : "";
+    if (strcmp(token_str, SORTIX_CONTROL_SECRET) != 0) {
+        ESP_LOGW(TAG, "SECURITY ALERT: Rejected unauthenticated config/set (invalid or missing auth_token)!");
+        uint32_t current_ver = sorting_engine_get_active_config_version();
+        mqtt_handler_publish_config_status(false, current_ver, "UNAUTHORIZED: Invalid or missing auth_token");
+        cJSON_Delete(root);
+        return;
+    }
+    cJSON_Delete(root);
+
     char *payload_str = malloc(data_len + 1);
     if (payload_str == NULL) return;
     memcpy(payload_str, data, data_len);

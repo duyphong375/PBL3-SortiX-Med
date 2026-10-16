@@ -93,9 +93,6 @@ function AnalyticsPageContent() {
   // 3. DỮ LIỆU BIỂU ĐỒ CỘT PHÂN BỐ THEO KHUNG GIỜ (HOURLY PRODUCTION BAR CHART)
   const hourlyData = useMemo(() => {
     const todayKey = getBusinessDateKey();
-    const shift = sorterConfig.shift || { start: "08:00", end: "17:00" };
-    const startHour = Number(shift.start.split(":")[0]) || 8;
-    const endHour = Number(shift.end.split(":")[0]) || 17;
 
     const getHourInBusinessTz = (d: Date): number => {
       try {
@@ -139,10 +136,9 @@ function AnalyticsPageContent() {
       hourMap[nowHourStr] = (hourMap[nowHourStr] || 0) + diff;
     }
 
-
     const activeHours = Object.keys(hourMap).map(h => parseInt(h));
-    const minHour = activeHours.length > 0 ? Math.min(...activeHours, startHour) : startHour;
-    const maxHour = activeHours.length > 0 ? Math.max(...activeHours) : endHour;
+    const minHour = activeHours.length > 0 ? Math.min(...activeHours, 8) : 8;
+    const maxHour = activeHours.length > 0 ? Math.max(...activeHours, nowHourNum) : Math.max(17, nowHourNum);
     
     const allHours = [];
     for (let i = minHour; i <= maxHour; i++) {
@@ -159,7 +155,7 @@ function AnalyticsPageContent() {
         isCurrentHour,
       };
     });
-  }, [records, sorterConfig.shift, totalSorted]);
+  }, [records, totalSorted]);
 
   // Tìm khung giờ đạt đỉnh sản lượng thực tế
   const peakHour = useMemo(() => {
@@ -183,7 +179,7 @@ function AnalyticsPageContent() {
         return {
           binId: 1,
           name: `Khay 1: ${brandNames}`,
-          route: `Servo ${sorterConfig.servo_routes?.["1"]?.io || "IO23"} • Góc ${sorterConfig.servo_routes?.["1"]?.angle ?? 45}°`,
+          route: `Servo ${sorterConfig.servo_routes?.["1"]?.io || "GPIO6"} • Góc ${sorterConfig.servo_routes?.["1"]?.angle ?? 45}°`,
           badgeStyle: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400",
           dot: "bg-rose-500 shadow-[0_0_8px_#f43f5e]",
         };
@@ -191,7 +187,7 @@ function AnalyticsPageContent() {
         return {
           binId: 2,
           name: `Khay 2: ${brandNames}`,
-          route: `Servo ${sorterConfig.servo_routes?.["2"]?.io || "IO24"} • Góc ${sorterConfig.servo_routes?.["2"]?.angle ?? 45}°`,
+          route: `Servo ${sorterConfig.servo_routes?.["2"]?.io || "GPIO24"} • Góc ${sorterConfig.servo_routes?.["2"]?.angle ?? 45}°`,
           badgeStyle: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
           dot: "bg-blue-500 shadow-[0_0_8px_#3b82f6]",
         };

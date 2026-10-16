@@ -80,89 +80,99 @@ export default function DashboardPage() {
   const cap3 = binCapacities.bin3 || 50;
   const isBinFull = binCounts.bin1 >= cap1 || binCounts.bin2 >= cap2 || binCounts.bin3 >= cap3;
   // Trạng thái phần cứng, cơ cấu chấp hành và cảm biến (ON / OFF)
-  const isBuzzerActive = isSystemLocked || telemetry.estop_pressed;
   const isConveyorActive = isRunning || telemetry.conveyor_running;
   const isArm1On = arm1Active || telemetry.arm1_active;
   const isArm2On = arm2Active || telemetry.arm2_active;
   const isS1Detected = telemetry.s1_entry || visualItems.some((item) => item.s1Triggered || (item.progress >= 5 && item.progress <= 20));
-  const isS2Detected = telemetry.s2_sorter1 || visualItems.some((item) => item.s2Triggered || (item.progress >= 35 && item.progress <= 48));
-  const isS3Detected = telemetry.s3_sorter2 || visualItems.some((item) => item.s3Triggered || (item.progress >= 65 && item.progress <= 78));
   const isEstopActive = isSystemLocked || telemetry.estop_pressed;
+  const isEncoderActive = isConveyorActive && (telemetry.encoder_count ?? 0) > 0;
+  const isLdrActive = Boolean(telemetry.ldr_active);
+  const isStartBtnActive = Boolean(telemetry.start_btn_pressed);
+  const isLedStatusActive = isConveyorActive || isEstopActive;
 
   const hardwareDeviceList: HardwareDeviceStatus[] = useMemo(() => [
     {
       id: "servo_1",
-      name: "Servo gạt 1",
-      pin: "IO18",
+      name: "Servo Gạt 1 (MG996R)",
+      pin: "GPIO6",
       category: "actuator",
       type: "servo",
       isOn: isArm1On,
-      description: "Gạt phân loại phôi vào khay 1",
-    },
-    {
-      id: "s1_entry",
-      name: "CB Quang S1",
-      pin: "IO0",
-      category: "sensor",
-      type: "sensor",
-      isOn: isS1Detected,
-      description: "Phát hiện phôi đầu băng tải",
+      description: "Gạt phân loại phôi vào Khay 1 (Vị trí 200mm)",
     },
     {
       id: "servo_2",
-      name: "Servo gạt 2",
-      pin: "IO19",
+      name: "Servo Gạt 2 (MG996R)",
+      pin: "GPIO24",
       category: "actuator",
       type: "servo",
       isOn: isArm2On,
-      description: "Gạt phân loại phôi vào khay 2",
+      description: "Gạt phân loại phôi vào Khay 2 (Vị trí 400mm)",
     },
     {
-      id: "s2_sorter1",
-      name: "CB Quang S2",
-      pin: "IO1",
-      category: "sensor",
-      type: "sensor",
-      isOn: isS2Detected,
-      description: "Vị trí phân loại máng 1",
-    },
-    {
-      id: "buzzer",
-      name: "Còi Buzzer",
-      pin: "IO21",
-      category: "alarm",
-      type: "buzzer",
-      isOn: isBuzzerActive,
-      description: "Còi báo động sự cố & khay đầy",
-    },
-    {
-      id: "s3_sorter2",
-      name: "CB Quang S3",
-      pin: "IO6",
-      category: "sensor",
-      type: "sensor",
-      isOn: isS3Detected,
-      description: "Vị trí phân loại máng 2",
-    },
-    {
-      id: "conveyor",
-      name: "Băng tải",
-      pin: "IO25",
+      id: "conveyor_motor",
+      name: "Động cơ Băng Tải L298N",
+      pin: "GPIO8/9",
       category: "actuator",
       type: "motor",
       isOn: isConveyorActive,
-      description: "Động cơ kéo băng tải SortiX",
+      description: "Động cơ DC JGB37-520 12V 66RPM kéo băng tải",
+    },
+    {
+      id: "s1_entry",
+      name: "Cảm biến vật cản IR LM393",
+      pin: "GPIO0",
+      category: "sensor",
+      type: "sensor",
+      isOn: isS1Detected,
+      description: "Phát hiện phôi đầu băng tải trước cổng quét AI",
+    },
+    {
+      id: "encoder",
+      name: "Encoder Động cơ (2 Pha A/B)",
+      pin: "GPIO1/4",
+      category: "sensor",
+      type: "sensor",
+      isOn: isEncoderActive,
+      description: "Đếm xung định vị phôi chính xác theo mm di chuyển",
+    },
+    {
+      id: "ldr_sensor",
+      name: "Cảm biến ánh sáng LDR",
+      pin: "GPIO5",
+      category: "sensor",
+      type: "sensor",
+      isOn: isLdrActive,
+      description: "Giám sát ngưỡng sáng buồng chụp ảnh nhận diện phôi",
+    },
+    {
+      id: "btn_start",
+      name: "Nút nhấn Khởi Động (Start)",
+      pin: "GPIO23",
+      category: "sensor",
+      type: "sensor",
+      isOn: isStartBtnActive,
+      description: "Nút nhấn cứng tái khởi động hệ thống sau dừng máy",
+    },
+    {
+      id: "led_status",
+      name: "Đèn LED Trạng Thái",
+      pin: "GPIO10",
+      category: "alarm",
+      type: "buzzer",
+      isOn: isLedStatusActive,
+      description: "Đèn LED xanh lá báo trạng thái vận hành & cảnh báo sự cố",
     },
     {
       id: "estop",
-      name: "Nút E-Stop",
-      pin: "IO10",
+      name: "Nút Dừng Khẩn Cấp (E-Stop)",
+      pin: "Cắt 12V",
       category: "sensor",
       type: "estop",
       isOn: isEstopActive,
-      description: "Nút dừng khẩn cấp an toàn",
+      description: "Tiếp điểm NC ngắt nguồn lực 12V an toàn phần cứng",
     },
-  ], [isArm1On, isS1Detected, isArm2On, isS2Detected, isBuzzerActive, isS3Detected, isConveyorActive, isEstopActive]);
+  ], [isArm1On, isArm2On, isConveyorActive, isS1Detected, isEncoderActive, isLdrActive, isStartBtnActive, isLedStatusActive, isEstopActive]);
 
   return (
     <div className="space-y-5 page-transition-enter pb-6">

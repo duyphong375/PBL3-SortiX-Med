@@ -149,26 +149,6 @@ export default function SettingsConfigPage() {
         }
         isDeviceOffline={isDeviceOffline}
         onReconnectDevice={handleReconnectDevice}
-        onSimulateShiftSummary={
-          isSimulation
-            ? () => {
-                void handleTriggerShiftSummary(
-                  {
-                    event: "shift_summary",
-                    shift_name: "Ca 1 - Buổi sáng",
-                    total_products: 1250,
-                    sorted_good: 1180,
-                    sorted_defect: 70,
-                    accuracy_rate: "94.4%",
-                    emergency_stops_count: 1,
-                    operating_hours: "7.5 giờ",
-                    timestamp: new Date().toISOString(),
-                  },
-                  "user_action"
-                );
-              }
-            : undefined
-        }
         isSimulation={isSimulation}
         binCounts={binCounts}
         onSetBinCount={isSimulation ? handleSetBinCount : undefined}

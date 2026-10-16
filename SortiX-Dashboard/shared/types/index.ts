@@ -105,8 +105,6 @@ export interface SorterConfig {
   default_bin: 3;
   apply_mode: "when_line_empty" | "immediate";
   timestamp: string;
-  timezone?: string;
-  shift?: { start: string; end: string };
   servo_routes?: Record<string, { io: string; angle: number }>;
 }
 
@@ -119,15 +117,18 @@ export interface TelemetryData {
   wifi_band: "2.4 GHz" | "5.0 GHz (Wi-Fi 6)";
   conveyor_running: boolean;
   conveyor_speed: number; // 0 - 100 (%)
-  s1_entry: boolean; // IO0 - Cảm biến quang trước camera
-  s2_sorter1: boolean; // IO1 - Cảm biến quang khay 1
-  s3_sorter2: boolean; // IO6 - Cảm biến quang khay 2
-  arm1_active: boolean; // IO23 - Servo 1 MCPWM
-  arm2_active: boolean; // IO24 - Servo 2 MCPWM
-  estop_pressed: boolean; // IO10 - Nút dừng khẩn cấp
-  encoder_count: number; // IO2/IO3 - Xung PCNT
+  s1_entry: boolean; // GPIO0 - Cảm biến vật cản hồng ngoại LM393 (Active Low)
+  ldr_active?: boolean; // GPIO5 - Cảm biến quang trở ánh sáng buồng quét LM393
+  arm1_active: boolean; // GPIO6 - Servo 1 (MG996R Khay 1)
+  arm2_active: boolean; // GPIO24 - Servo 2 (MG996R Khay 2)
+  start_btn_pressed?: boolean; // GPIO23 - Nút nhấn Khởi Động Start (PBS-110)
+  estop_pressed: boolean; // Tiếp điểm NC ngắt nguồn lực 12V
+  encoder_count: number; // GPIO1 (Phase A) & GPIO4 (Phase B) - Xung Encoder JGB37-520
   active_config_version: number;
   last_heartbeat: string;
+  // Cờ tương thích ngược (deprecated - không dùng cho logic vật lý)
+  s2_sorter1?: boolean;
+  s3_sorter2?: boolean;
 }
 
 export interface VisionDetection {

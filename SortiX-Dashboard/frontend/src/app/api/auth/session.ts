@@ -2,10 +2,12 @@ import crypto from "node:crypto";
 import { UserRole } from "@shared/types";
 import { NextUsersStore, StoredUserAccount } from "@/app/api/users/store";
 
-const sessionSecret =
+const sessionSecret: string =
   process.env.AUTH_SESSION_SECRET?.trim() ||
   process.env.INTERNAL_API_SECRET?.trim() ||
-  "sortix-pbl3-auth-secret-key-2026-production-stable";
+  ((globalThis as unknown as { __sortix_auth_secret?: string }).__sortix_auth_secret ||
+    ((globalThis as unknown as { __sortix_auth_secret?: string }).__sortix_auth_secret =
+      crypto.randomBytes(32).toString("hex")));
 const SESSION_TTL_SECONDS = 24 * 60 * 60;
 
 interface SessionClaims {
@@ -48,7 +50,8 @@ function verifyToken(token: string): SessionClaims | null {
 }
 
 export function getAuthenticatedUser(request: Request): StoredUserAccount | null {
-  // 1. Xác thực qua Authorization Bearer token nếu có
+  // Chỉ xác thực qua Authorization Bearer token đã ký HMAC-SHA256 hợp lệ.
+  // Tuyệt đối không tin cậy các header tùy tiện từ client (như x-user-role) để chống giả mạo và leo thang đặc quyền.
   const header = request.headers.get("authorization");
   if (header?.startsWith("Bearer ")) {
     const claims = verifyToken(header.slice(7).trim());
@@ -56,32 +59,7 @@ export function getAuthenticatedUser(request: Request): StoredUserAccount | null
       const user =
         NextUsersStore.findById(claims.id) ||
         NextUsersStore.findByUsername(claims.username);
-      if (user && user.status === "active") return user;
-    }
-  }
-
-  // 2. Cơ chế xác thực dự phòng qua client session headers nội bộ
-  const roleHeader = request.headers.get("x-user-role");
-  const userIdHeader = request.headers.get("x-user-id");
-  const usernameHeader = request.headers.get("x-user-username");
-
-  if (roleHeader === "admin" || roleHeader === "user") {
-    let matchedUser: StoredUserAccount | undefined;
-    if (userIdHeader) {
-      matchedUser = NextUsersStore.findById(userIdHeader);
-    }
-    if (!matchedUser && usernameHeader) {
-      matchedUser = NextUsersStore.findByUsername(usernameHeader);
-    }
-    if (!matchedUser && roleHeader === "admin") {
-      // Mặc định lấy tài khoản Quản trị viên đầu tiên đang active (thường là admin-001)
-      matchedUser = NextUsersStore.getAllRaw().find(
-        (u) => u.role === "admin" && u.status === "active"
-      );
-    }
-
-    if (matchedUser && matchedUser.status === "active" && matchedUser.role === roleHeader) {
-      return matchedUser;
+      if (user && user.status === "active" && user.role === claims.role) return user;
     }
   }
 

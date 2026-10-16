@@ -16,14 +16,16 @@ export const TelemetrySchema = z.object({
   conveyor_running: z.boolean().default(false),
   conveyor_speed: finiteNumber.min(0).max(100).default(60),
   s1_entry: z.boolean().default(false),
-  s2_sorter1: z.boolean().default(false),
-  s3_sorter2: z.boolean().default(false),
+  ldr_active: z.boolean().optional().default(false),
   arm1_active: z.boolean().default(false),
   arm2_active: z.boolean().default(false),
+  start_btn_pressed: z.boolean().optional().default(false),
   estop_pressed: z.boolean().default(false),
   encoder_count: finiteNumber.nonnegative().default(0),
   active_config_version: finiteNumber.int().nonnegative().default(1),
   last_heartbeat: nonEmptyString.max(128).default(() => new Date().toISOString()),
+  s2_sorter1: z.boolean().optional().default(false),
+  s3_sorter2: z.boolean().optional().default(false),
 }).passthrough();
 
 export const VisionDetectionSchema = z.object({
@@ -48,8 +50,6 @@ export const SorterConfigSchema = z.object({
   default_bin: z.literal(3).default(3),
   apply_mode: z.enum(["when_line_empty", "immediate"]).default("when_line_empty"),
   timestamp: nonEmptyString.max(128).default(() => new Date().toISOString()),
-  timezone: z.string().optional(),
-  shift: z.object({ start: z.string(), end: z.string() }).optional(),
   servo_routes: z.record(z.string(), z.object({ io: z.string(), angle: finiteNumber })).optional(),
 }).passthrough();
 

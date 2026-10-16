@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { SyncService } from "@/services/syncService";
 import { SyncActionSchema } from "@shared/schemas";
 import { HistoryModel } from "@/services/historyService";
+import { getAuthenticatedUser } from "@/app/api/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,14 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const user = getAuthenticatedUser(request);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "401 Unauthorized: Vui lòng đăng nhập để thực hiện đồng bộ" },
+        { status: 401 }
+      );
+    }
+
     const action = SyncActionSchema.parse(await request.json());
     const { type } = action;
 
@@ -34,6 +43,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: true, state: SyncService.getState() });
     }
     if (type === "clear_history") {
+        if (user.role !== "admin") {
+          return NextResponse.json(
+            { success: false, error: "Truy cập bị từ chối: Thao tác xóa lịch sử yêu cầu quyền Quản trị viên (Admin)" },
+            { status: 403 }
+          );
+        }
         SyncService.clearHistory(action.senderId);
         return NextResponse.json({ success: true, state: SyncService.getState() });
     }

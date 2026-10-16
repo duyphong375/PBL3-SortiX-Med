@@ -39,7 +39,17 @@
 #define SORTIX_TOPIC_JAM                    "conveyor/sensor/jam"
 #define SORTIX_TOPIC_TEMP_WARN              "conveyor/telemetry/temp"
 
-// Default Network Configuration
+// Shared Secret for Control Command Authentication (START, STOP, ESTOP_RELEASE, CONFIG_SET)
+// Commands from MQTT without a matching auth_token will be strictly rejected.
+#define SORTIX_CONTROL_SECRET               "sortix_sec_control_2026"
+
+// =============================================================================
+// Security Notice Regarding Hardcoded Default Credentials:
+// WARNING: The following Wi-Fi SSID, Wi-Fi password, SoftAP password and MQTT Broker
+// URI are development defaults for initial laboratory setup. In production, these
+// MUST be provisioned dynamically via NVS, captive portal, or encrypted provisioning.
+// Never expose a device using default passwords to a public network or public MQTT broker!
+// =============================================================================
 #define DEFAULT_WIFI_SSID                   "SortiX-Lab"
 #define DEFAULT_WIFI_PASS                   "sortix1234"
 #define DEFAULT_MQTT_BROKER_URI             "mqtt://192.168.1.100:1883"

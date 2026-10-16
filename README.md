@@ -130,8 +130,9 @@ d:/PBL3_NHOM5/
 ### Bước 1: Khởi động Dashboard (PC)
 ```bash
 cd d:/PBL3_NHOM5/SortiX-Dashboard
-npm run dev
+npm run dev:all
 ```
+> **Lưu ý:** Lệnh `npm run dev:all` khởi động đồng thời cả Frontend (Next.js port 3000) và Backend Node.js API (port 5000). Nếu chỉ muốn chạy riêng frontend, dùng `npm run dev`.
 Truy cập giao diện: `http://localhost:3000` (Backend API chạy song song tại port 5000).
 
 ### Bước 2: Nạp Firmware & Giám Sát ESP32-C5

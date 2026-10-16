@@ -333,10 +333,12 @@ export function useMQTT({
     if (!command || !mqttRef.current || !mqttRef.current.isConnected()) return false;
     if (value !== undefined && !Number.isFinite(value)) return false;
     const topic = process.env.NEXT_PUBLIC_MQTT_TOPIC_CONTROL || "sorter/sorter_01/control";
+    const auth_token = process.env.NEXT_PUBLIC_MQTT_AUTH_TOKEN || "sortix_sec_control_2026";
     const payload = {
       command,
       value: value !== undefined ? value : null,
       timestamp: new Date().toISOString(),
+      auth_token,
     };
     return mqttRef.current.publish(topic, payload);
   }, []);
@@ -345,7 +347,12 @@ export function useMQTT({
     if (isSimulationRef.current) return false;
     if (!mqttRef.current || !mqttRef.current.isConnected()) return false;
     const topic = process.env.NEXT_PUBLIC_MQTT_TOPIC_CONFIG || "sorter/sorter_01/config";
-    return await mqttRef.current.publish(topic, config);
+    const auth_token = process.env.NEXT_PUBLIC_MQTT_AUTH_TOKEN || "sortix_sec_control_2026";
+    const payload = {
+      ...config,
+      auth_token,
+    };
+    return await mqttRef.current.publish(topic, payload);
   }, []);
 
   const publishEmergencyStop = useCallback(async (payload: EmergencyStopPayload): Promise<boolean> => {

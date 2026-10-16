@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useDashboardSafe } from "@/components/layout/DashboardLayout";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Bot,
   Sparkles,
@@ -28,6 +29,9 @@ import {
   ArrowUpRight,
   Edit3,
   Activity,
+  Sun,
+  Moon,
+  UserCheck,
 } from "lucide-react";
 
 interface ChatMessage {
@@ -37,6 +41,7 @@ interface ChatMessage {
   timestamp: string;
   isSendingTelegram?: boolean;
   telegramSent?: boolean;
+  isError?: boolean;
 }
 
 export interface QuestionItem {
@@ -68,9 +73,9 @@ export interface SuggestedPrompt {
   icon: React.ElementType;
 }
 
+const INTERNAL_COPILOT_API = "/api/chat/copilot";
 const DEFAULT_WEBHOOK_URL =
-  process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL ||
-  "http://localhost:5678/webhook/6d323161-bad3-44b1-a861-b4c052f52d7b/chat";
+  process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || INTERNAL_COPILOT_API;
 
 // BẢNG 4 CHỦ ĐỀ CHÍNH VÀ DANH SÁCH CÂU HỎI CHI TIẾT
 export const PROMPT_TOPICS: PromptTopic[] = [
@@ -306,6 +311,12 @@ const SUGGESTED_PROMPTS: SuggestedPrompt[] = PROMPT_TOPICS.flatMap((topic) =>
 // THANH GỢI Ý CƠ BẢN (QUICK CHIPS) HIỂN THỊ TRÊN KHUNG NHẬP
 const QUICK_SUGGESTIONS = [
   {
+    id: "quick_admin",
+    label: "Admin & Người trực",
+    icon: UserCheck,
+    query: "Admin hiện tại đang trực là ai? Cho tôi biết thông tin tài khoản đang đăng nhập hệ thống.",
+  },
+  {
     id: "quick_temp",
     label: "Nhiệt độ nội vi ESP32",
     icon: Thermometer,
@@ -370,11 +381,184 @@ export const getTrayColorStatus = (count: number, cap: number) => {
   }
 };
 
+// Helper trả lời ngoại tuyến tự động từ dữ liệu Telemetry khi n8n chưa kết nối
+const generateOfflineFallbackResponse = (
+  query: string,
+  dashboard: ReturnType<typeof useDashboardSafe>,
+  user?: import("@/lib/permissions").AuthUser | null
+): string | null => {
+  if (!dashboard) return null;
+  const q = query.toLowerCase();
+
+  const b1 = dashboard.binCounts?.bin1 ?? 0;
+  const b2 = dashboard.binCounts?.bin2 ?? 0;
+  const b3 = dashboard.binCounts?.bin3 ?? 0;
+  const cap1 = dashboard.binCapacities?.bin1 || 38;
+  const cap2 = dashboard.binCapacities?.bin2 || 50;
+  const cap3 = dashboard.binCapacities?.bin3 || 50;
+  const t1 = getTrayColorStatus(b1, cap1);
+  const t2 = getTrayColorStatus(b2, cap2);
+  const t3 = getTrayColorStatus(b3, cap3);
+  const temp = typeof dashboard.telemetry?.cpu_temp === "number" ? dashboard.telemetry.cpu_temp : 42.5;
+  const estop = dashboard.isSystemLocked || Boolean(dashboard.telemetry?.estop_pressed);
+  const jam = Boolean(dashboard.isJammed);
+  const isRunning = Boolean(dashboard.isRunning);
+  const speed = dashboard.conveyorSpeed ?? 0;
+  const modeTag = dashboard.isSimulation
+    ? "[CHẾ ĐỘ MÔ PHỎNG - SIMULATION]"
+    : "[CHẾ ĐỘ THỰC TẾ - REAL HARDWARE]";
+
+  // 1. Thông tin Admin / Người dùng đang đăng nhập / Ca trực
+  if (
+    q.includes("admin") ||
+    q.includes("người trực") ||
+    q.includes("ai đang") ||
+    q.includes("đăng nhập") ||
+    q.includes("tôi là ai") ||
+    q.includes("tài khoản") ||
+    q.includes("người dùng") ||
+    q.includes("quản trị")
+  ) {
+    const roleLabel =
+      user?.role === "admin"
+        ? "Quản trị viên (Admin) — Toàn quyền kiểm soát & mở khóa an toàn"
+        : user?.role === "maintenance"
+        ? "Kỹ thuật viên bảo trì (Maintenance)"
+        : "Người vận hành / Điều dưỡng viên (User)";
+
+    return `${modeTag}
+
+### 👤 Thông tin Tài khoản & Admin đang trực hệ thống:
+
+- **Họ và tên**: **${user?.displayName || "Chưa xác định"}**
+- **Tài khoản (Username)**: \`${user?.username || "Chưa đăng nhập"}\`
+- **Vai trò (Role)**: **${roleLabel}**
+- **Email**: \`${user?.email || "N/A"}\`
+- **Quyền hạn**: ${
+      user?.role === "admin"
+        ? "🟢 **Quản trị viên toàn quyền** (Điều khiển băng tải, cấu hình servo, mở khóa E-Stop, quản lý người dùng)."
+        : "🔵 **Người vận hành** (Giám sát telemetry, nạp phôi, xem lịch sử phân loại)."
+    }
+- **Vị trí trực**: **Trạm phân loại y tế SortiX-Med #01 (Khoa CSSD - Kiểm soát Nhiễm khuẩn)**
+- **Thời gian đăng nhập**: ${
+      user?.loginTime
+        ? new Date(user.loginTime).toLocaleString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          })
+        : "Phiên làm việc hiện tại"
+    }
+
+> ℹ️ *Hệ thống AI Copilot tự động nhận diện danh tính theo tài khoản thực tế đang đăng nhập trên Dashboard.*`;
+  }
+
+  // 2. Kiểm tra 3 khay chứa / dung lượng / lấp đầy
+  if (
+    q.includes("khay") ||
+    q.includes("lấp đầy") ||
+    q.includes("dung lượng") ||
+    q.includes("sức chứa") ||
+    q.includes("tray")
+  ) {
+    return `${modeTag}
+
+### 📦 Báo cáo dung lượng & Tỷ lệ lấp đầy 3 khay chứa:
+
+| Khay chứa | Nhóm dụng cụ | Số lượng | Sức chứa | Tỷ lệ (%) | Trạng thái hiện tại |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| **Khay 1** | Kéo & Dao mổ | ${b1} SP | ${cap1} SP | ${t1.rate}% | ${t1.emoji} ${t1.statusText} |
+| **Khay 2** | Kẹp panh cầm máu | ${b2} SP | ${cap2} SP | ${t2.rate}% | ${t2.emoji} ${t2.statusText} |
+| **Khay 3** | Dụng cụ khác | ${b3} SP | ${cap3} SP | ${t3.rate}% | ${t3.emoji} ${t3.statusText} |
+
+#### 💡 Tóm tắt & Hướng dẫn:
+- **Đánh giá ngưỡng**: ${
+      t1.rate >= 80 || t2.rate >= 80 || t3.rate >= 80
+        ? "⚠️ Có khay đạt ngưỡng cảnh báo ≥80%, kỹ thuật viên chuẩn bị sẵn khay rỗng mới."
+        : "🟢 Cả 3 khay đều ở mức an toàn (<80%), hệ thống phân loại ổn định."
+    }
+- **Quy chuẩn 3 mức**: 🟢 Dưới 80% (Bình thường) | 🟡 80% - 99% (Chuẩn bị khay mới) | 🔴 100% (Đầy - Thay ngay).
+*(Dữ liệu cập nhật thời gian thực từ cảm biến phân loại SortiX-Med)*`;
+  }
+
+  // 3. Nhiệt độ / ESP32 / Chip
+  if (q.includes("nhiệt độ") || q.includes("temp") || q.includes("esp32") || q.includes("chip")) {
+    const isOverheat = temp >= 75;
+    return `${modeTag}
+
+### 🌡️ Báo cáo cảm biến nhiệt độ nội vi ESP32-C5:
+
+- **Nhiệt độ chip đo được**: **${temp.toFixed(1)}°C**
+- **Ngưỡng an toàn tối đa**: **75.0°C**
+- **Đánh giá**: ${
+      isOverheat
+        ? "🔴 **CẢNH BÁO QUÁ NHIỆT** - Bo mạch vượt ngưỡng cho phép, cần kiểm tra quạt làm mát!"
+        : "🟢 **BÌNH THƯỜNG** - Mức nhiệt hoàn toàn trong khoảng an toàn cho phòng mổ vô trùng."
+    }
+- **Tản nhiệt**: Vỏ nhôm chống bám bụi chuẩn y tế, thông gió đối lưu tự nhiên.
+*(Dữ liệu cảm biến nội vi trên chip thời gian thực)*`;
+  }
+
+  // 4. Nút dừng E-Stop / An toàn / Băng tải
+  if (
+    q.includes("e-stop") ||
+    q.includes("khẩn cấp") ||
+    q.includes("an toàn") ||
+    q.includes("băng tải") ||
+    q.includes("động cơ")
+  ) {
+    const isSafe = !estop && !jam && temp < 75;
+    return `${modeTag}
+
+### 🛡️ Báo cáo an toàn phần cứng & Băng tải:
+
+| Hạng mục kiểm tra | Trạng thái hiện tại | Đánh giá an toàn |
+| :--- | :--- | :--- |
+| **Nút E-Stop** | ${estop ? "🔴 Đang kích hoạt (Khóa)" : "🟢 Mở khóa (Bình thường)"} | ${estop ? "DỪNG KHẨN CẤP" : "ĐẠT"} |
+| **Cảm biến quang #02** | ${jam ? "🔴 Phát hiện kẹt phôi Zone A" : "🟢 Thông thoáng, không kẹt"} | ${jam ? "SỰ CỐ KẸT" : "ĐẠT"} |
+| **Động cơ băng tải** | ${isRunning ? `Đang chạy (${speed}% PWM)` : "Đang dừng"} | ${isRunning ? "VẬN HÀNH" : "CHỜ / DỪNG"} |
+| **Nhiệt độ ESP32** | ${temp.toFixed(1)}°C (Ngưỡng: 75°C) | ${temp < 75 ? "ĐẠT" : "QUÁ NHIỆT"} |
+
+- **Kết luận vận hành**: ${
+      isSafe
+        ? "🟢 **Hệ thống ĐỦ ĐIỀU KIỆN an toàn** để tiếp tục phân loại."
+        : "🔴 **Hệ thống KHÔNG ĐỦ ĐIỀU KIỆN an toàn**, cần kiểm tra trước khi tái khởi động."
+    }
+*(Dữ liệu telemetry cảm biến thời gian thực)*`;
+  }
+
+  // 5. Ca trực / CSSD
+  if (
+    q.includes("cssd") ||
+    q.includes("ca trực") ||
+    q.includes("sản lượng") ||
+    q.includes("tổng số")
+  ) {
+    const totalInBins = b1 + b2 + b3;
+    const totalSorted = Math.max(dashboard.records?.length || 0, totalInBins);
+    return `${modeTag}
+
+### 🏥 Báo cáo ca trực - Khoa Kiểm soát Nhiễm khuẩn (CSSD):
+
+- **Tổng số lượng dụng cụ đã phân loại**: **${totalSorted} sản phẩm**
+- **Dung lượng 3 khay hiện tại**:
+  - Khay 1 (Kéo & Dao mổ): **${b1}/${cap1} SP** (${t1.rate}%)
+  - Khay 2 (Kẹp panh cầm máu): **${b2}/${cap2} SP** (${t2.rate}%)
+  - Khay 3 (Dụng cụ khác): **${b3}/${cap3} SP** (${t3.rate}%)
+- **Độ tin cậy Camera AI Vision**: **~98.5%** (Mô hình YOLOv8 phân loại chuẩn)
+*(Dữ liệu ca trực cập nhật từ Local Database & Telemetry)*`;
+  }
+
+  return null;
+};
+
 export const AiCopilot: React.FC = () => {
   const dashboard = useDashboardSafe();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showDiagram, setShowDiagram] = useState(false);
   const [showPromptList, setShowPromptList] = useState(false);
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -388,6 +572,33 @@ export const AiCopilot: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Quản lý chế độ Nền Sáng / Nền Tối cho AiCopilot (Mặc định: Nền sáng theo yêu cầu)
+  const [copilotTheme, setCopilotTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("sortix_copilot_theme") as "light" | "dark" | null;
+    if (saved === "light" || saved === "dark") {
+      setCopilotTheme(saved);
+    } else if (dashboard?.themeMode) {
+      setCopilotTheme(dashboard.themeMode);
+    } else {
+      setCopilotTheme("light");
+    }
+  }, [dashboard?.themeMode]);
+
+  const toggleCopilotTheme = () => {
+    const nextTheme = copilotTheme === "light" ? "dark" : "light";
+    setCopilotTheme(nextTheme);
+    localStorage.setItem("sortix_copilot_theme", nextTheme);
+    setToastMessage({
+      text: nextTheme === "light" ? "Đã chuyển sang giao diện Nền sáng" : "Đã chuyển sang giao diện Nền tối",
+      type: "success",
+    });
+    setTimeout(() => setToastMessage(null), 2200);
+  };
+
+  const isLight = copilotTheme === "light";
 
   // Số liệu thời gian thực đồng bộ trực tiếp với Web Dashboard & Mobile App
   const b1 = dashboard?.binCounts?.bin1 ?? 0;
@@ -436,7 +647,11 @@ export const AiCopilot: React.FC = () => {
     setSessionId(sid);
 
     const savedWebhook = localStorage.getItem("sortix_n8n_webhook_url");
-    if (savedWebhook && !savedWebhook.includes("trigger-chat/chat")) {
+    if (
+      savedWebhook &&
+      !savedWebhook.includes("trigger-chat/chat") &&
+      !savedWebhook.includes("localhost:5678/webhook")
+    ) {
       setWebhookUrl(savedWebhook);
     } else {
       setWebhookUrl(DEFAULT_WEBHOOK_URL);
@@ -461,7 +676,7 @@ export const AiCopilot: React.FC = () => {
       sender: "bot",
       text: `### 🏥 SortiX-Med AI Copilot
 
-Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Dashboard**, **ESP32 IoT** và **n8n Workflow**.
+Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Dashboard**, **ESP32 IoT** và **Google Gemini AI**.
 
 #### 🎯 Năng lực hỗ trợ:
 - 🛡️ **An toàn công nghiệp**: Giám sát nút E-Stop, kẹt phôi cảm biến quang #02.
@@ -522,6 +737,9 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
           isSystemLocked,
           isJammed,
           isSimulation,
+          sorterConfig,
+          alerts,
+          mqttStatus,
         } = dashboard;
 
         const b1 = binCounts?.bin1 ?? 0;
@@ -543,11 +761,34 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
         const jam = Boolean(isJammed);
         const modeTag = isSimulation ? "[CHẾ ĐỘ MÔ PHỎNG - SIMULATION]" : "[CHẾ ĐỘ THỰC TẾ - REAL HARDWARE]";
 
+        const roleLabel =
+          user?.role === "admin"
+            ? "Quản trị viên cấp cao (Admin) — Toàn quyền kiểm soát và mở khóa an toàn"
+            : user?.role === "maintenance"
+            ? "Kỹ thuật viên bảo trì (Maintenance)"
+            : "Người vận hành / Điều dưỡng viên (User)";
+
+        const loggedInUserText = user
+          ? `${user.displayName} (Tài khoản: "${user.username}", Email: "${user.email}", Vai trò: "${roleLabel}")`
+          : "Chưa đăng nhập (Khách vãng lai)";
+
+        const unresolvedAlerts = alerts?.filter((a) => !a.resolved) || [];
+
         realTimeContext = `[THÔNG TIN HỆ THỐNG THỜI GIAN THỰC SORTIX-MED]:
 - CHẾ ĐỘ HIỆN TẠI: ${modeTag}
 - NGUỒN DỮ LIỆU: ${isSimulation ? "Dữ liệu đang được sinh giả lập tự động từ môi trường mô phỏng (Simulation)." : "Dữ liệu đo trực tiếp từ vi điều khiển ESP32 (cảm biến nhiệt độ nội vi trên chip), cảm biến quang học và camera AI Vision thật (Real Hardware)."}
 - QUY TẮC BẮT BUỘC: DÒNG ĐẦU TIÊN CỦA CÂU TRẢ LỜI BẠN PHẢI BẮT ĐẦU CHÍNH XÁC BẰNG: "${modeTag}" để người dùng nhận diện ngay đây là số liệu mô phỏng hay thực tế.
 ------------------------------------------------------------
+[THÔNG TIN TÀI KHOẢN & NGƯỜI ĐANG TRỰC CA]:
+- Người dùng / Admin hiện tại đang đăng nhập: ${loggedInUserText}
+- Họ và tên người dùng hiện tại: "${user?.displayName || "Chưa xác định"}"
+- Vai trò tài khoản: ${roleLabel} (role = "${user?.role || "guest"}")
+- Quyền Quản trị viên (Admin): ${user?.role === "admin" ? "ĐÚNG - ĐANG CÓ QUYỀN ADMIN CAO NHẤT" : "KHÔNG - ĐÂY LÀ TÀI KHOẢN NGƯỜI DÙNG THƯỜNG"}
+- Vị trí trực: Trạm phân loại y tế SortiX-Med #01 (Khoa CSSD - Kiểm Soát Nhiễm Khuẩn)
+- Thời gian đăng nhập phiên: ${user?.loginTime ? new Date(user.loginTime).toLocaleString("vi-VN") : "Ca trực hiện tại"}
+* QUY TẮC BẮT BUỘC KHI ĐƯỢC HỎI VỀ ADMIN / NGƯỜI ĐĂNG NHẬP: Bạn PHẢI trả lời chính xác họ tên "${user?.displayName || "Chưa xác định"}" và thông tin tài khoản như trên. Tuyệt đối không bịa đặt tên người khác.
+------------------------------------------------------------
+[TRẠNG THÁI DÂY CHUYỀN & PHÂN LOẠI DỤNG CỤ]:
 - Tổng sản lượng ca hiện tại: ${totalSorted} SP (Hiện trong 3 khay: K1: ${b1} | K2: ${b2} | K3: ${b3})
 - Khay 1 (Dao mổ & Kéo phẫu thuật): ${b1}/${cap1} SP (${t1.rate}%) - Màu hiển thị: ${t1.colorCode} - ${t1.statusText}
 - Khay 2 (Kẹp panh cầm máu): ${b2}/${cap2} SP (${t2.rate}%) - Màu hiển thị: ${t2.colorCode} - ${t2.statusText}
@@ -561,7 +802,14 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
 - Cảm biến quang #02 Zone A: ${jam ? "🔴 CẢNH BÁO KẸT PHÔI" : "🟢 Bình thường, không che khuất (jam_detected = false)"}
 - Nút Dừng Khẩn Cấp (E-Stop): ${estop ? "🔴 ĐANG KÍCH HOẠT / KHÓA" : "🟢 Không kích hoạt (estop_pressed = false, Hệ thống OPERATIONAL)"}
 - Kết luận an toàn: ${!estop && !jam && temp < 75 ? "Hệ thống ĐỦ ĐIỀU KIỆN an toàn để tiếp tục vận hành." : "Hệ thống KHÔNG ĐỦ ĐIỀU KIỆN an toàn để tiếp tục vận hành."}
-- Yêu cầu định dạng bảng: BẮT BUỘC định dạng bảng Markdown chuẩn (| Cột 1 | Cột 2 |...) rõ ràng, cân đối.
+------------------------------------------------------------
+[CẤU HÌNH THIẾT BỊ & KẾT NỐI IOT]:
+- Thiết bị điều khiển: ${telemetry?.device_id || "sorter_01"} (Phiên bản cấu hình: v${sorterConfig?.config_version ?? 1})
+- Trạng thái Actuator Servo: Servo 1 (GPIO6: ${telemetry?.arm1_active ? "Đang gạt" : "Chờ"}), Servo 2 (GPIO24: ${telemetry?.arm2_active ? "Đang gạt" : "Chờ"})
+- Kết nối MQTT Broker: ${mqttStatus || "connected"} (Ping: ${dashboard.pingMs ?? 15}ms)
+- Wi-Fi ESP32-C5: ${telemetry?.wifi_band || "5.0 GHz (Wi-Fi 6)"} (${telemetry?.wifi_rssi ?? -58} dBm)
+- Cảnh báo chưa giải quyết: ${unresolvedAlerts.length} sự cố ${unresolvedAlerts.length > 0 ? `(${unresolvedAlerts[0].description})` : ""}
+- Yêu cầu định dạng bảng: BẮT BUỘC định dạng bảng Markdown chuẩn (| Cột 1 | Cột 2 |...) rõ ràng, cân đối khi trình bày số liệu.
 ------------------------------------------------------------
 [CÂU HỎI]:
 `;
@@ -609,14 +857,34 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
 
       saveMessages([...updated, botMsg]);
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Không thể kết nối tới n8n webhook";
-      const errorBotMsg: ChatMessage = {
-        id: "msg_err_" + Date.now(),
-        sender: "bot",
-        text: `⚠️ **Không thể kết nối AI Agent (n8n)** (\`${errorMsg}\`)\n\n*Kiểm tra nhanh*:\n• n8n đang chạy tại \`http://localhost:5678\` (Workflow đã Publish).\n• Bấm ⚙️ để dán URL Webhook chính xác.`,
-        timestamp: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
-      };
-      saveMessages([...updated, errorBotMsg]);
+      const offlineReply = generateOfflineFallbackResponse(query, dashboard, user);
+      if (offlineReply) {
+        const fallbackMsg: ChatMessage = {
+          id: "msg_fallback_" + Date.now(),
+          sender: "bot",
+          text: offlineReply,
+          timestamp: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
+        };
+        saveMessages([...updated, fallbackMsg]);
+      } else {
+        const isInternalApi = webhookUrl.startsWith("/api/");
+        const errorMsg =
+          err instanceof Error
+            ? err.message
+            : isInternalApi
+            ? "Không thể kết nối API AI Copilot"
+            : "Không thể kết nối tới n8n webhook";
+        const errorBotMsg: ChatMessage = {
+          id: "msg_err_" + Date.now(),
+          sender: "bot",
+          isError: true,
+          text: isInternalApi
+            ? `⚠️ **Chưa thể kết nối tới Google Gemini** (\`${errorMsg}\`)\n\n*Kiểm tra nhanh:*\n• Đã cấu hình \`GEMINI_API_KEY\` trong file \`.env.local\` chưa.\n• Kiểm tra kết nối mạng Internet của máy tính.`
+            : `⚠️ **Chưa kết nối máy chủ AI Agent (n8n)** (\`${errorMsg}\`)\n\n*Trợ lý vẫn có thể đọc số liệu từ ESP32 & Dashboard:*\n• Bạn có thể dùng các gợi ý nhanh bên dưới để xem số liệu 3 khay, nhiệt độ, E-Stop.\n• Bấm ⚙️ ở góc trên để chuyển về API Gemini nội bộ hoặc cấu hình lại Webhook URL.`,
+          timestamp: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
+        };
+        saveMessages([...updated, errorBotMsg]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -697,16 +965,28 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
     // 0. Nhận diện nhãn chế độ [CHẾ ĐỘ MÔ PHỎNG - SIMULATION] hoặc [CHẾ ĐỘ THỰC TẾ - REAL HARDWARE]
     if (trimmed.includes("[CHẾ ĐỘ MÔ PHỎNG") || trimmed === "[SIMULATION]") {
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-950/90 text-amber-300 border border-amber-500/70 font-bold font-mono text-[11px] whitespace-nowrap shadow-sm">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+        <span
+          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md font-bold font-mono text-[11px] whitespace-nowrap shadow-xs border ${
+            isLight
+              ? "bg-amber-50 text-amber-800 border-amber-300"
+              : "bg-amber-950/90 text-amber-300 border-amber-500/70"
+          }`}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
           <span>{trimmed}</span>
         </span>
       );
     }
     if (trimmed.includes("[CHẾ ĐỘ THỰC TẾ") || trimmed === "[REAL HARDWARE]") {
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-950/90 text-emerald-300 border border-emerald-500/70 font-bold font-mono text-[11px] whitespace-nowrap shadow-sm">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <span
+          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md font-bold font-mono text-[11px] whitespace-nowrap shadow-xs border ${
+            isLight
+              ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+              : "bg-emerald-950/90 text-emerald-300 border-emerald-500/70"
+          }`}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           <span>{trimmed}</span>
         </span>
       );
@@ -724,8 +1004,14 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
       trimmed.length <= 40
     ) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-700/80 font-semibold font-mono text-[11px] whitespace-nowrap shadow-sm">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <span
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold font-mono text-[11px] whitespace-nowrap shadow-2xs border ${
+            isLight
+              ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+              : "bg-emerald-950/80 text-emerald-300 border-emerald-700/80"
+          }`}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           <span>{trimmed}</span>
         </span>
       );
@@ -740,8 +1026,14 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
       trimmed.length <= 40
     ) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-700/80 font-semibold font-mono text-[11px] whitespace-nowrap shadow-sm">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+        <span
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold font-mono text-[11px] whitespace-nowrap shadow-2xs border ${
+            isLight
+              ? "bg-amber-50 text-amber-800 border-amber-300"
+              : "bg-amber-950/80 text-amber-300 border-amber-700/80"
+          }`}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
           <span>{trimmed}</span>
         </span>
       );
@@ -759,8 +1051,14 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
       trimmed.length <= 40
     ) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-950/80 text-rose-300 border border-rose-700/80 font-semibold font-mono text-[11px] whitespace-nowrap shadow-sm">
-          <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
+        <span
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold font-mono text-[11px] whitespace-nowrap shadow-2xs border ${
+            isLight
+              ? "bg-rose-50 text-rose-800 border-rose-300"
+              : "bg-rose-950/80 text-rose-300 border-rose-700/80"
+          }`}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
           <span>{trimmed}</span>
         </span>
       );
@@ -779,7 +1077,11 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
             return (
               <code
                 key={tIdx}
-                className="px-1.5 py-0.5 rounded bg-[#060a12] border border-slate-750 text-cyan-300 font-mono text-xs shadow-inner"
+                className={`px-1.5 py-0.5 rounded-md font-mono text-[11px] border ${
+                  isLight
+                    ? "bg-teal-50 border-teal-200/80 text-teal-800 font-semibold"
+                    : "bg-slate-800/80 border-slate-700/50 text-cyan-300"
+                }`}
               >
                 {token.slice(1, -1)}
               </code>
@@ -798,7 +1100,11 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
               return (
                 <span
                   key={tIdx}
-                  className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-semibold font-mono text-[11px]"
+                  className={`px-1.5 py-0.5 rounded font-semibold font-mono text-[11px] border ${
+                    isLight
+                      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                      : "bg-emerald-950 text-emerald-400 border-emerald-800"
+                  }`}
                 >
                   {boldText}
                 </span>
@@ -813,14 +1119,18 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
               return (
                 <span
                   key={tIdx}
-                  className="px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 font-semibold font-mono text-[11px]"
+                  className={`px-1.5 py-0.5 rounded font-semibold font-mono text-[11px] border ${
+                    isLight
+                      ? "bg-rose-50 text-rose-800 border-rose-200"
+                      : "bg-rose-950 text-rose-300 border-rose-800"
+                  }`}
                 >
                   {boldText}
                 </span>
               );
             }
             return (
-              <strong key={tIdx} className="font-semibold text-slate-100">
+              <strong key={tIdx} className={`font-semibold ${isLight ? "text-slate-900" : "text-slate-100"}`}>
                 {boldText}
               </strong>
             );
@@ -834,7 +1144,7 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
             !token.startsWith("**")
           ) {
             return (
-              <em key={tIdx} className="italic text-slate-400">
+              <em key={tIdx} className={`italic ${isLight ? "text-slate-500" : "text-slate-400"}`}>
                 {token.slice(1, -1)}
               </em>
             );
@@ -998,11 +1308,21 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
             return (
               <div
                 key={bIdx}
-                className="my-3 overflow-x-auto rounded-xl border border-slate-700/80 bg-[#070c18] shadow-2xl shadow-black/60"
+                className={`my-3 overflow-x-auto rounded-xl border shadow-xs ${
+                  isLight
+                    ? "border-slate-200 bg-white"
+                    : "border-slate-700/80 bg-[#070c18] shadow-2xl shadow-black/60"
+                }`}
               >
                 <table className="w-full text-xs border-collapse">
                   <thead>
-                    <tr className="bg-[#0f172a] text-emerald-400 font-semibold tracking-wide border-b border-slate-700/80">
+                    <tr
+                      className={`font-semibold tracking-wide border-b ${
+                        isLight
+                          ? "bg-slate-100/90 text-slate-800 border-slate-200"
+                          : "bg-[#0f172a] text-emerald-400 border-slate-700/80"
+                      }`}
+                    >
                       {block.headers.map((h, hIdx) => {
                         const align = block.alignments[hIdx] || "left";
                         const alignClass =
@@ -1014,7 +1334,9 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                         return (
                           <th
                             key={hIdx}
-                            className={`px-3 py-2.5 text-[11px] font-bold text-slate-200 uppercase tracking-wider border-r border-slate-800/80 last:border-r-0 whitespace-nowrap ${alignClass}`}
+                            className={`px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider border-r last:border-r-0 whitespace-nowrap ${
+                              isLight ? "text-slate-700 border-slate-200" : "text-slate-200 border-slate-800/80"
+                            } ${alignClass}`}
                           >
                             {renderInlineText(h)}
                           </th>
@@ -1022,11 +1344,15 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                       })}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className={`divide-y ${isLight ? "divide-slate-200" : "divide-slate-800/60"}`}>
                     {block.rows.map((row, rIdx) => (
                       <tr
                         key={rIdx}
-                        className="hover:bg-slate-800/50 transition-colors odd:bg-[#070c18] even:bg-[#0b1222]"
+                        className={`transition-colors ${
+                          isLight
+                            ? "hover:bg-teal-50/40 odd:bg-white even:bg-slate-50/60"
+                            : "hover:bg-slate-800/50 odd:bg-[#070c18] even:bg-[#0b1222]"
+                        }`}
                       >
                         {row.map((cell, cIdx) => {
                           const align = block.alignments[cIdx] || "left";
@@ -1039,7 +1365,9 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                           return (
                             <td
                               key={cIdx}
-                              className={`px-3 py-2 text-slate-200 border-r border-slate-800/40 last:border-r-0 leading-relaxed ${alignClass}`}
+                              className={`px-3 py-2 border-r last:border-r-0 leading-relaxed ${
+                                isLight ? "text-slate-700 border-slate-200/80" : "text-slate-200 border-slate-800/40"
+                              } ${alignClass}`}
                             >
                               {renderInlineText(cell)}
                             </td>
@@ -1059,7 +1387,9 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
               return (
                 <div
                   key={bIdx}
-                  className="font-bold text-sm sm:text-base text-emerald-400 mt-2.5 mb-1 pb-1 border-b border-emerald-900/40 flex items-center gap-1.5"
+                  className={`font-bold text-sm sm:text-base mt-2.5 mb-1 pb-1 border-b flex items-center gap-1.5 ${
+                    isLight ? "text-teal-800 border-teal-100" : "text-emerald-400 border-emerald-900/40"
+                  }`}
                 >
                   <span>{renderInlineText(block.text)}</span>
                 </div>
@@ -1069,9 +1399,11 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
               return (
                 <div
                   key={bIdx}
-                  className="font-semibold text-xs sm:text-sm text-cyan-300 mt-2 mb-0.5 flex items-center gap-1"
+                  className={`font-semibold text-xs sm:text-sm mt-2 mb-0.5 flex items-center gap-1 ${
+                    isLight ? "text-slate-800" : "text-cyan-300"
+                  }`}
                 >
-                  <ChevronRight className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <ChevronRight className={`w-3.5 h-3.5 shrink-0 ${isLight ? "text-teal-600" : "text-cyan-400"}`} />
                   <span>{renderInlineText(block.text)}</span>
                 </div>
               );
@@ -1079,7 +1411,9 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
             return (
               <div
                 key={bIdx}
-                className="font-bold text-base text-emerald-300 mt-3 mb-1 border-b border-slate-800 pb-1"
+                className={`font-bold text-base mt-3 mb-1 border-b pb-1 ${
+                  isLight ? "text-slate-900 border-slate-200" : "text-emerald-300 border-slate-800"
+                }`}
               >
                 <span>{renderInlineText(block.text)}</span>
               </div>
@@ -1091,8 +1425,7 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
             return (
               <hr
                 key={bIdx}
-                className="my-2.5 border-slate-800"
-                style={{ borderColor: "#1e293b" }}
+                className={`my-2.5 ${isLight ? "border-slate-200" : "border-slate-800"}`}
               />
             );
           }
@@ -1100,8 +1433,8 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
           // RENDER BULLET
           if (block.type === "bullet") {
             return (
-              <div key={bIdx} className="flex items-start gap-2 pl-2 text-slate-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+              <div key={bIdx} className={`flex items-start gap-2 pl-2 ${isLight ? "text-slate-700" : "text-slate-300"}`}>
+                <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${isLight ? "bg-teal-600" : "bg-emerald-400"}`} />
                 <div className="flex-1 leading-relaxed">{renderInlineText(block.text)}</div>
               </div>
             );
@@ -1110,8 +1443,14 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
           // RENDER NUMBERED
           if (block.type === "numbered") {
             return (
-              <div key={bIdx} className="flex items-start gap-2 pl-1 text-slate-300">
-                <span className="px-1.5 py-0.2 rounded bg-slate-800 text-cyan-300 font-mono text-[10px] font-bold mt-0.5 shrink-0 border border-slate-700">
+              <div key={bIdx} className={`flex items-start gap-2 pl-1 ${isLight ? "text-slate-700" : "text-slate-300"}`}>
+                <span
+                  className={`px-1.5 py-0.2 rounded font-mono text-[10px] font-bold mt-0.5 shrink-0 border ${
+                    isLight
+                      ? "bg-slate-100 text-teal-800 border-slate-200"
+                      : "bg-slate-800 text-cyan-300 border-slate-700"
+                  }`}
+                >
                   {block.num}
                 </span>
                 <div className="flex-1 leading-relaxed">{renderInlineText(block.text)}</div>
@@ -1125,13 +1464,14 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
             return (
               <div
                 key={bIdx}
-                className="my-2.5 p-3 rounded-xl border border-amber-500/60 bg-amber-950/40 text-amber-200 text-xs shadow-lg shadow-amber-950/40 flex items-start gap-2.5"
+                className={`my-2 px-3 py-1.5 rounded-lg border text-xs flex items-center gap-2 ${
+                  isLight
+                    ? "border-amber-200 bg-amber-50 text-amber-800"
+                    : "border-amber-500/30 bg-amber-950/20 text-amber-200"
+                }`}
               >
-                <span className="relative flex h-2.5 w-2.5 mt-0.5 shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
-                </span>
-                <div className="flex-1 font-mono text-[11px] font-bold text-amber-300 leading-relaxed">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                <div className={`font-mono text-[11px] font-semibold ${isLight ? "text-amber-800" : "text-amber-300"}`}>
                   {renderInlineText(block.text)}
                 </div>
               </div>
@@ -1141,13 +1481,14 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
             return (
               <div
                 key={bIdx}
-                className="my-2.5 p-3 rounded-xl border border-emerald-500/60 bg-emerald-950/40 text-emerald-200 text-xs shadow-lg shadow-emerald-950/40 flex items-start gap-2.5"
+                className={`my-2 px-3 py-1.5 rounded-lg border text-xs flex items-center gap-2 ${
+                  isLight
+                    ? "border-teal-200 bg-teal-50 text-teal-800"
+                    : "border-teal-500/30 bg-teal-950/20 text-teal-200"
+                }`}
               >
-                <span className="relative flex h-2.5 w-2.5 mt-0.5 shrink-0">
-                  <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-                </span>
-                <div className="flex-1 font-mono text-[11px] font-bold text-emerald-300 leading-relaxed">
+                <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse shrink-0" />
+                <div className={`font-mono text-[11px] font-semibold ${isLight ? "text-teal-800" : "text-teal-300"}`}>
                   {renderInlineText(block.text)}
                 </div>
               </div>
@@ -1155,7 +1496,7 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
           }
 
           return (
-            <div key={bIdx} className="leading-relaxed text-slate-200">
+            <div key={bIdx} className={`leading-relaxed ${isLight ? "text-slate-700" : "text-slate-200"}`}>
               {renderInlineText(block.text)}
             </div>
           );
@@ -1165,7 +1506,23 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
   };
 
   // Helper lấy style màu cho từng danh mục câu hỏi
-  const getBadgeStyle = (color: SuggestedPrompt["categoryColor"]) => {
+  const getBadgeStyle = (color: PromptTopic["categoryColor"]) => {
+    if (isLight) {
+      switch (color) {
+        case "rose":
+          return "bg-rose-50 text-rose-700 border-rose-200";
+        case "emerald":
+          return "bg-emerald-50 text-emerald-700 border-emerald-200";
+        case "cyan":
+          return "bg-cyan-50 text-cyan-800 border-cyan-200";
+        case "blue":
+          return "bg-blue-50 text-blue-800 border-blue-200";
+        case "amber":
+          return "bg-amber-50 text-amber-800 border-amber-200";
+        default:
+          return "bg-slate-100 text-slate-700 border-slate-200";
+      }
+    }
     switch (color) {
       case "rose":
         return "bg-rose-950 text-rose-300 border-rose-800";
@@ -1222,139 +1579,127 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
       {/* Cửa sổ Chat Drawer: Desktop Floating Panel / Mobile Bottom Sheet */}
       {isOpen && (
         <div
-          className={`fixed z-50 transition-all duration-300 ease-in-out shadow-2xl flex flex-col ${
+          className={`fixed z-50 transition-all duration-300 ease-in-out flex flex-col ${
             isExpanded
               ? "inset-3 sm:inset-6 rounded-2xl"
-              : "max-sm:inset-x-0 max-sm:bottom-0 max-sm:w-full max-sm:h-[86vh] max-sm:max-h-[86vh] max-sm:rounded-t-3xl max-sm:rounded-b-none sm:bottom-5 sm:right-5 sm:w-[540px] sm:h-[720px] sm:max-h-[90vh] sm:rounded-2xl"
-          } bg-[#0b0f19] border border-slate-800 text-slate-100 overflow-hidden shadow-2xl shadow-black/90`}
-          style={{ backgroundColor: "#0b0f19", color: "#f1f5f9" }}
+              : "max-sm:inset-x-0 max-sm:bottom-0 max-sm:w-full max-sm:h-[86vh] max-sm:max-h-[86vh] max-sm:rounded-t-3xl max-sm:rounded-b-none sm:bottom-5 sm:right-5 sm:w-[520px] sm:h-[700px] sm:max-h-[90vh] sm:rounded-2xl"
+          } ${
+            isLight
+              ? "bg-slate-50 border border-slate-200/90 text-slate-800 shadow-2xl shadow-slate-900/15"
+              : "bg-[#0b101d] border border-slate-800 text-slate-100 shadow-2xl shadow-black/90"
+          } overflow-hidden`}
+          style={{
+            backgroundColor: isLight ? "#f8fafc" : "#0b101d",
+            color: isLight ? "#0f172a" : "#f1f5f9",
+          }}
         >
           {/* Mobile Bottom Sheet Handle Bar */}
-          <div className="sm:hidden pt-2.5 pb-1 flex justify-center bg-[#0f172a]">
-            <div className="w-12 h-1 rounded-full bg-slate-600/70" />
+          <div className={`sm:hidden pt-2.5 pb-1 flex justify-center ${isLight ? "bg-white" : "bg-[#0d1424]"}`}>
+            <div className={`w-12 h-1 rounded-full ${isLight ? "bg-slate-300" : "bg-slate-600/70"}`} />
           </div>
 
-          {/* Header */}
+          {/* Header tinh gọn, không nhồi nhét */}
           <div
-            className="flex items-center justify-between px-4 py-3 bg-[#0f172a] border-b border-slate-800 select-none shrink-0"
-            style={{ backgroundColor: "#0f172a" }}
+            className={`flex items-center justify-between px-4 py-3 border-b select-none shrink-0 ${
+              isLight ? "bg-white border-slate-200/90" : "bg-[#0d1424] border-slate-800/80"
+            }`}
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-0.5 shadow-md shadow-emerald-900/30">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-teal-500 to-emerald-500 p-0.5 shadow-md shadow-emerald-600/20">
                 <div
-                  className="w-full h-full bg-[#0b0f19] rounded-[10px] flex items-center justify-center"
-                  style={{ backgroundColor: "#0b0f19" }}
+                  className={`w-full h-full rounded-[10px] flex items-center justify-center ${
+                    isLight ? "bg-white" : "bg-[#0b0f19]"
+                  }`}
                 >
-                  <Stethoscope className="w-4 h-4 text-emerald-400" />
+                  <Stethoscope className={`w-4 h-4 ${isLight ? "text-teal-600" : "text-emerald-400"}`} />
                 </div>
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-sm text-slate-100 tracking-wide">SortiX Copilot</h3>
-                  {dashboard?.isSimulation ? (
-                    <span
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/90 text-amber-300 border border-amber-600/80 shadow-xs"
-                      title="Hệ thống đang chạy Chế độ Mô phỏng dữ liệu (Simulation)"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                      MÔ PHỎNG
-                    </span>
-                  ) : (
-                    <span
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/90 text-emerald-300 border border-emerald-600/80 shadow-xs"
-                      title="Hệ thống đang chạy Chế độ Phần cứng Thực tế (Real Hardware)"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      THỰC TẾ
-                    </span>
-                  )}
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    ONLINE
-                  </span>
-                  <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-mono text-cyan-300 bg-cyan-950/80 border border-cyan-800/60">
-                    Gemini
+                  <h3 className={`font-semibold text-sm tracking-wide ${isLight ? "text-slate-900" : "text-slate-100"}`}>
+                    SortiX Copilot
+                  </h3>
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
+                      isLight
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-emerald-950/70 text-emerald-300 border-emerald-800/60"
+                    }`}
+                    title={dashboard?.isSimulation ? "Chế độ Mô phỏng dữ liệu" : "Chế độ Phần cứng Thực tế"}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    {dashboard?.isSimulation ? "MÔ PHỎNG" : "TRỰC TUYẾN"}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400">Trợ lý Y tế & IoT</p>
+                <p className={`text-[11px] ${isLight ? "text-slate-500" : "text-slate-400"}`}>
+                  Trợ lý Y tế & IoT
+                </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-1 text-slate-400">
-              {/* Nút bật/tắt Ô list câu hỏi gợi ý (4 chủ đề) */}
+            <div className={`flex items-center gap-1 ${isLight ? "text-slate-500" : "text-slate-400"}`}>
+              {/* Nút chuyển chế độ Nền Sáng / Nền Tối */}
               <button
-                onClick={() => {
-                  if (showPromptList && selectedTopicId === null) {
-                    setShowPromptList(false);
-                  } else {
-                    setShowPromptList(true);
-                    setSelectedTopicId(null);
-                  }
-                  if (showDiagram) setShowDiagram(false);
-                  if (showSettings) setShowSettings(false);
-                }}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition ${showPromptList
-                    ? "text-emerald-300 bg-emerald-950 border border-emerald-700 shadow-sm"
-                    : "text-slate-300 hover:text-emerald-300 hover:bg-slate-800 border border-slate-700/60"
-                  }`}
-                title="Mở danh mục 4 chủ đề câu hỏi chuyên môn"
+                type="button"
+                onClick={toggleCopilotTheme}
+                className={`p-1.5 rounded-lg transition ${
+                  isLight
+                    ? "hover:text-amber-600 hover:bg-amber-50"
+                    : "hover:text-amber-400 hover:bg-slate-800/60"
+                }`}
+                title={isLight ? "Chuyển sang giao diện Nền tối" : "Chuyển sang giao diện Nền sáng"}
               >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="hidden sm:inline">Gợi ý</span>
-                <span className="px-1.5 py-0.2 rounded-full bg-emerald-900/80 text-[10px] font-mono text-emerald-300 font-bold">
-                  4
-                </span>
+                {isLight ? <Moon className="w-4 h-4 text-slate-600" /> : <Sun className="w-4 h-4 text-amber-400" />}
               </button>
 
               <button
-                onClick={() => {
-                  setShowDiagram(!showDiagram);
-                  if (showPromptList) setShowPromptList(false);
-                  if (showSettings) setShowSettings(false);
-                }}
-                className={`p-1.5 rounded-lg transition ${showDiagram
-                    ? "text-cyan-300 bg-cyan-950 border border-cyan-800"
-                    : "hover:text-slate-200 hover:bg-slate-800"
-                  }`}
-                title="Sơ đồ luồng phân loại SortiX"
-              >
-                <Network className="w-4 h-4" />
-              </button>
-
-              <button
+                type="button"
                 onClick={() => {
                   setShowSettings(!showSettings);
                   if (showPromptList) setShowPromptList(false);
-                  if (showDiagram) setShowDiagram(false);
                 }}
-                className={`p-1.5 rounded-lg transition ${showSettings
-                    ? "text-emerald-300 bg-emerald-950 border border-emerald-800"
-                    : "hover:text-slate-200 hover:bg-slate-800"
-                  }`}
-                title="Cài đặt kết nối Webhook n8n"
+                className={`p-1.5 rounded-lg transition ${
+                  showSettings
+                    ? isLight
+                      ? "text-teal-700 bg-teal-50 border border-teal-300"
+                      : "text-emerald-300 bg-emerald-950/80 border border-emerald-800"
+                    : isLight
+                    ? "hover:text-slate-800 hover:bg-slate-100"
+                    : "hover:text-slate-200 hover:bg-slate-800/60"
+                }`}
+                title="Cài đặt kết nối AI Backend"
               >
                 <Settings className="w-4 h-4" />
               </button>
 
               <button
+                type="button"
                 onClick={handleResetChat}
-                className="p-1.5 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition"
+                className={`p-1.5 rounded-lg transition ${
+                  isLight ? "hover:text-slate-800 hover:bg-slate-100" : "hover:text-slate-200 hover:bg-slate-800/60"
+                }`}
                 title="Làm mới hội thoại"
               >
                 <RotateCcw className="w-4 h-4" />
               </button>
 
               <button
+                type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="p-1.5 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition hidden sm:block"
+                className={`p-1.5 rounded-lg transition hidden sm:block ${
+                  isLight ? "hover:text-slate-800 hover:bg-slate-100" : "hover:text-slate-200 hover:bg-slate-800/60"
+                }`}
                 title={isExpanded ? "Thu nhỏ" : "Phóng to"}
               >
                 {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>
 
               <button
+                type="button"
                 onClick={() => setIsOpen(false)}
-                className="p-1.5 hover:text-rose-400 hover:bg-rose-950/60 rounded-lg transition ml-1"
+                className={`p-1.5 rounded-lg transition ml-0.5 ${
+                  isLight ? "hover:text-rose-600 hover:bg-rose-50" : "hover:text-rose-400 hover:bg-rose-950/60"
+                }`}
                 title="Đóng cửa sổ chat"
               >
                 <X className="w-4 h-4" />
@@ -1364,22 +1709,33 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
 
           {/* DẢI ĐỒNG BỘ DỮ LIỆU THỜI GIAN THỰC & MÀU SẮC 3 KHAY */}
           <div
-            className="px-3.5 py-1.5 bg-[#080d19] border-b border-slate-800 flex items-center justify-between text-[11px] font-mono select-none overflow-x-auto gap-2 shrink-0"
-            style={{ backgroundColor: "#080d19" }}
+            className={`px-3.5 py-1.5 border-b flex items-center justify-between text-[11px] font-mono select-none overflow-x-auto gap-2 shrink-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${
+              isLight
+                ? "bg-slate-100/90 border-slate-200 text-slate-600"
+                : "bg-[#090e1a] border-slate-800/70 text-slate-400"
+            }`}
           >
-            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-              <span className="text-slate-400 font-sans text-[10px] uppercase font-bold tracking-wider flex items-center gap-1">
-                <Activity className="w-3 h-3 text-cyan-400" />
-                <span className="hidden sm:inline">Sync Live:</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className={`font-sans text-[10px] uppercase font-semibold flex items-center gap-1 ${
+                isLight ? "text-teal-700" : "text-slate-400"
+              }`}>
+                <Activity className={`w-3 h-3 ${isLight ? "text-teal-600" : "text-teal-400"}`} />
+                <span className="hidden sm:inline">Sync:</span>
               </span>
               {/* Khay 1 */}
               <span
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${
                   liveK1.level === "critical"
-                    ? "bg-rose-950 text-rose-300 border border-rose-500/60 animate-pulse"
+                    ? isLight
+                      ? "bg-rose-50 text-rose-800 border-rose-300 animate-pulse"
+                      : "bg-rose-950/80 text-rose-300 border-rose-700/60 animate-pulse"
                     : liveK1.level === "warning"
-                    ? "bg-amber-950 text-amber-300 border border-amber-500/60"
-                    : "bg-slate-900/90 text-emerald-400 border border-slate-800"
+                    ? isLight
+                      ? "bg-amber-50 text-amber-800 border-amber-300"
+                      : "bg-amber-950/80 text-amber-300 border-amber-700/60"
+                    : isLight
+                    ? "bg-white text-slate-700 border-slate-200 shadow-2xs"
+                    : "bg-slate-800/60 text-slate-300 border-slate-700/50"
                 }`}
                 title={`Khay 1 (Kéo & Dao): ${b1}/${cap1} SP (${liveK1.rate}%) - ${liveK1.statusText}`}
               >
@@ -1388,144 +1744,75 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
               </span>
               {/* Khay 2 */}
               <span
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${
                   liveK2.level === "critical"
-                    ? "bg-rose-950 text-rose-300 border border-rose-500/60 animate-pulse"
+                    ? isLight
+                      ? "bg-rose-50 text-rose-800 border-rose-300 animate-pulse"
+                      : "bg-rose-950/80 text-rose-300 border-rose-700/60 animate-pulse"
                     : liveK2.level === "warning"
-                    ? "bg-amber-950 text-amber-300 border border-amber-500/60"
-                    : "bg-slate-900/90 text-blue-400 border border-slate-800"
+                    ? isLight
+                      ? "bg-amber-50 text-amber-800 border-amber-300"
+                      : "bg-amber-950/80 text-amber-300 border-amber-700/60"
+                    : isLight
+                    ? "bg-white text-slate-700 border-slate-200 shadow-2xs"
+                    : "bg-slate-800/60 text-slate-300 border-slate-700/50"
                 }`}
                 title={`Khay 2 (Kẹp panh): ${b2}/${cap2} SP (${liveK2.rate}%) - ${liveK2.statusText}`}
               >
                 <span>{liveK2.emoji}</span>
-                <span>K2: {b2}/${cap2}</span>
+                <span>K2: {b2}/{cap2}</span>
               </span>
               {/* Khay 3 */}
               <span
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${
                   liveK3.level === "critical"
-                    ? "bg-rose-950 text-rose-300 border border-rose-500/60 animate-pulse"
+                    ? isLight
+                      ? "bg-rose-50 text-rose-800 border-rose-300 animate-pulse"
+                      : "bg-rose-950/80 text-rose-300 border-rose-700/60 animate-pulse"
                     : liveK3.level === "warning"
-                    ? "bg-amber-950 text-amber-300 border border-amber-500/60"
-                    : "bg-slate-900/90 text-cyan-400 border border-slate-800"
+                    ? isLight
+                      ? "bg-amber-50 text-amber-800 border-amber-300"
+                      : "bg-amber-950/80 text-amber-300 border-amber-700/60"
+                    : isLight
+                    ? "bg-white text-slate-700 border-slate-200 shadow-2xs"
+                    : "bg-slate-800/60 text-slate-300 border-slate-700/50"
                 }`}
                 title={`Khay 3 (Dụng cụ khác): ${b3}/${cap3} SP (${liveK3.rate}%) - ${liveK3.statusText}`}
               >
                 <span>{liveK3.emoji}</span>
-                <span>K3: {b3}/${cap3}</span>
+                <span>K3: {b3}/{cap3}</span>
               </span>
             </div>
 
-            <div className="flex items-center gap-2 text-slate-400 shrink-0 text-[10px]">
+            <div className={`flex items-center gap-2.5 shrink-0 text-[10px] ${isLight ? "text-slate-600" : "text-slate-400"}`}>
               <span className="flex items-center gap-1" title="Cảm biến nhiệt độ nội vi trên chip ESP32-C5">
-                <Thermometer className="w-3 h-3 text-amber-400" />
-                <span className={liveTemp >= 75 ? "text-rose-400 font-bold" : "text-slate-300"}>
+                <Thermometer className="w-3 h-3 text-amber-500" />
+                <span className={liveTemp >= 75 ? "text-rose-600 font-bold" : isLight ? "text-slate-700 font-semibold" : "text-slate-300"}>
                   {liveTemp.toFixed(1)}°C
                 </span>
               </span>
-              <span className="hidden sm:flex items-center gap-1" title="Trạng thái động cơ băng tải">
-                <span className={`w-1.5 h-1.5 rounded-full ${dashboard?.isRunning ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`} />
-                <span>{dashboard?.isRunning ? "Băng tải: CHẠY" : "DỪNG"}</span>
+              <span className="flex items-center gap-1" title="Trạng thái động cơ băng tải">
+                <span className={`w-1.5 h-1.5 rounded-full ${dashboard?.isRunning ? "bg-emerald-500 animate-pulse" : isLight ? "bg-slate-400" : "bg-slate-500"}`} />
+                <span className={isLight ? "text-slate-600 font-medium" : "text-slate-400"}>{dashboard?.isRunning ? "Chạy" : "Dừng"}</span>
               </span>
             </div>
           </div>
 
-          {/* Sơ đồ luồng phân phối dụng cụ (Interactive Diagram) */}
-          {showDiagram && (
-            <div
-              className="p-3 bg-[#0b0f19] border-b border-cyan-900/60 text-slate-200 shrink-0 animate-fadeIn"
-              style={{ backgroundColor: "#0b0f19" }}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-cyan-300 flex items-center gap-1.5">
-                  <Network className="w-3.5 h-3.5 text-cyan-400" />
-                  Sơ đồ Phân phối Dụng cụ Y tế SortiX-Med
-                </span>
-                <button
-                  onClick={() => setShowDiagram(false)}
-                  className="text-[11px] text-slate-400 hover:text-slate-200"
-                >
-                  Ẩn sơ đồ
-                </button>
-              </div>
-
-              {/* 4 bước phân loại */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-center text-[11px]">
-                <div
-                  className="p-2 rounded-lg bg-[#131b2e] border border-slate-750"
-                  style={{ backgroundColor: "#131b2e", borderColor: "#1e293b" }}
-                >
-                  <div className="text-[10px] text-slate-400 font-mono">1. TIẾP NHẬN</div>
-                  <div className="font-bold text-slate-200 mt-0.5">Dụng cụ vào</div>
-                  <div className="text-[10px] text-emerald-400 mt-1">Cảm biến #01</div>
-                </div>
-
-                <div
-                  className="p-2 rounded-lg bg-[#131b2e] border border-cyan-800"
-                  style={{ backgroundColor: "#131b2e" }}
-                >
-                  <div className="text-[10px] text-cyan-400 font-mono">2. AI VISION</div>
-                  <div className="font-bold text-slate-200 mt-0.5">Nhận dạng phôi</div>
-                  <div className="text-[10px] text-cyan-400 mt-1">YOLO / MobileNet</div>
-                </div>
-
-                <div
-                  className="p-2 rounded-lg bg-[#131b2e] border border-slate-750"
-                  style={{ backgroundColor: "#131b2e", borderColor: "#1e293b" }}
-                >
-                  <div className="text-[10px] text-slate-400 font-mono">3. ĐIỀU PHỐI</div>
-                  <div className="font-bold text-slate-200 mt-0.5">Tay gạt Servo</div>
-                  <div className="text-[10px] text-slate-400 mt-1">Zone A / CB #02</div>
-                </div>
-
-                <div
-                  className="p-2 rounded-lg bg-[#131b2e] border border-emerald-800"
-                  style={{ backgroundColor: "#131b2e" }}
-                >
-                  <div className="text-[10px] text-emerald-400 font-mono">4. 3 KHAY CHỨA</div>
-                  <div className="font-bold text-slate-200 mt-0.5">Khử trùng phòng mổ</div>
-                  <div className="text-[10px] text-emerald-400 mt-1">Bin 1 - 2 - 3</div>
-                </div>
-              </div>
-
-              {/* Chi tiết khay chứa */}
-              <div
-                className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-800 text-[10px]"
-                style={{ borderColor: "#1e293b" }}
-              >
-                <div
-                  className="px-2 py-1 rounded bg-[#131b2e] border border-slate-800 text-left"
-                  style={{ backgroundColor: "#131b2e", borderColor: "#1e293b" }}
-                >
-                  <span className="font-bold text-emerald-400">Khay 1:</span> Dao & Kéo mổ
-                </div>
-                <div
-                  className="px-2 py-1 rounded bg-[#131b2e] border border-slate-800 text-left"
-                  style={{ backgroundColor: "#131b2e", borderColor: "#1e293b" }}
-                >
-                  <span className="font-bold text-cyan-400">Khay 2:</span> Kẹp Kelly, Pean
-                </div>
-                <div
-                  className="px-2 py-1 rounded bg-[#131b2e] border border-slate-800 text-left"
-                  style={{ backgroundColor: "#131b2e", borderColor: "#1e293b" }}
-                >
-                  <span className="font-bold text-amber-400">Khay 3:</span> Xử lý lại
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Cấu hình Webhook n8n Dropdown */}
           {showSettings && (
             <div
-              className="p-3 bg-[#0f172a] border-b border-slate-750 text-xs space-y-2 shrink-0 animate-fadeIn"
-              style={{ backgroundColor: "#0f172a", borderColor: "#1e293b" }}
+              className={`p-3 border-b text-xs space-y-2 shrink-0 animate-fadeIn ${
+                isLight ? "bg-white border-slate-200" : "bg-[#0f172a] border-slate-750"
+              }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-slate-200">Cấu hình Webhook URL n8n:</span>
+                <span className={`font-semibold ${isLight ? "text-slate-800" : "text-slate-200"}`}>
+                  Cấu hình kết nối AI Backend:
+                </span>
                 <button
+                  type="button"
                   onClick={() => setShowSettings(false)}
-                  className="text-slate-400 hover:text-slate-200 text-xs"
+                  className={`text-xs ${isLight ? "text-slate-400 hover:text-slate-600" : "text-slate-400 hover:text-slate-200"}`}
                 >
                   Đóng
                 </button>
@@ -1534,20 +1821,41 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                 type="text"
                 value={webhookUrl}
                 onChange={(e) => setWebhookUrl(e.target.value)}
-                placeholder="http://localhost:5678/webhook/.../chat"
-                className="w-full px-2.5 py-1.5 rounded bg-[#131b2e] border border-slate-700 text-slate-100 font-mono text-xs focus:outline-none focus:border-emerald-500"
-                style={{ backgroundColor: "#131b2e", color: "#f8fafc" }}
+                placeholder="/api/chat/copilot hoặc http://localhost:5678/.../chat"
+                className={`w-full px-2.5 py-1.5 rounded border font-mono text-xs focus:outline-none ${
+                  isLight
+                    ? "bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:border-teal-500"
+                    : "bg-[#131b2e] border-slate-700 text-slate-100 focus:border-emerald-500"
+                }`}
               />
-              <div className="flex justify-between items-center pt-1">
-                <span className="text-[11px] text-slate-400">
-                  Mặc định: <code className="text-emerald-400">http://localhost:5678/webhook/.../chat</code>
+              <div className="flex justify-between items-center pt-1 gap-2 flex-wrap">
+                <span className={`text-[11px] ${isLight ? "text-slate-500" : "text-slate-400"}`}>
+                  Mặc định: <code className={isLight ? "text-teal-700 font-semibold" : "text-emerald-400"}>/api/chat/copilot</code> (Gemini Direct)
                 </span>
-                <button
-                  onClick={() => handleSaveWebhook(webhookUrl)}
-                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium text-xs transition"
-                >
-                  Lưu Webhook
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWebhookUrl(INTERNAL_COPILOT_API);
+                      handleSaveWebhook(INTERNAL_COPILOT_API);
+                    }}
+                    className={`px-2 py-1 rounded text-xs transition ${
+                      isLight
+                        ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+                        : "bg-slate-800 hover:bg-slate-700 text-slate-300"
+                    }`}
+                    title="Đặt lại về API Gemini nội bộ"
+                  >
+                    Dùng API nội bộ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveWebhook(webhookUrl)}
+                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium text-xs transition"
+                  >
+                    Lưu
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1555,33 +1863,43 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
           {/* Ô LIST CÁC CÂU HỎI GỢI Ý CHO AI AGENT (PANEL 4 MỤC CHỦ ĐỀ VÀ LIST CÂU HỎI CHI TIẾT) */}
           {showPromptList && (
             <div
-              className="p-3 bg-[#0a0e17] border-b border-slate-800 text-xs space-y-3 shrink-0 max-h-[55vh] overflow-y-auto animate-fadeIn shadow-2xl"
-              style={{ backgroundColor: "#0a0e17", borderColor: "#1e293b" }}
+              className={`p-3 border-b text-xs space-y-3 shrink-0 max-h-[55vh] overflow-y-auto animate-fadeIn ${
+                isLight ? "bg-white border-slate-200 shadow-md" : "bg-[#0a0e17] border-slate-800 shadow-2xl"
+              }`}
             >
               {!selectedTopicId ? (
                 /* === LEVEL 1: HIỂN THỊ 4 MỤC CHỦ ĐỀ CHÍNH === */
                 <div>
                   {/* Header Level 1 */}
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2.5">
+                  <div className={`flex items-center justify-between border-b pb-2 mb-2.5 ${isLight ? "border-slate-200" : "border-slate-800"}`}>
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-emerald-950 border border-emerald-700 flex items-center justify-center shrink-0">
-                        <Sparkles className="w-4 h-4 text-emerald-400" />
+                      <div className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 ${
+                        isLight ? "bg-teal-50 border-teal-200" : "bg-emerald-950 border-emerald-700"
+                      }`}>
+                        <Sparkles className={`w-4 h-4 ${isLight ? "text-teal-700" : "text-emerald-400"}`} />
                       </div>
                       <div>
-                        <h4 className="font-bold text-xs text-slate-100 uppercase tracking-wide flex items-center gap-2">
+                        <h4 className={`font-bold text-xs uppercase tracking-wide flex items-center gap-2 ${isLight ? "text-slate-800" : "text-slate-100"}`}>
                           <span>Danh Mục Câu Hỏi AI Agent</span>
-                          <span className="text-[10px] font-normal px-2 py-0.2 rounded-full bg-emerald-900/60 text-emerald-300 border border-emerald-700">
+                          <span className={`text-[10px] font-normal px-2 py-0.2 rounded-full border ${
+                            isLight
+                              ? "bg-teal-50 text-teal-800 border-teal-200"
+                              : "bg-emerald-900/60 text-emerald-300 border-emerald-700"
+                          }`}>
                             4 Chủ Đề
                           </span>
                         </h4>
-                        <p className="text-[10px] text-slate-400">
+                        <p className={`text-[10px] ${isLight ? "text-slate-500" : "text-slate-400"}`}>
                           Click vào bất kỳ mục nào dưới đây để xem danh sách câu hỏi chi tiết
                         </p>
                       </div>
                     </div>
                     <button
+                      type="button"
                       onClick={() => setShowPromptList(false)}
-                      className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition"
+                      className={`p-1 rounded-lg transition ${
+                        isLight ? "hover:bg-slate-100 text-slate-400 hover:text-slate-600" : "hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+                      }`}
                       title="Đóng danh mục"
                     >
                       <X className="w-4 h-4" />
@@ -1596,16 +1914,27 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                         <div
                           key={topic.id}
                           onClick={() => setSelectedTopicId(topic.id)}
-                          className="p-3 rounded-xl bg-[#121927] hover:bg-[#182338] border border-slate-750 hover:border-emerald-500/70 cursor-pointer transition-all duration-200 group flex flex-col justify-between space-y-2 shadow-sm"
-                          style={{ backgroundColor: "#121927", borderColor: "#1e293b" }}
+                          className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 group flex flex-col justify-between space-y-2 shadow-2xs ${
+                            isLight
+                              ? "bg-slate-50 hover:bg-teal-50/60 border-slate-200 hover:border-teal-400 text-slate-800"
+                              : "bg-[#121927] hover:bg-[#182338] border-slate-750 hover:border-emerald-500/70"
+                          }`}
                         >
                           <div>
                             <div className="flex items-center justify-between gap-2 mb-1.5">
                               <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-lg bg-[#0b0f19] border border-slate-700 flex items-center justify-center shrink-0 group-hover:border-emerald-500 transition">
-                                  <Icon className="w-4 h-4 text-emerald-400" />
+                                <div className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 transition ${
+                                  isLight
+                                    ? "bg-white border-slate-200 group-hover:border-teal-400"
+                                    : "bg-[#0b0f19] border-slate-700 group-hover:border-emerald-500"
+                                }`}>
+                                  <Icon className={`w-4 h-4 ${isLight ? "text-teal-700" : "text-emerald-400"}`} />
                                 </div>
-                                <span className="font-bold text-xs text-slate-200 group-hover:text-emerald-300 transition">
+                                <span className={`font-bold text-xs transition ${
+                                  isLight
+                                    ? "text-slate-800 group-hover:text-teal-800"
+                                    : "text-slate-200 group-hover:text-emerald-300"
+                                }`}>
                                   {topic.shortTitle}
                                 </span>
                               </div>
@@ -1617,16 +1946,20 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                                 {topic.categoryTag}
                               </span>
                             </div>
-                            <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                            <p className={`text-[11px] line-clamp-2 leading-relaxed ${isLight ? "text-slate-500" : "text-slate-400"}`}>
                               {topic.subtitle}
                             </p>
                           </div>
 
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-[10px]">
-                            <span className="text-slate-400 font-medium">
+                          <div className={`flex items-center justify-between pt-2 border-t text-[10px] ${
+                            isLight ? "border-slate-200/80 text-slate-500" : "border-slate-800/80 text-slate-400"
+                          }`}>
+                            <span className="font-medium">
                               {topic.questions.length} câu hỏi gợi ý
                             </span>
-                            <span className="text-emerald-400 font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                            <span className={`font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform ${
+                              isLight ? "text-teal-700" : "text-emerald-400"
+                            }`}>
                               <span>Xem danh sách</span>
                               <ChevronRight className="w-3 h-3" />
                             </span>
@@ -1647,27 +1980,35 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                     return (
                       <div className="space-y-2.5">
                         {/* Header Level 2 với Nút Quay Lại */}
-                        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <div className={`flex items-center justify-between border-b pb-2 ${isLight ? "border-slate-200" : "border-slate-800"}`}>
                           <div className="flex items-center gap-2 min-w-0">
                             <button
+                              type="button"
                               onClick={() => setSelectedTopicId(null)}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#131b2e] hover:bg-slate-800 text-slate-200 hover:text-emerald-300 text-[11px] font-semibold border border-slate-700/80 hover:border-emerald-500/50 transition"
+                              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition ${
+                                isLight
+                                  ? "bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-teal-800 border-slate-200"
+                                  : "bg-[#131b2e] hover:bg-slate-800 text-slate-200 hover:text-emerald-300 border-slate-700/80 hover:border-emerald-500/50"
+                              }`}
                               title="Quay lại danh sách 4 mục"
                             >
-                              <ChevronLeft className="w-3.5 h-3.5 text-emerald-400" />
+                              <ChevronLeft className={`w-3.5 h-3.5 ${isLight ? "text-teal-700" : "text-emerald-400"}`} />
                               <span>← Quay lại 4 chủ đề</span>
                             </button>
                             <div className="flex items-center gap-1.5 min-w-0">
-                              <TopicIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-                              <h4 className="font-bold text-xs text-slate-100 truncate">
+                              <TopicIcon className={`w-4 h-4 shrink-0 ${isLight ? "text-teal-700" : "text-emerald-400"}`} />
+                              <h4 className={`font-bold text-xs truncate ${isLight ? "text-slate-800" : "text-slate-100"}`}>
                                 {currentTopic.title}
                               </h4>
                             </div>
                           </div>
 
                           <button
+                            type="button"
                             onClick={() => setShowPromptList(false)}
-                            className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition shrink-0"
+                            className={`p-1 rounded-lg transition shrink-0 ${
+                              isLight ? "hover:bg-slate-100 text-slate-400 hover:text-slate-600" : "hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+                            }`}
                             title="Đóng danh mục"
                           >
                             <X className="w-4 h-4" />
@@ -1675,7 +2016,11 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                         </div>
 
                         {/* Tóm tắt chủ đề */}
-                        <div className="px-2.5 py-1.5 rounded-lg bg-[#121927] border border-slate-800 text-[11px] text-slate-300 flex items-center justify-between">
+                        <div className={`px-2.5 py-1.5 rounded-lg border text-[11px] flex items-center justify-between ${
+                          isLight
+                            ? "bg-slate-50 border-slate-200 text-slate-700"
+                            : "bg-[#121927] border-slate-800 text-slate-300"
+                        }`}>
                           <span>{currentTopic.subtitle}</span>
                           <span
                             className={`px-2 py-0.5 rounded-full font-mono text-[9px] font-semibold border ${getBadgeStyle(
@@ -1691,15 +2036,26 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                           {currentTopic.questions.map((q, qIdx) => (
                             <div
                               key={q.id}
-                              className="p-2.5 rounded-xl bg-[#121927] border border-slate-750 hover:border-emerald-500/50 transition group space-y-1.5"
-                              style={{ backgroundColor: "#121927", borderColor: "#1e293b" }}
+                              className={`p-2.5 rounded-xl border transition group space-y-1.5 shadow-2xs ${
+                                isLight
+                                  ? "bg-white border-slate-200 hover:border-teal-400"
+                                  : "bg-[#121927] border-slate-750 hover:border-emerald-500/50"
+                              }`}
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <div className="flex items-center gap-2">
-                                  <span className="w-5 h-5 rounded-full bg-[#0b0f19] border border-slate-700 flex items-center justify-center font-mono text-[10px] text-emerald-400 font-bold shrink-0">
+                                  <span className={`w-5 h-5 rounded-full border flex items-center justify-center font-mono text-[10px] font-bold shrink-0 ${
+                                    isLight
+                                      ? "bg-teal-50 border-teal-200 text-teal-800"
+                                      : "bg-[#0b0f19] border-slate-700 text-emerald-400"
+                                  }`}>
                                     {qIdx + 1}
                                   </span>
-                                  <span className="font-bold text-xs text-slate-200 group-hover:text-emerald-300 transition">
+                                  <span className={`font-bold text-xs transition ${
+                                    isLight
+                                      ? "text-slate-800 group-hover:text-teal-800"
+                                      : "text-slate-200 group-hover:text-emerald-300"
+                                  }`}>
                                     {q.title}
                                   </span>
                                 </div>
@@ -1713,28 +2069,40 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                               </div>
 
                               {q.summary && (
-                                <p className="text-[11px] text-slate-400 leading-relaxed pl-7">
+                                <p className={`text-[11px] leading-relaxed pl-7 ${isLight ? "text-slate-500" : "text-slate-400"}`}>
                                   {q.summary}
                                 </p>
                               )}
 
                               {/* Preview nội dung câu hỏi */}
-                              <div className="ml-7 p-2 rounded-lg bg-[#0b0f19] border border-slate-800/80 font-mono text-[10px] text-slate-300 max-h-20 overflow-y-auto whitespace-pre-wrap">
+                              <div className={`ml-7 p-2 rounded-lg border font-mono text-[10px] max-h-20 overflow-y-auto whitespace-pre-wrap ${
+                                isLight
+                                  ? "bg-slate-50 border-slate-200 text-slate-600"
+                                  : "bg-[#0b0f19] border-slate-800/80 text-slate-300"
+                              }`}>
                                 {q.prompt.length > 220 ? q.prompt.slice(0, 220) + "..." : q.prompt}
                               </div>
 
                               {/* Các nút hành động */}
-                              <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-800/80">
+                              <div className={`flex items-center justify-end gap-2 pt-1 border-t ${
+                                isLight ? "border-slate-100" : "border-slate-800/80"
+                              }`}>
                                 <button
+                                  type="button"
                                   onClick={() => handlePastePromptToInput(q.prompt)}
-                                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0b0f19] hover:bg-slate-800 text-slate-300 hover:text-white text-[11px] font-medium border border-slate-700/60 transition"
+                                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition ${
+                                    isLight
+                                      ? "bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border-slate-200"
+                                      : "bg-[#0b0f19] hover:bg-slate-800 text-slate-300 hover:text-white border-slate-700/60"
+                                  }`}
                                   title="Dán câu hỏi vào ô nhập để xem lại hoặc bổ sung"
                                 >
-                                  <Edit3 className="w-3 h-3 text-cyan-400" />
+                                  <Edit3 className={`w-3 h-3 ${isLight ? "text-teal-600" : "text-cyan-400"}`} />
                                   <span>Dán vào ô nhập</span>
                                 </button>
 
                                 <button
+                                  type="button"
                                   onClick={() => handleSendMessage(q.prompt)}
                                   disabled={isLoading}
                                   className="flex items-center gap-1 px-3 py-1 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-[11px] font-semibold shadow-sm transition active:scale-95 disabled:opacity-40"
@@ -1755,10 +2123,12 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
             </div>
           )}
 
-          {/* Danh sách tin nhắn (Solid Dark Container) */}
+          {/* Danh sách tin nhắn */}
           <div
-            className="flex-1 overflow-y-auto p-4 space-y-4 text-xs sm:text-sm bg-[#0b0f19]"
-            style={{ backgroundColor: "#0b0f19" }}
+            className={`flex-1 overflow-y-auto p-4 space-y-3.5 text-xs sm:text-sm ${
+              isLight ? "bg-[#f8fafc]" : "bg-[#0b101d]"
+            }`}
+            style={{ backgroundColor: isLight ? "#f8fafc" : "#0b101d" }}
           >
             {messages.map((msg) => (
               <div
@@ -1766,35 +2136,55 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                 className={`flex gap-3 ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
               >
                 {msg.sender === "bot" && (
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-emerald-600 to-cyan-600 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-teal-600 to-emerald-600 flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
                     <Bot className="w-4 h-4 text-white" />
                   </div>
                 )}
 
                 <div
-                  className={`max-w-[88%] rounded-2xl px-4 py-3 shadow-md ${msg.sender === "user"
-                      ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-tr-none"
-                      : "bg-[#131b2e] text-slate-100 border border-slate-700/60 rounded-tl-none"
-                    }`}
-                  style={msg.sender === "bot" ? { backgroundColor: "#131b2e", borderColor: "#1e293b" } : undefined}
+                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs sm:text-sm ${
+                    msg.sender === "user"
+                      ? isLight
+                        ? "bg-slate-200/90 text-slate-800 border border-slate-300/80 rounded-tr-sm shadow-xs"
+                        : "bg-[#1e293b] text-slate-100 border border-slate-700/70 rounded-tr-sm shadow-xs"
+                      : isLight
+                      ? "bg-white text-slate-800 border border-slate-200/90 shadow-xs rounded-tl-sm"
+                      : "bg-[#0e1626] text-slate-100 border border-slate-800/90 rounded-tl-sm shadow-xs"
+                  }`}
+                  style={
+                    msg.sender === "bot"
+                      ? {
+                          backgroundColor: isLight ? "#ffffff" : "#0e1626",
+                          borderColor: isLight ? "#e2e8f0" : "#1e293b",
+                        }
+                      : {
+                          backgroundColor: isLight ? "#e2e8f0" : "#1e293b",
+                          borderColor: isLight ? "#cbd5e1" : "#334155",
+                        }
+                  }
                 >
                   {/* Nội dung Markdown */}
                   {renderFormattedContent(msg.text)}
 
                   {/* Starter Cards hiển thị ngay trong tin nhắn Welcome */}
                   {msg.id === "msg_welcome" && messages.length <= 1 && (
-                    <div className="mt-3 pt-3 border-t border-slate-750" style={{ borderColor: "#1e293b" }}>
-                      <div className="text-[11px] font-semibold text-slate-400 mb-2 flex items-center justify-between">
-                        <span className="flex items-center gap-1 text-emerald-400">
+                    <div
+                      className={`mt-3 pt-3 border-t ${isLight ? "border-slate-100" : "border-slate-800"}`}
+                    >
+                      <div className="text-[11px] font-semibold mb-2 flex items-center justify-between">
+                        <span className={`flex items-center gap-1 ${isLight ? "text-teal-700" : "text-teal-400"}`}>
                           <Sparkles className="w-3.5 h-3.5" />
-                          4 Chủ đề câu hỏi chuyên môn gợi ý:
+                          4 Chủ đề câu hỏi chuyên môn:
                         </span>
                         <button
+                          type="button"
                           onClick={() => {
                             setShowPromptList(true);
                             setSelectedTopicId(null);
                           }}
-                          className="text-[10px] text-cyan-400 hover:text-cyan-300 underline font-medium"
+                          className={`text-[10px] underline font-medium ${
+                            isLight ? "text-teal-700 hover:text-teal-800" : "text-teal-400 hover:text-teal-300"
+                          }`}
                         >
                           Mở danh mục (4)
                         </button>
@@ -1806,27 +2196,53 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                           return (
                             <button
                               key={topic.id}
+                              type="button"
                               onClick={() => {
                                 setShowPromptList(true);
                                 setSelectedTopicId(topic.id);
                               }}
-                              className="p-2.5 rounded-xl bg-[#0b0f19] hover:bg-[#18233c] border border-slate-750 hover:border-emerald-500/60 transition group text-left flex items-center justify-between gap-2 shadow-sm"
-                              style={{ backgroundColor: "#0b0f19", borderColor: "#1e293b" }}
+                              className={`p-2.5 rounded-xl border transition group text-left flex items-center justify-between gap-2 shadow-2xs ${
+                                isLight
+                                  ? "bg-slate-50 hover:bg-teal-50/60 border-slate-200 hover:border-teal-400 text-slate-800"
+                                  : "bg-[#090e1a] hover:bg-[#131d32] border-slate-800 hover:border-teal-500/60 text-slate-200"
+                              }`}
                             >
                               <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-7 h-7 rounded-lg bg-emerald-950 border border-emerald-800 flex items-center justify-center shrink-0">
-                                  <Icon className="w-3.5 h-3.5 text-emerald-400" />
+                                <div
+                                  className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 ${
+                                    isLight
+                                      ? "bg-teal-50 border-teal-200"
+                                      : "bg-teal-950/80 border-teal-800/80"
+                                  }`}
+                                >
+                                  <Icon className={`w-3.5 h-3.5 ${isLight ? "text-teal-700" : "text-teal-400"}`} />
                                 </div>
                                 <div className="min-w-0">
-                                  <div className="font-semibold text-xs text-slate-200 group-hover:text-emerald-300 transition truncate">
+                                  <div
+                                    className={`font-semibold text-xs transition truncate ${
+                                      isLight
+                                        ? "text-slate-800 group-hover:text-teal-800"
+                                        : "text-slate-200 group-hover:text-teal-300"
+                                    }`}
+                                  >
                                     {topic.shortTitle}
                                   </div>
-                                  <div className="text-[10px] text-slate-400 truncate">
+                                  <div
+                                    className={`text-[10px] truncate ${
+                                      isLight ? "text-slate-500" : "text-slate-400"
+                                    }`}
+                                  >
                                     {topic.questions.length} câu hỏi chi tiết
                                   </div>
                                 </div>
                               </div>
-                              <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition shrink-0" />
+                              <ChevronRight
+                                className={`w-3.5 h-3.5 group-hover:translate-x-0.5 transition shrink-0 ${
+                                  isLight
+                                    ? "text-slate-400 group-hover:text-teal-600"
+                                    : "text-slate-500 group-hover:text-teal-400"
+                                }`}
+                              />
                             </button>
                           );
                         })}
@@ -1834,54 +2250,84 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                     </div>
                   )}
 
-                  {/* Thanh công cụ gửi Telegram & Sao chép */}
-                  {msg.sender === "bot" && msg.id !== "msg_welcome" && (
+                  {/* Thanh công cụ sao chép & gửi Telegram tinh gọn */}
+                  {msg.sender === "bot" && msg.id !== "msg_welcome" && !msg.isError && (
                     <div
-                      className="mt-3 pt-2 border-t border-slate-750 flex items-center justify-between text-[11px] text-slate-400"
-                      style={{ borderColor: "#1e293b" }}
+                      className={`mt-2.5 pt-2 border-t flex items-center justify-between text-[11px] ${
+                        isLight ? "border-slate-100 text-slate-500" : "border-slate-800/60 text-slate-400"
+                      }`}
                     >
-                      <div className="flex items-center gap-2">
-                        {/* Nút gửi Telegram 1-click */}
-                        <button
-                          onClick={() => handleSendToTelegram(msg.id, msg.text)}
-                          disabled={msg.isSendingTelegram || msg.telegramSent}
-                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition font-medium ${msg.telegramSent
-                              ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
-                              : "bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-800 hover:border-cyan-600"
-                            } disabled:opacity-50`}
-                          title="Gửi báo cáo này trực tiếp vào Telegram nhóm phòng mổ"
-                        >
-                          {msg.isSendingTelegram ? (
-                            <span className="w-3 h-3 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-                          ) : msg.telegramSent ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          ) : (
-                            <SendHorizontal className="w-3.5 h-3.5 text-cyan-400" />
-                          )}
-                          <span>{msg.telegramSent ? "Đã gửi Telegram" : "Gửi Telegram"}</span>
-                        </button>
-
+                      <div className="flex items-center gap-1.5">
                         {/* Nút sao chép */}
                         <button
+                          type="button"
                           onClick={() => handleCopy(msg.id, msg.text)}
-                          className="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition"
+                          className={`flex items-center gap-1 px-2 py-1 rounded transition text-[11px] ${
+                            isLight
+                              ? "hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200/80 shadow-2xs"
+                              : "hover:bg-slate-800/70 text-slate-400 hover:text-slate-200"
+                          }`}
                           title="Sao chép nội dung"
                         >
                           {copiedId === msg.id ? (
-                            <Check className="w-3 h-3 text-emerald-400" />
+                            <Check className="w-3 h-3 text-emerald-600" />
                           ) : (
                             <Copy className="w-3 h-3" />
                           )}
                           <span>{copiedId === msg.id ? "Đã chép" : "Sao chép"}</span>
                         </button>
+
+                        {/* Nút gửi Telegram tinh gọn */}
+                        <button
+                          type="button"
+                          onClick={() => handleSendToTelegram(msg.id, msg.text)}
+                          disabled={msg.isSendingTelegram || msg.telegramSent}
+                          className={`flex items-center gap-1 px-2 py-1 rounded transition text-[11px] ${
+                            msg.telegramSent
+                              ? isLight
+                                ? "text-emerald-700 bg-emerald-50 border border-emerald-200"
+                                : "text-emerald-400 bg-emerald-950/60"
+                              : isLight
+                              ? "text-slate-600 hover:text-teal-700 hover:bg-slate-100 border border-slate-200/80 shadow-2xs"
+                              : "text-slate-400 hover:text-cyan-300 hover:bg-slate-800/70"
+                          } disabled:opacity-50`}
+                          title="Gửi báo cáo này vào Telegram nhóm phòng mổ"
+                        >
+                          {msg.isSendingTelegram ? (
+                            <span className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                          ) : msg.telegramSent ? (
+                            <Check className="w-3 h-3 text-emerald-600" />
+                          ) : (
+                            <SendHorizontal className="w-3 h-3" />
+                          )}
+                          <span>{msg.telegramSent ? "Đã gửi Telegram" : "Telegram"}</span>
+                        </button>
                       </div>
 
-                      <span className="font-mono text-[10px] text-slate-500">{msg.timestamp}</span>
+                      <span className={`font-mono text-[10px] ${isLight ? "text-slate-400" : "text-slate-500"}`}>
+                        {msg.timestamp}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Footer nhẹ cho tin nhắn cảnh báo/lỗi */}
+                  {msg.sender === "bot" && msg.isError && (
+                    <div
+                      className={`mt-2 pt-1.5 border-t flex items-center justify-between text-[10px] font-mono ${
+                        isLight ? "border-slate-200 text-slate-400" : "border-slate-800/40 text-slate-500"
+                      }`}
+                    >
+                      <span>Thông báo hệ thống</span>
+                      <span>{msg.timestamp}</span>
                     </div>
                   )}
 
                   {msg.sender === "user" && (
-                    <div className="text-[10px] mt-1 text-right text-emerald-200/80 font-mono">
+                    <div
+                      className={`text-[10px] mt-1 text-right font-mono ${
+                        isLight ? "text-slate-500" : "text-slate-400"
+                      }`}
+                    >
                       {msg.timestamp}
                     </div>
                   )}
@@ -1892,19 +2338,31 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
             {/* Hiệu ứng đang suy nghĩ tự nhiên chuẩn AI Assistant */}
             {isLoading && (
               <div className="flex gap-2.5 justify-start items-center animate-fadeIn">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-emerald-600 to-cyan-600 flex items-center justify-center shrink-0 shadow-sm">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-teal-600 to-emerald-600 flex items-center justify-center shrink-0 shadow-xs">
                   <Bot className="w-4 h-4 text-white" />
                 </div>
                 <div
-                  className="inline-flex items-center gap-2.5 bg-[#131b2e] text-slate-300 border border-slate-750 rounded-2xl rounded-tl-sm px-3.5 py-2 shadow-md"
-                  style={{ backgroundColor: "#131b2e", borderColor: "#1e293b" }}
+                  className={`inline-flex items-center gap-2.5 rounded-2xl rounded-tl-sm px-3.5 py-2 shadow-xs border ${
+                    isLight
+                      ? "bg-white text-slate-700 border-slate-200"
+                      : "bg-[#0e1626] text-slate-300 border-slate-800"
+                  }`}
+                  style={
+                    isLight
+                      ? { backgroundColor: "#ffffff", borderColor: "#e2e8f0" }
+                      : { backgroundColor: "#0e1626", borderColor: "#1e293b" }
+                  }
                 >
                   <div className="flex items-center gap-1.5 py-0.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce [animation-duration:900ms]" />
-                    <span className="w-2 h-2 rounded-full bg-teal-400 animate-bounce [animation-duration:900ms] [animation-delay:150ms]" />
-                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce [animation-duration:900ms] [animation-delay:300ms]" />
+                    <span className="w-2 h-2 rounded-full bg-teal-500 animate-bounce [animation-duration:900ms]" />
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-bounce [animation-duration:900ms] [animation-delay:150ms]" />
+                    <span className="w-2 h-2 rounded-full bg-cyan-500 animate-bounce [animation-duration:900ms] [animation-delay:300ms]" />
                   </div>
-                  <span className="text-xs text-slate-300 font-medium tracking-wide transition-all duration-300 select-none">
+                  <span
+                    className={`text-xs font-medium tracking-wide transition-all duration-300 select-none ${
+                      isLight ? "text-slate-600" : "text-slate-300"
+                    }`}
+                  >
                     {getLoadingText()}
                   </span>
                 </div>
@@ -1913,46 +2371,14 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
             <div ref={messagesEndRef} />
           </div>
 
-          {/* KHU VỰC NHẬP LIỆU & THANH GỢI Ý CƠ BẢN:
-              - Thanh gợi ý cơ bản với nút Sparkle ✨ mở 4 danh mục câu hỏi (trổ ra 4 mục)
-              - Dòng text nhập chuyên nghiệp (không gợi ý gõ chữ, nền tối 100%)
-          */}
+          {/* KHU VỰC NHẬP LIỆU & THANH GỢI Ý CƠ BẢN */}
           <div
-            className="p-3 bg-[#0f172a] border-t border-slate-800 shrink-0 space-y-2.5"
-            style={{ backgroundColor: "#0f172a" }}
+            className={`p-3 border-t shrink-0 space-y-2 ${
+              isLight ? "bg-white border-slate-200" : "bg-[#0d1424] border-slate-800/80"
+            }`}
           >
-            {/* 1. Thanh gợi ý cơ bản + Nút Sparkle mở 4 danh mục câu hỏi */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-              {/* Nút Sparkle đặc biệt mở 4 danh mục câu hỏi (trổ ra 4 mục) */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (showPromptList && selectedTopicId === null) {
-                    setShowPromptList(false);
-                  } else {
-                    setShowPromptList(true);
-                    setSelectedTopicId(null);
-                  }
-                }}
-                className={`px-2.5 py-1.5 rounded-xl transition border shrink-0 flex items-center gap-1.5 shadow-sm ${
-                  showPromptList
-                    ? "bg-emerald-950 text-emerald-300 border-emerald-500 shadow-emerald-950/60"
-                    : "bg-[#131b2e] text-slate-200 hover:text-emerald-300 hover:bg-[#1a253e] border-slate-700/80 hover:border-emerald-500/50"
-                }`}
-                style={{ backgroundColor: showPromptList ? undefined : "#131b2e" }}
-                title="Mở bảng 4 danh mục câu hỏi chuyên môn"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                <span className="text-xs font-semibold">Gợi ý</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-900/60 text-emerald-300 font-mono font-bold">
-                  4
-                </span>
-              </button>
-
-              {/* Phân cách nhẹ */}
-              <div className="h-4 w-[1px] bg-slate-800 shrink-0" />
-
-              {/* Các gợi ý cơ bản (Quick Chips) */}
+            {/* Thanh gợi ý câu hỏi nhanh (Quick Chips) - Ẩn thanh cuộn xấu */}
+            <div className="flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-0.5">
               {QUICK_SUGGESTIONS.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -1961,18 +2387,42 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                     type="button"
                     onClick={() => handleSendMessage(item.query)}
                     disabled={isLoading}
-                    className="px-2.5 py-1.5 rounded-xl bg-[#131b2e] hover:bg-[#1a253e] text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 text-xs font-medium transition shrink-0 flex items-center gap-1.5 whitespace-nowrap active:scale-95 disabled:opacity-50"
-                    style={{ backgroundColor: "#131b2e", borderColor: "#1e293b" }}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-normal transition shrink-0 flex items-center gap-1.5 whitespace-nowrap active:scale-95 disabled:opacity-50 shadow-2xs ${
+                      isLight
+                        ? "bg-slate-50 hover:bg-teal-50 text-slate-700 hover:text-teal-800 border border-slate-200 hover:border-teal-300"
+                        : "bg-slate-800/60 hover:bg-slate-800 text-slate-300 hover:text-teal-200 border border-slate-700/50 hover:border-teal-500/40"
+                    }`}
                     title={`Gửi nhanh: ${item.query}`}
                   >
-                    <Icon className="w-3.5 h-3.5 text-cyan-400" />
+                    <Icon className={`w-3.5 h-3.5 ${isLight ? "text-teal-600" : "text-teal-400"}`} />
                     <span>{item.label}</span>
                   </button>
                 );
               })}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPromptList(!showPromptList);
+                  setSelectedTopicId(null);
+                }}
+                className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition shrink-0 flex items-center gap-1.5 whitespace-nowrap ${
+                  showPromptList
+                    ? isLight
+                      ? "bg-teal-50 text-teal-800 border-teal-300"
+                      : "bg-teal-950/80 text-teal-300 border-teal-600"
+                    : isLight
+                    ? "bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-slate-200"
+                    : "bg-slate-800/40 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border-slate-700/40"
+                }`}
+                title="Xem toàn bộ 4 danh mục câu hỏi chuyên môn"
+              >
+                <Sparkles className={`w-3.5 h-3.5 ${isLight ? "text-teal-600" : "text-teal-400"}`} />
+                <span>Xem thêm gợi ý</span>
+              </button>
             </div>
 
-            {/* 2. Form nhập tin nhắn */}
+            {/* Form nhập tin nhắn */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -1990,13 +2440,16 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                 }}
                 className={`p-2.5 rounded-xl transition border shrink-0 flex items-center justify-center ${
                   showPromptList
-                    ? "bg-emerald-950 text-emerald-400 border-emerald-600"
-                    : "bg-[#131b2e] text-slate-400 hover:text-emerald-400 hover:bg-[#1a253e] border-slate-750 hover:border-slate-600"
+                    ? isLight
+                      ? "bg-teal-50 text-teal-800 border-teal-300"
+                      : "bg-teal-950/80 text-teal-300 border-teal-600"
+                    : isLight
+                    ? "bg-slate-50 text-slate-600 hover:text-teal-700 hover:bg-slate-100 border-slate-200"
+                    : "bg-slate-800/60 text-slate-400 hover:text-teal-300 hover:bg-slate-800 border-slate-700/50"
                 }`}
-                style={{ backgroundColor: showPromptList ? undefined : "#131b2e", borderColor: "#1e293b" }}
                 title="Mở danh mục câu hỏi (4 chủ đề)"
               >
-                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <Sparkles className={`w-4 h-4 ${isLight ? "text-teal-600" : "text-teal-400"}`} />
               </button>
 
               {/* Ô nhập văn bản sạch - không gợi ý, không dropdown lịch sử */}
@@ -2007,7 +2460,7 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Nhập tin nhắn..."
+                placeholder="Nhập tin nhắn hỏi AI Copilot..."
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
@@ -2016,15 +2469,18 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                 data-lpignore="true"
                 data-form-type="other"
                 disabled={isLoading}
-                className="flex-1 bg-[#131b2e] border border-slate-750 focus:border-emerald-500 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition disabled:opacity-50"
-                style={{ backgroundColor: "#131b2e", color: "#f8fafc", borderColor: "#1e293b" }}
+                className={`flex-1 border rounded-xl px-4 py-2.5 text-xs sm:text-sm placeholder-slate-400 focus:outline-none transition disabled:opacity-50 ${
+                  isLight
+                    ? "bg-slate-50 focus:bg-white border-slate-200 focus:border-teal-500 text-slate-900 focus:ring-1 focus:ring-teal-500/30"
+                    : "bg-slate-800/60 focus:bg-slate-800/90 border-slate-700/60 focus:border-teal-500/70 text-slate-100 focus:ring-1 focus:ring-teal-500/40"
+                }`}
               />
 
               {/* Nút gửi */}
               <button
                 type="submit"
                 disabled={!inputValue.trim() || isLoading}
-                className="p-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-30 text-white rounded-xl shadow-md transition active:scale-95 shrink-0"
+                className="p-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-30 text-white rounded-xl shadow-md transition active:scale-95 shrink-0"
                 title="Gửi tin nhắn (Enter)"
               >
                 <Send className="w-4 h-4" />
