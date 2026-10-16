@@ -21,7 +21,7 @@ import {
   Thermometer,
   FlaskConical,
   Layers,
-  Sparkles,
+  Info,
   ShieldAlert,
 } from "lucide-react";
 
@@ -369,8 +369,8 @@ export const ConfigAndDiagnostics: React.FC<ConfigAndDiagnosticsProps> = ({
             {/* Hướng dẫn nguyên lý SCADA */}
             <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-white/[0.06] dark:bg-[#111319]/70 text-slate-600 dark:text-slate-400 mt-1.5">
               <div className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-1 flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-cyan-500" />
-                Nguyên lý phân loại thông minh SortiX-Med:
+                <Info className="h-3.5 w-3.5 text-cyan-500" />
+                Nguyên lý định tuyến chấp hành SortiX-Med:
               </div>
               <p className="text-[11px] leading-relaxed">
                 Khi Camera AI nhận diện vật thể tại cổng vào S1, bộ điều khiển ESP32 tính toán quãng đường dịch chuyển của băng tải và kích hoạt servo gạt tương ứng theo cấu hình khay đã lưu.

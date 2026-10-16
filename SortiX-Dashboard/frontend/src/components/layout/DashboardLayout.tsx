@@ -331,6 +331,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, []);
 
+
+
   // Khi ở trang Login hoặc chưa đăng nhập, lập tức dập tắt toàn bộ còi hú báo động và hủy các trạng thái sự cố
   useEffect(() => {
     if (isLoginPage || !isAuthenticated) {
@@ -460,6 +462,64 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   toastRef.current = toast;
   const setAlertsRef = useRef(sorterData.setAlerts);
   setAlertsRef.current = sorterData.setAlerts;
+
+  // Industrial SCADA Hotkeys:
+  // Space: Chạy / Tạm dừng
+  // Shift + E: Dừng khẩn cấp tức thời (Instant E-Stop)
+  // D: Chuyển đổi mật độ Gọn (Compact) / Tiêu chuẩn (Comfortable)
+  // M: Bật / Tắt âm thanh còi báo (Mute Siren)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Bỏ qua khi người dùng đang nhập liệu trong ô input, textarea hoặc contentEditable
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      // 1. Shift + E -> Instant Emergency Stop
+      if (e.shiftKey && (e.key === "E" || e.key === "e")) {
+        e.preventDefault();
+        void triggerEmergencyStopRef.current(undefined, "user_action");
+        toast.error("🛑 [HMI PHÍM TẮT] Đã kích hoạt DỪNG KHẨN CẤP (Shift + E)!");
+        return;
+      }
+
+      // 2. Space -> Chạy / Tạm dừng băng tải
+      if (e.code === "Space" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        conveyor.handleToggleRun();
+        return;
+      }
+
+      // 3. D -> Chuyển đổi mật độ hiển thị (Compact / Comfortable)
+      if ((e.key === "d" || e.key === "D") && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        toggleDisplayDensity();
+        toast.info(
+          displayDensity === "compact"
+            ? "Mật độ hiển thị: Tiêu chuẩn (Comfortable)"
+            : "Mật độ hiển thị: Gọn gàng (Compact - Fit màn hình)"
+        );
+        return;
+      }
+
+      // 4. M -> Bật / Tắt âm thanh còi báo
+      if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        handleToggleSound();
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [conveyor, toggleDisplayDensity, displayDensity, handleToggleSound, toast]);
 
   // Tài khoản người dùng (role: user) chỉ có duy nhất chế độ thực tế, không có mô phỏng
   const isUserRole = user?.role === "user";

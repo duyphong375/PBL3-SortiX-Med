@@ -228,12 +228,12 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
                 }}
                 className={`flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition-all duration-200 ${
                   isSimulation
-                    ? "bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white shadow-xs border border-purple-400/40"
-                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                    ? "bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-xs border border-amber-400/50"
+                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:white"
                 }`}
-                title="Chế độ Mô phỏng: Cho phép nạp phôi ảo và kiểm thử an toàn"
+                title="Chế độ Mô phỏng (Test Rig): Cho phép nạp phôi ảo và kiểm thử an toàn"
               >
-                <FlaskConical className={`h-3.5 w-3.5 ${isSimulation ? "animate-pulse text-purple-200" : ""}`} />
+                <FlaskConical className={`h-3.5 w-3.5 ${isSimulation ? "animate-pulse text-slate-950" : ""}`} />
                 <span className="hidden xs:inline text-xs">Mô phỏng</span>
               </button>
 
@@ -271,7 +271,7 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
               onClick={() => setStatusMenuOpen((prev) => !prev)}
               className={`hidden sm:flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold border transition-all shadow-2xs ${
                 isSimulation
-                  ? "border-purple-500/30 bg-purple-500/10 text-purple-700 dark:text-purple-300 hover:bg-purple-500/15"
+                  ? "border-amber-500/40 bg-amber-500/15 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20"
                   : isRealOnline
                   ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15"
                   : "border-rose-500/50 bg-rose-500/15 text-rose-700 dark:text-rose-300 hover:bg-rose-500/20 animate-pulse"
@@ -285,10 +285,10 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
                 <span
                   className={`relative inline-flex h-2 w-2 rounded-full ${
                     isSimulation
-                      ? "bg-purple-500 shadow-[0_0_6px_#a855f7]"
+                      ? "bg-amber-500"
                       : isRealOnline
-                      ? "bg-emerald-500 shadow-[0_0_6px_#3b82f6]"
-                      : "bg-rose-500 shadow-[0_0_6px_#f43f5e]"
+                      ? "bg-emerald-500"
+                      : "bg-rose-500"
                   }`}
                 />
               </span>
@@ -316,7 +316,7 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
                   <span
                     className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
                       isSimulation
-                        ? "bg-purple-500/15 text-purple-700 dark:text-purple-300"
+                        ? "bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30"
                         : isRealOnline
                         ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                         : "bg-rose-500/15 text-rose-700 dark:text-rose-300"
@@ -400,7 +400,7 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
               {isRealIssue && (
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 bg-rose-400" />
               )}
-              <span className={`relative inline-flex h-2 w-2 rounded-full ${isRealOnline ? "bg-emerald-500" : isSimulation ? "bg-purple-500" : "bg-rose-500"}`} />
+              <span className={`relative inline-flex h-2 w-2 rounded-full ${isRealOnline ? "bg-emerald-500" : isSimulation ? "bg-amber-500" : "bg-rose-500"}`} />
             </span>
             <Clock className="h-3.5 w-3.5 text-slate-400" />
             <span className="text-[11px] text-slate-400 hidden xl:inline">Cập nhật:</span>

@@ -90,9 +90,9 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
           {isSimulation ? (
             <Badge
               variant="outline"
-              className="border-purple-500/40 bg-purple-500/10 text-purple-700 dark:text-purple-300 gap-1 text-[10px] font-semibold px-2 py-0.5"
+              className="border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300 gap-1 text-[10px] font-semibold px-2 py-0.5"
             >
-              <FlaskConical className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+              <FlaskConical className="h-3 w-3 text-amber-600 dark:text-amber-400" />
               <span>Mô phỏng</span>
             </Badge>
           ) : (

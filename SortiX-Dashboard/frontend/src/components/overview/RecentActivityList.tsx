@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Package, CheckCircle2, AlertTriangle, ArrowRight, Sparkles } from "lucide-react";
+import { Package, CheckCircle2, AlertTriangle, ArrowRight, ScanLine } from "lucide-react";
 import { ClassificationRecord, CATALOG_BRANDS } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,7 @@ export function RecentActivityList({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-white/[0.06] px-6 py-4">
         <div>
           <h3 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-cyan-500" />
+            <ScanLine className="h-4 w-4 text-cyan-500" />
             <span>Nhật ký phân loại thời gian thực</span>
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -78,7 +78,7 @@ export function RecentActivityList({
                       <button
                         type="button"
                         onClick={onSimulateNewItem}
-                        className="rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-500/20 dark:text-purple-300 transition-colors"
+                        className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-500/20 dark:text-amber-300 transition-colors"
                       >
                         Nạp phôi mô phỏng
                       </button>

@@ -15,7 +15,6 @@ import {
   X,
   Copy,
   Check,
-  Sparkles,
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
@@ -344,9 +343,9 @@ export function ForgotPasswordModal({
               <button
                 type="button"
                 onClick={() => handleAutoFillOtp(mockOtpToast.otp)}
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 py-2 px-3 text-xs font-bold text-slate-950 shadow-md transition-all active:scale-[0.98] cursor-pointer"
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2 px-3 text-xs font-bold text-white shadow-xs transition-all active:scale-[0.98] cursor-pointer"
               >
-                <Sparkles className="h-3.5 w-3.5 text-slate-950" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-white" />
                 <span>Tự động điền vào form</span>
               </button>
             </div>

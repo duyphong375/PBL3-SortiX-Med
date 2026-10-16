@@ -29,7 +29,6 @@ import {
   ShieldAlert,
   Wrench,
   Activity,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   BarChart3,

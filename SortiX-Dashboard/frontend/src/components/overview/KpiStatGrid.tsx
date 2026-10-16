@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Boxes, Cpu, Gauge, Sparkles, TrendingUp, TrendingDown } from "lucide-react";
+import { Boxes, Cpu, Gauge, ScanLine, TrendingUp, TrendingDown } from "lucide-react";
 import { TelemetryData } from "@/lib/types";
 import { formatUptime } from "@/lib/dataProcessor";
 import { Card } from "@/components/ui/card";
@@ -35,6 +35,7 @@ export function StatCard({
   subtitle,
   trend,
   color,
+  tag,
 }: {
   icon: React.FC<{ className?: string }>;
   title: string;
@@ -42,61 +43,63 @@ export function StatCard({
   subtitle: string;
   trend?: { value: string; positive?: boolean; neutral?: boolean };
   color: string;
+  tag?: string;
 }) {
-  const iconThemes: Record<string, { bg: string; text: string; glow: string; border: string }> = {
+  const iconThemes: Record<string, { bg: string; text: string; border: string }> = {
     cyan: {
       bg: "bg-cyan-500/10 dark:bg-cyan-500/15",
-      text: "text-cyan-600 dark:text-cyan-400",
-      glow: "shadow-[0_0_15px_-3px_rgba(6,182,212,0.2)]",
-      border: "border-cyan-500/30",
+      text: "text-cyan-700 dark:text-cyan-400",
+      border: "border-cyan-500/25",
     },
     emerald: {
       bg: "bg-emerald-500/10 dark:bg-emerald-500/15",
-      text: "text-emerald-600 dark:text-emerald-400",
-      glow: "shadow-[0_0_15px_-3px_rgba(16,185,129,0.2)]",
-      border: "border-emerald-500/30",
-    },
-    purple: {
-      bg: "bg-purple-500/10 dark:bg-purple-500/15",
-      text: "text-purple-600 dark:text-purple-400",
-      glow: "shadow-[0_0_15px_-3px_rgba(168,85,247,0.2)]",
-      border: "border-purple-500/30",
+      text: "text-emerald-700 dark:text-emerald-400",
+      border: "border-emerald-500/25",
     },
     amber: {
       bg: "bg-amber-500/10 dark:bg-amber-500/15",
-      text: "text-amber-600 dark:text-amber-400",
-      glow: "shadow-[0_0_15px_-3px_rgba(245,158,11,0.2)]",
-      border: "border-amber-500/30",
+      text: "text-amber-700 dark:text-amber-400",
+      border: "border-amber-500/25",
     },
     rose: {
       bg: "bg-rose-500/10 dark:bg-rose-500/15",
-      text: "text-rose-600 dark:text-rose-400",
-      glow: "shadow-[0_0_15px_-3px_rgba(244,63,94,0.2)]",
-      border: "border-rose-500/30",
+      text: "text-rose-700 dark:text-rose-400",
+      border: "border-rose-500/25",
     },
     slate: {
       bg: "bg-slate-500/10 dark:bg-slate-500/15",
-      text: "text-slate-600 dark:text-slate-400",
-      glow: "shadow-none",
+      text: "text-slate-700 dark:text-slate-300",
       border: "border-slate-500/20",
+    },
+    teal: {
+      bg: "bg-teal-500/10 dark:bg-teal-500/15",
+      text: "text-teal-700 dark:text-teal-400",
+      border: "border-teal-500/25",
     },
   };
 
   const theme = iconThemes[color] || iconThemes.slate;
 
   return (
-    <Card className="group relative overflow-hidden transition-all duration-300 hover:translate-y-[-2px] hover:shadow-lg border-slate-200/90 dark:border-white/[0.08] dark:bg-[#131722]/90">
-      <div className="p-5">
-        <div className="flex items-start justify-between">
-          <div
-            className={`flex h-11 w-11 items-center justify-center rounded-xl border transition-transform duration-300 group-hover:scale-105 ${theme.bg} ${theme.text} ${theme.border} ${theme.glow}`}
-          >
-            <Icon className="h-5 w-5" />
+    <Card className="group relative overflow-hidden transition-all duration-200 border-slate-200/90 dark:border-white/[0.08] dark:bg-[#121622] rounded-xl shadow-xs">
+      <div className="p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div
+              className={`flex h-10 w-10 items-center justify-center rounded-lg border transition-colors ${theme.bg} ${theme.text} ${theme.border}`}
+            >
+              <Icon className="h-5 w-5" />
+            </div>
+            {tag && (
+              <span className="font-mono text-[10px] font-bold text-slate-400 dark:text-slate-500 tracking-wider">
+                {tag}
+              </span>
+            )}
           </div>
           {trend && (
             <Badge
               variant={trend.neutral ? "secondary" : trend.positive ? "success" : "destructive"}
-              className={`text-xs font-semibold tracking-tight ${
+              className={`text-[11px] font-mono font-bold tracking-tight py-0.5 px-2 ${
                 trend.neutral
                   ? "bg-slate-100 text-slate-700 dark:bg-white/[0.08] dark:text-slate-300 border border-slate-200/80 dark:border-white/10"
                   : ""
@@ -113,14 +116,14 @@ export function StatCard({
             </Badge>
           )}
         </div>
-        <div className="mt-4">
-          <p className="font-mono text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+        <div className="mt-3.5">
+          <p className="font-mono tabular-nums text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
             {value}
           </p>
-          <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-400">
+          <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
             {title}
           </p>
-          <p className="mt-1 text-xs text-slate-600 dark:text-slate-400 leading-relaxed truncate" title={subtitle}>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed truncate" title={subtitle}>
             {subtitle}
           </p>
         </div>
@@ -160,7 +163,7 @@ export function KpiStatGrid({
   const animatedTotal = useCountUp(totalSorted, 800);
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
       {/* KPI 1: Sản lượng ca */}
       {(() => {
         const totalInBins = (binCounts.bin1 || 0) + (binCounts.bin2 || 0) + (binCounts.bin3 || 0);
@@ -168,7 +171,6 @@ export function KpiStatGrid({
         const trayDetail = `Hiện trong khay: K1: ${binCounts.bin1} | K2: ${binCounts.bin2} | K3: ${binCounts.bin3}${
           clearedCount > 0 ? ` • Đã dọn: ${clearedCount} SP` : ""
         }`;
-        // Không hiển thị chip +0 hôm nay như một xu hướng tăng. Nếu chưa có so sánh hoặc = 0, dùng nhãn trung tính "Hôm nay".
         const trendBadge =
           totalSorted > 0
             ? { value: `${totalSorted} SP hôm nay`, positive: true }
@@ -178,13 +180,14 @@ export function KpiStatGrid({
           <div className="relative">
             <StatCard
               icon={Boxes}
+              tag="[PROD-01]"
               title="Sản lượng ca"
               value={`${animatedTotal.toLocaleString()} SP`}
               subtitle="Tổng tích lũy ca làm việc hôm nay"
               trend={trendBadge}
               color="cyan"
             />
-            {/* Ẩn dòng thông tin gộp khỏi giao diện KPI (chỉ số dọn khay hiển thị trực tiếp ở từng khay riêng); duy trì contract kiểm thử */}
+            {/* Duy trì chuỗi text phục vụ contract kiểm thử hồi quy */}
             <span className="hidden" aria-hidden="true">{trayDetail}</span>
           </div>
         );
@@ -193,6 +196,7 @@ export function KpiStatGrid({
       {/* KPI 2: Trạng thái băng tải */}
       <StatCard
         icon={Gauge}
+        tag="[CONV-01]"
         title="Trạng thái băng tải"
         value={
           !isEspConnected && !isSimulation
@@ -233,6 +237,7 @@ export function KpiStatGrid({
       {/* KPI 3: Thiết bị IoT */}
       <StatCard
         icon={Cpu}
+        tag="[IOT-01]"
         title="Thiết bị IoT"
         value={
           isDeviceOffline
@@ -256,12 +261,13 @@ export function KpiStatGrid({
             : "Mất tín hiệu",
           positive: !isDeviceOffline && (isSimulation ? true : isEspConnected),
         }}
-        color={isDeviceOffline || (!isEspConnected && !isSimulation) ? "rose" : isSimulation ? "purple" : "emerald"}
+        color={isDeviceOffline || (!isEspConnected && !isSimulation) ? "rose" : isSimulation ? "amber" : "emerald"}
       />
 
       {/* KPI 4: Độ tin cậy AI */}
       <StatCard
-        icon={Sparkles}
+        icon={ScanLine}
+        tag="[VISION-01]"
         title="Độ tin cậy AI"
         value={avgConfidence}
         subtitle={
@@ -274,7 +280,7 @@ export function KpiStatGrid({
             ? { value: `${sampleCount} mẫu đã quét`, positive: true }
             : { value: "Chưa có dữ liệu", neutral: true }
         }
-        color={avgConfidence === "--" || avgConfidence === "--%" ? "slate" : "emerald"}
+        color={avgConfidence === "--" || avgConfidence === "--%" ? "slate" : "teal"}
       />
     </div>
   );

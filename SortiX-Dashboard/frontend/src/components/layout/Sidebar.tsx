@@ -209,12 +209,12 @@ const SidebarComponent: React.FC<SidebarProps> = ({
             const isOfflineReal = !isSimulation && (mqttStatus !== "connected" || isDeviceOffline);
 
             const dotColor = isSimulation
-              ? "bg-purple-500 shadow-[0_0_8px_#a855f7]"
+              ? "bg-amber-500"
               : isOnlineReal
-              ? "bg-emerald-500 shadow-[0_0_8px_#3b82f6]"
-              : "bg-rose-500 shadow-[0_0_8px_#f43f5e]";
+              ? "bg-emerald-500"
+              : "bg-rose-500";
 
-            const pingColor = isSimulation ? "bg-purple-400" : isOnlineReal ? "bg-emerald-400" : "bg-rose-400";
+            const pingColor = isSimulation ? "bg-amber-400" : isOnlineReal ? "bg-emerald-400" : "bg-rose-400";
 
             const labelText = isSimulation
               ? "Chế độ mô phỏng"
@@ -225,7 +225,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({
             const badgeText = isSimulation ? "SIMULATION" : isOnlineReal ? "ONLINE" : "OFFLINE";
 
             const badgeStyle = isSimulation
-              ? "bg-purple-500/10 text-purple-600 dark:text-purple-300 border-purple-500/20"
+              ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
               : isOnlineReal
               ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
               : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20";
@@ -262,10 +262,10 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                 <div
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white shadow-xs ${
                     user.role === "admin"
-                      ? "bg-gradient-to-br from-indigo-500 to-purple-600"
+                      ? "bg-indigo-600"
                       : user.role === "maintenance"
-                      ? "bg-gradient-to-br from-amber-500 to-orange-600"
-                      : "bg-gradient-to-br from-emerald-500 to-teal-600"
+                      ? "bg-amber-600"
+                      : "bg-emerald-600"
                   }`}
                 >
                   {user.role === "admin" ? "AD" : user.role === "maintenance" ? "MT" : "OP"}
@@ -278,10 +278,10 @@ const SidebarComponent: React.FC<SidebarProps> = ({
                     <span
                       className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
                         user.role === "admin"
-                          ? "bg-purple-500/15 text-purple-700 dark:text-purple-300"
+                          ? "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30"
                           : user.role === "maintenance"
-                          ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                          : "bg-teal-500/15 text-teal-700 dark:text-teal-300"
+                          ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+                          : "bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30"
                       }`}
                     >
                       {user.role === "admin"

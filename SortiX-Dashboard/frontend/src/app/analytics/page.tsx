@@ -13,7 +13,8 @@ import { calculateDailyTotalProduction, getBusinessDateKey, BUSINESS_TIME_ZONE }
 import {
   Layers,
   PackageCheck,
-  Sparkles,
+  TrendingUp,
+  Radio,
   BarChart3,
   PieChart as PieIcon,
   History,
@@ -428,7 +429,7 @@ function AnalyticsPageContent() {
 
           <div className="flex items-center gap-2">
             <div className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-700 dark:text-cyan-300">
-              <Sparkles className="h-3.5 w-3.5 text-cyan-500" />
+              <TrendingUp className="h-3.5 w-3.5 text-cyan-500" />
               <span>Đỉnh sản lượng:</span>
               <span className="font-mono font-bold text-cyan-600 dark:text-cyan-400">
                 {peakHour.hour} ({peakHour.count} SP)
@@ -718,7 +719,7 @@ function AnalyticsPageContent() {
         {/* Chú thích chân bảng ma trận */}
         <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
           <div className="flex items-center gap-2 text-[11px]">
-            <Sparkles className="h-3.5 w-3.5 text-cyan-500 shrink-0" />
+            <Radio className="h-3.5 w-3.5 text-cyan-500 shrink-0" />
             <span>
               Luật phân nhánh được đồng bộ qua topic MQTT{" "}
               <code className="rounded bg-slate-100 dark:bg-white/5 px-1 py-0.5 font-mono text-cyan-600 dark:text-cyan-400">

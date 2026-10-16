@@ -5,7 +5,7 @@ import { useDashboardSafe } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Bot,
-  Sparkles,
+  Terminal,
   Send,
   X,
   RotateCcw,
@@ -2008,11 +2008,11 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                       <div className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 ${
                         isLight ? "bg-teal-50 border-teal-200" : "bg-emerald-950 border-emerald-700"
                       }`}>
-                        <Sparkles className={`w-4 h-4 ${isLight ? "text-teal-700" : "text-emerald-400"}`} />
+                        <Terminal className={`w-4 h-4 ${isLight ? "text-teal-700" : "text-emerald-400"}`} />
                       </div>
                       <div>
                         <h4 className={`font-bold text-xs uppercase tracking-wide flex items-center gap-2 ${isLight ? "text-slate-800" : "text-slate-100"}`}>
-                          <span>Danh Mục Câu Hỏi AI Agent</span>
+                          <span>Danh Mục Khảo Sát & Chẩn Đoán SCADA</span>
                           <span className={`text-[10px] font-normal px-2 py-0.2 rounded-full border ${
                             isLight
                               ? "bg-teal-50 text-teal-800 border-teal-200"
@@ -2022,7 +2022,7 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                           </span>
                         </h4>
                         <p className={`text-[10px] ${isLight ? "text-slate-500" : "text-slate-400"}`}>
-                          Click vào bất kỳ mục nào dưới đây để xem danh sách câu hỏi chi tiết
+                          Click vào bất kỳ mục nào dưới đây để xem danh mục lệnh & truy vấn chi tiết
                         </p>
                       </div>
                     </div>
@@ -2305,8 +2305,8 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                     >
                       <div className="text-[11px] font-semibold mb-2 flex items-center justify-between">
                         <span className={`flex items-center gap-1 ${isLight ? "text-teal-700" : "text-teal-400"}`}>
-                          <Sparkles className="w-3.5 h-3.5" />
-                          4 Chủ đề câu hỏi chuyên môn:
+                          <Terminal className="w-3.5 h-3.5" />
+                          4 Chuyên mục giám sát kỹ thuật:
                         </span>
                         <button
                           type="button"
@@ -2576,8 +2576,8 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                 }`}
                 title="Xem toàn bộ 4 danh mục câu hỏi chuyên môn"
               >
-                <Sparkles className={`w-3.5 h-3.5 ${isLight ? "text-teal-600" : "text-teal-400"}`} />
-                <span>Xem thêm gợi ý</span>
+                <Terminal className={`w-3.5 h-3.5 ${isLight ? "text-teal-600" : "text-teal-400"}`} />
+                <span>Mở menu lệnh SCADA</span>
               </button>
             </div>
 
@@ -2590,7 +2590,7 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
               className="flex items-center gap-2"
               autoComplete="off"
             >
-              {/* Nút Sparkle nhỏ ở đầu ô nhập cho thao tác tiện lợi */}
+              {/* Nút Terminal nhỏ ở đầu ô nhập cho thao tác tiện lợi */}
               <button
                 type="button"
                 onClick={() => {
@@ -2606,9 +2606,9 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                     ? "bg-slate-50 text-slate-600 hover:text-teal-700 hover:bg-slate-100 border-slate-200"
                     : "bg-slate-800/60 text-slate-400 hover:text-teal-300 hover:bg-slate-800 border-slate-700/50"
                 }`}
-                title="Mở danh mục câu hỏi (4 chủ đề)"
+                title="Mở menu lệnh chẩn đoán & truy vấn SCADA (4 chuyên mục)"
               >
-                <Sparkles className={`w-4 h-4 ${isLight ? "text-teal-600" : "text-teal-400"}`} />
+                <Terminal className={`w-4 h-4 ${isLight ? "text-teal-600" : "text-teal-400"}`} />
               </button>
 
               {/* Ô nhập văn bản sạch - không gợi ý, không dropdown lịch sử */}
@@ -2619,7 +2619,7 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Nhập tin nhắn hỏi AI Copilot..."
+                placeholder="Nhập lệnh hoặc câu hỏi giám sát hệ thống..."
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"

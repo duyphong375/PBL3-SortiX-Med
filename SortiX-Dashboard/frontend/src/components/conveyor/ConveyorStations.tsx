@@ -21,50 +21,50 @@ export const ConveyorStations: React.FC<ConveyorStationsProps> = ({
 }) => {
   return (
     <>
-      {/* 1. CỔNG VÒM CAMERA AI & TIA QUÉT LASER (INSPECTION GANTRY - 15%) */}
-      <div className="absolute left-[15%] -top-7 bottom-0 z-30 flex flex-col items-center pointer-events-none">
-        {/* Khung cầu vượt cổng vòm kim loại (Truss Arch) */}
-        <div className="relative flex items-center gap-1.5 rounded-t-lg border-x-2 border-t-2 border-cyan-400/70 bg-slate-950 px-2.5 py-1 shadow-[0_0_15px_rgba(6,182,212,0.4)]">
+      {/* 1. CỔNG CAMERA THỊ GIÁC MÁY CÔNG NGHIỆP & CẢM BIẾN S1 (INSPECTION GANTRY - 15%) */}
+      <div className="absolute left-[15%] -top-6 bottom-0 z-30 flex flex-col items-center pointer-events-none">
+        {/* Khung cổng vòm nhôm định hình 2020 anot hóa */}
+        <div className="relative flex items-center gap-1.5 rounded-t-md border-x border-t border-slate-600 bg-slate-900 px-2 py-0.5 shadow-sm">
           <div className="flex items-center gap-1">
-            <Camera className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-            <span className="text-[9px] font-mono font-black tracking-wider text-cyan-300 whitespace-nowrap">
-              AI-VISION
+            <Camera className="h-3 w-3 text-cyan-400 shrink-0" />
+            <span className="text-[8px] font-mono font-bold tracking-wider text-slate-200 whitespace-nowrap">
+              CAM-01
             </span>
           </div>
-          {/* Mini HUD status indicator */}
+          {/* LED trạng thái camera */}
           <span
-            className={`h-2 w-2 rounded-full transition-all duration-300 shrink-0 ${
+            className={`h-1.5 w-1.5 rounded-full transition-colors duration-200 shrink-0 ${
               telemetry.s1_entry
-                ? "bg-emerald-400 shadow-[0_0_8px_#3b82f6] animate-pulse"
-                : "bg-cyan-500/40"
+                ? "bg-emerald-400 shadow-xs"
+                : "bg-slate-600"
             }`}
+            title={telemetry.s1_entry ? "Đang nhận diện phôi" : "Sẵn sàng"}
           />
         </div>
 
-        {/* Tia quét Laser nón quang học (Holographic Scan Cone) */}
-        <div className="relative w-16 flex-1 overflow-hidden">
-          <div
-            className={`holographic-scan-cone absolute inset-0 transition-opacity duration-200 ${
-              isBeltMoving ? "opacity-75" : "opacity-30"
-            } ${telemetry.s1_entry ? "!opacity-100 !shadow-[0_0_30px_#06b6d4]" : ""}`}
-          >
-            {/* Tia laser quét dọc chạy qua lại */}
-            {isBeltMoving && (
-              <div className="laser-scan-line absolute inset-x-1 h-0.5 bg-cyan-200 shadow-[0_0_10px_#38bdf8]" />
-            )}
-          </div>
+        {/* Vùng chiếu sáng quang học đồng đều (Medical LED Ring Illumination) */}
+        <div className="relative w-14 flex-1 overflow-hidden border-x border-dashed border-cyan-500/20 bg-gradient-to-b from-cyan-500/10 via-cyan-500/5 to-transparent">
+          {/* Vạch căn chỉnh tiêu cự camera */}
+          <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 border-b border-cyan-400/30" />
+          {telemetry.s1_entry && (
+            <div className="absolute inset-x-1 top-2 bottom-2 rounded bg-cyan-400/10 border border-cyan-400/40 transition-opacity" />
+          )}
         </div>
 
-        {/* Cảm biến vật cản hồng ngoại S1 (GPIO0) */}
-        <div className="flex items-center gap-1 mt-0.5">
-          <div
-            className={`h-3.5 w-3.5 rounded-full border-2 transition-all shrink-0 ${
+        {/* Cảm biến hồng ngoại S1 (GPIO0) với 2 LED vật lý PWR & OUT */}
+        <div className="flex items-center gap-1.5 mt-0.5 bg-slate-950/90 border border-slate-700/80 rounded px-1.5 py-0.5 shadow-xs">
+          {/* LED Đỏ: Báo nguồn PWR */}
+          <span className="h-1.5 w-1.5 rounded-full bg-rose-500" title="LED PWR: Nguồn 5V ON" />
+          {/* LED Xanh: Báo tín hiệu OUT */}
+          <span
+            className={`h-1.5 w-1.5 rounded-full transition-colors duration-150 ${
               telemetry.s1_entry
-                ? "border-amber-300 bg-amber-400 shadow-[0_0_12px_#f59e0b]"
-                : "border-slate-400 bg-slate-800"
+                ? "bg-emerald-400 shadow-xs"
+                : "bg-slate-600"
             }`}
+            title="LED OUT: Tín hiệu cảm biến phôi"
           />
-          <span className="rounded bg-slate-950/90 px-1 font-mono text-[8px] font-bold text-cyan-400 border border-cyan-500/30 whitespace-nowrap">
+          <span className="font-mono text-[7px] font-bold text-slate-300 whitespace-nowrap">
             S1:GPIO0
           </span>
         </div>

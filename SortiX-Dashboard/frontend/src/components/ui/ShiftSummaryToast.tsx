@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ClipboardCheck, Bell, ChevronRight, X, Sparkles } from "lucide-react";
+import { ClipboardCheck, Bell, ChevronRight, X, BarChart2 } from "lucide-react";
 import { ShiftSummaryPayload } from "@shared/types";
 
 interface ShiftSummaryToastProps {
@@ -114,9 +114,9 @@ export const ShiftSummaryToast: React.FC<ShiftSummaryToastProps> = ({
             <button
               type="button"
               onClick={onOpenDetails}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white py-2 px-3 text-xs font-bold transition-all shadow-md active:scale-95 border border-emerald-400/30"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white py-2 px-3 text-xs font-bold transition-all shadow-xs active:scale-95 border border-emerald-400/40"
             >
-              <Sparkles className="h-3.5 w-3.5 text-emerald-200" />
+              <BarChart2 className="h-3.5 w-3.5 text-emerald-100" />
               <span>Xem chi tiết & biểu đồ</span>
               <ChevronRight className="h-3.5 w-3.5" />
             </button>

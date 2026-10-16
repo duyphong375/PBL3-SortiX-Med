@@ -230,7 +230,7 @@ export const TemperatureGaugeWidget: React.FC<TemperatureGaugeWidgetProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Nhiệt độ ESP32</span>
               {isSimulation && (
-                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25">
                   Sim
                 </span>
               )}
@@ -579,10 +579,10 @@ export const TemperatureGaugeWidget: React.FC<TemperatureGaugeWidgetProps> = ({
           </div>
         ) : isSimulation ? (
           /* 2. CHẾ ĐỘ MÔ PHỎNG RÚT GỌN TRÊN TRANG TỔNG QUAN (CHỈ HIỆN BADGE MÔ PHỎNG NHỎ) */
-          <div className="mt-1.5 w-full flex items-center justify-between rounded-lg border border-purple-500/25 bg-purple-500/10 px-2.5 py-1 text-xs">
+          <div className="mt-1.5 w-full flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs">
             <div className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-pulse shadow-[0_0_8px_#a855f7]" />
-              <span className="font-bold text-[11px] text-purple-700 dark:text-purple-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              <span className="font-bold text-[11px] text-amber-800 dark:text-amber-300">
                 Chế độ mô phỏng
               </span>
             </div>
