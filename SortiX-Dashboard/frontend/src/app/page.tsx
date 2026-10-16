@@ -159,7 +159,7 @@ export default function DashboardPage() {
       name: "Đèn LED Trạng Thái",
       pin: "GPIO10",
       category: "alarm",
-      type: "buzzer",
+      type: "led",
       isOn: isLedStatusActive,
       description: "Đèn LED xanh lá báo trạng thái vận hành & cảnh báo sự cố",
     },

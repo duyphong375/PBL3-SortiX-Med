@@ -22,7 +22,7 @@ export interface HardwareDeviceStatus {
   name: string;
   pin: string;
   category: "actuator" | "sensor" | "alarm";
-  type?: "servo" | "motor" | "buzzer" | "sensor" | "estop";
+  type?: "servo" | "motor" | "buzzer" | "sensor" | "estop" | "led";
   isOn: boolean;
   description?: string;
 }
@@ -130,7 +130,7 @@ export const TemperatureGaugeWidget: React.FC<TemperatureGaugeWidgetProps> = ({
       name: "Đèn LED Trạng Thái",
       pin: "GPIO10",
       category: "alarm",
-      type: "buzzer",
+      type: "led",
       isOn: false,
       description: "Đèn LED xanh lá báo trạng thái vận hành & cảnh báo sự cố",
     },
@@ -662,6 +662,8 @@ export const TemperatureGaugeWidget: React.FC<TemperatureGaugeWidgetProps> = ({
                       <RotateCw className={`h-2.5 w-2.5 ${isDeviceOn ? "animate-spin text-emerald-500" : ""}`} />
                     ) : device.type === "sensor" ? (
                       <Eye className={`h-2.5 w-2.5 ${isDeviceOn ? "text-emerald-500" : ""}`} />
+                    ) : device.type === "led" || device.id === "led_status" ? (
+                      <Zap className={`h-2.5 w-2.5 ${isDeviceOn ? "animate-pulse text-emerald-500" : ""}`} />
                     ) : device.type === "buzzer" ? (
                       <Volume2 className={`h-2.5 w-2.5 ${isDeviceOn ? "animate-bounce text-rose-500" : ""}`} />
                     ) : device.type === "estop" ? (

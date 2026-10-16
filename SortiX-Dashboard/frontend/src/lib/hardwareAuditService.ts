@@ -93,7 +93,7 @@ export function logHardwareTestAction(
   const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
 
   const newEntry: HardwareAuditEntry = {
-    id: `hw-log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    id: `hw-log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     timestamp: timeStr,
     actor,
     action,

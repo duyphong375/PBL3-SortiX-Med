@@ -299,6 +299,14 @@ export default function SettingsDevicesPage() {
     return gpioList.filter((g) => g.category === selectedCategory);
   }, [gpioList, selectedCategory]);
 
+  const categoryCounts = useMemo(() => ({
+    all: gpioList.length,
+    actuators: gpioList.filter((g) => g.category === "actuators").length,
+    sensors: gpioList.filter((g) => g.category === "sensors").length,
+    indicators: gpioList.filter((g) => g.category === "indicators").length,
+    bus: gpioList.filter((g) => g.category === "bus").length,
+  }), [gpioList]);
+
   const confirmReset = async () => {
     try {
       await handleResetActuatorStates();
@@ -576,11 +584,11 @@ export default function SettingsDevicesPage() {
           {/* Bộ lọc phân loại chân */}
           <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 dark:bg-white/[0.04] p-1 rounded-xl border border-slate-200/80 dark:border-white/[0.06]">
             {[
-              { id: "all", label: "Tất cả (13)" },
-              { id: "actuators", label: "Cơ cấu chấp hành (4)" },
-              { id: "sensors", label: "Cảm biến & Encoder (4)" },
-              { id: "indicators", label: "Đèn tháp & Còi (3)" },
-              { id: "bus", label: "An toàn & Bus (2)" },
+              { id: "all", label: `Tất cả (${categoryCounts.all})` },
+              { id: "actuators", label: `Cơ cấu chấp hành (${categoryCounts.actuators})` },
+              { id: "sensors", label: `Cảm biến & Encoder (${categoryCounts.sensors})` },
+              { id: "indicators", label: `Đèn báo trạng thái (${categoryCounts.indicators})` },
+              { id: "bus", label: `An toàn & Bus (${categoryCounts.bus})` },
             ].map((tab) => (
               <button
                 key={tab.id}
