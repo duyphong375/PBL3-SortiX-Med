@@ -326,12 +326,16 @@ export const TelegramBotService = {
     const telemetryContext = this.buildTelemetrySummary();
     const promptWithContext = `${telemetryContext}\n\n[CÂU HỎI TỪ KỸ SƯ / ĐIỀU DƯỠNG TRÊN TELEGRAM]:\n${userPrompt}`;
 
-    const primaryModel = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
+    const primaryModel = process.env.GEMINI_MODEL?.trim() || "gemini-3.1-flash-lite";
     const candidateModels = Array.from(
       new Set([
         primaryModel,
+        "gemini-3.1-flash-lite",
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash-lite-preview",
         "gemini-3.5-flash-lite",
         "gemini-3.5-flash",
+        "gemini-3.8-flash",
         "gemini-flash-lite-latest",
         "gemini-flash-latest",
       ])
