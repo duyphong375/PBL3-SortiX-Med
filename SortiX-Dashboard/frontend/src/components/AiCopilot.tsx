@@ -32,6 +32,7 @@ import {
   Sun,
   Moon,
   UserCheck,
+  Trash2,
 } from "lucide-react";
 
 interface ChatMessage {
@@ -567,6 +568,7 @@ export const AiCopilot: React.FC = () => {
   const [loadingStep, setLoadingStep] = useState(0);
   const [webhookUrl, setWebhookUrl] = useState(DEFAULT_WEBHOOK_URL);
   const [showSettings, setShowSettings] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [sessionId, setSessionId] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
@@ -945,10 +947,35 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleResetChat = () => {
+  // Xóa toàn bộ lịch sử trò chuyện
+  const handleClearAllHistory = () => {
     localStorage.removeItem("sortix_ai_messages");
+    localStorage.removeItem("sortix_ai_session_id");
+    const newSid = "session_" + Math.random().toString(36).substring(2, 11) + "_" + Date.now();
+    localStorage.setItem("sortix_ai_session_id", newSid);
+    setSessionId(newSid);
     initWelcomeMessage();
-    showToast("Đã làm mới phiên hội thoại", "success");
+    setShowClearConfirm(false);
+    showToast("Đã xóa toàn bộ lịch sử trò chuyện thành công!", "success");
+  };
+
+  // Xóa một tin nhắn cụ thể
+  const handleDeleteMessage = (id: string) => {
+    const updated = messages.filter((m) => m.id !== id);
+    if (updated.length === 0 || (updated.length === 1 && updated[0].id === "msg_welcome")) {
+      handleClearAllHistory();
+    } else {
+      saveMessages(updated);
+      showToast("Đã xóa tin nhắn đã chọn", "success");
+    }
+  };
+
+  const handleResetChat = () => {
+    if (messages.length > 1 || (messages.length === 1 && messages[0].id !== "msg_welcome")) {
+      setShowClearConfirm(true);
+    } else {
+      handleClearAllHistory();
+    }
   };
 
   const handleSaveWebhook = (url: string) => {
@@ -1672,6 +1699,25 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                 <Settings className="w-4 h-4" />
               </button>
 
+              {/* Nút Xóa lịch sử trò chuyện */}
+              <button
+                type="button"
+                onClick={() => setShowClearConfirm(true)}
+                disabled={messages.length <= 1 && messages[0]?.id === "msg_welcome"}
+                className={`p-1.5 rounded-lg transition ${
+                  messages.length > 1 || (messages.length === 1 && messages[0]?.id !== "msg_welcome")
+                    ? isLight
+                      ? "hover:text-rose-600 hover:bg-rose-50 text-slate-500"
+                      : "hover:text-rose-400 hover:bg-rose-950/60 text-slate-400"
+                    : "opacity-40 cursor-not-allowed text-slate-400"
+                }`}
+                title="Xóa toàn bộ lịch sử trò chuyện"
+                aria-label="Xóa toàn bộ lịch sử trò chuyện"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+
+              {/* Nút Làm mới hội thoại */}
               <button
                 type="button"
                 onClick={handleResetChat}
@@ -1856,6 +1902,34 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                     Lưu
                   </button>
                 </div>
+              </div>
+
+              {/* Quản lý dữ liệu trò chuyện */}
+              <div
+                className={`pt-2.5 mt-1 border-t flex items-center justify-between gap-2 ${
+                  isLight ? "border-slate-200" : "border-slate-800"
+                }`}
+              >
+                <div>
+                  <div className={`font-semibold text-[11px] ${isLight ? "text-slate-800" : "text-slate-200"}`}>
+                    Quản lý dữ liệu trò chuyện:
+                  </div>
+                  <div className={`text-[10px] ${isLight ? "text-slate-500" : "text-slate-400"}`}>
+                    {messages.length} tin nhắn được lưu trong bộ nhớ
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSettings(false);
+                    setShowClearConfirm(true);
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-xs font-semibold transition active:scale-95"
+                  title="Xóa toàn bộ lịch sử trò chuyện"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Xóa lịch sử chat</span>
+                </button>
               </div>
             </div>
           )}
@@ -2302,6 +2376,21 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                           )}
                           <span>{msg.telegramSent ? "Đã gửi Telegram" : "Telegram"}</span>
                         </button>
+
+                        {/* Nút xóa câu trả lời */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMessage(msg.id)}
+                          className={`flex items-center gap-1 px-1.5 py-1 rounded transition text-[11px] ${
+                            isLight
+                              ? "hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200/80 shadow-2xs"
+                              : "hover:bg-rose-950/60 text-slate-400 hover:text-rose-400"
+                          }`}
+                          title="Xóa tin nhắn này"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Xóa</span>
+                        </button>
                       </div>
 
                       <span className={`font-mono text-[10px] ${isLight ? "text-slate-400" : "text-slate-500"}`}>
@@ -2324,11 +2413,23 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
 
                   {msg.sender === "user" && (
                     <div
-                      className={`text-[10px] mt-1 text-right font-mono ${
+                      className={`text-[10px] mt-1 flex items-center justify-end gap-2 font-mono ${
                         isLight ? "text-slate-500" : "text-slate-400"
                       }`}
                     >
-                      {msg.timestamp}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMessage(msg.id)}
+                        className={`p-0.5 rounded transition ${
+                          isLight
+                            ? "text-slate-400 hover:text-rose-600 hover:bg-slate-300/60"
+                            : "text-slate-500 hover:text-rose-400 hover:bg-slate-700/60"
+                        }`}
+                        title="Xóa câu hỏi này"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                      <span>{msg.timestamp}</span>
                     </div>
                   )}
                 </div>
@@ -2487,6 +2588,55 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
               </button>
             </form>
           </div>
+
+          {/* Hộp thoại xác nhận xóa lịch sử */}
+          {showClearConfirm && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+              <div
+                className={`w-full max-w-sm rounded-2xl p-5 border shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 ${
+                  isLight
+                    ? "bg-white border-slate-200 text-slate-800"
+                    : "bg-[#0f172a] border-slate-800 text-slate-100"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0 text-rose-600 dark:text-rose-400">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className={`text-sm font-bold ${isLight ? "text-slate-900" : "text-white"}`}>
+                      Xóa toàn bộ lịch sử trò chuyện?
+                    </h4>
+                    <p className={`text-xs leading-relaxed ${isLight ? "text-slate-600" : "text-slate-400"}`}>
+                      Tất cả các câu hỏi và câu trả lời trong phiên này sẽ bị xóa vĩnh viễn khỏi bộ nhớ trình duyệt và phiên làm việc sẽ được làm mới.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowClearConfirm(false)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-xl border transition ${
+                      isLight
+                        ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+                        : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
+                    }`}
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearAllHistory}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 active:scale-95 rounded-xl shadow-md shadow-rose-900/30 transition"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Xác nhận xóa</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>
