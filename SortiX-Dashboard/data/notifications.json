@@ -1,0 +1,13 @@
+[
+  {
+    "event": "device_offline",
+    "severity": "error",
+    "station_id": "ESP32_MAIN_CONTROLLER",
+    "triggered_by": "HEARTBEAT_WATCHDOG",
+    "description": "[MẤT KẾT NỐI THIẾT BỊ] Vi điều khiển trung tâm (ESP32) đã ngoại tuyến! Dữ liệu cảm biến thời gian thực bị ngắt",
+    "timestamp": "2026-10-16T02:59:00.900Z",
+    "mode": "realtime",
+    "status": "unprocessed",
+    "id": "notif_1792119540900_of9u6"
+  }
+]
