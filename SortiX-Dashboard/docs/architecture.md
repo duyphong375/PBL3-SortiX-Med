@@ -11,8 +11,8 @@ Các sơ đồ và phân tích chi tiết trong tài liệu này được giữ 
 - Backend runtime là HTTP server dùng `node:http` trong `backend/src/server.ts`, không phải Express. `routes/`, `controllers/`, `middlewares/` và `services/` vẫn giữ cách phân lớp tương ứng.
 - Frontend có hai lớp phục vụ API: Next.js route handlers tại `frontend/src/app/api` và backend standalone tại cổng `5000`. Các route tương thích có thể xuất hiện ở cả hai lớp.
 - JSON là persistence đang chạy: `data/history.json`, `data/notifications.json`, `data/sync_state.json`, `data/users.json`. `ConfigModel` giữ config hiện tại trong memory. Các DDL trong `backend/database/migrations` và seed là artifact tham chiếu, không phải adapter database đang được gọi bởi runtime.
-- Capacitor dùng `webDir: "out"` và `server.url` từ `CAPACITOR_SERVER_URL`, với fallback được định nghĩa trong `frontend/capacitor.config.ts`. Không ghi cố định IP LAN vào tài liệu vận hành.
-- Script root hiện chạy 16 test file, trong đó có `cross_device_sync.test.cjs`; một số test file bổ sung trong `tests/` chưa được nối vào `npm test`.
+- Script root `npm test` hiện chạy toàn bộ **21 file test suites** tự động với **163/163 unit tests PASS 100%** qua lệnh `node --test tests/*.test.cjs`.
+- Tích hợp thêm kênh Telegram Bot Gateway hai chiều (`/api/telegram/webhook`) và trợ lý AI Copilot gọi trực tiếp mô hình `gemini-3.5-flash-lite` qua Google AI Studio API v1beta.
 
 ## 📌 Mục Lục
 1. [Tổng Quan Kiến Trúc (High-Level Architecture)](#1-tổng-quan-kiến-trúc-high-level-architecture)

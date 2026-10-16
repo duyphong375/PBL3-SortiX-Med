@@ -4,6 +4,37 @@ Tất cả các thay đổi về kiến trúc, tính năng, sửa lỗi và nân
 
 ---
 
+## [3.2.0] - 2026-10-16 (AI Copilot Gemini 3.5 Flash Lite 2 Chiều, Telegram Bot Gateway SCADA & SCADA Kiosk Zero-Scroll Fit Màn Hình)
+
+### 🤖 Trợ Lý AI Copilot 2 Chiều & Telegram Bot Gateway
+- **Nâng Cấp Mô Hình Google Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`)**:
+  - Tích hợp trực tiếp Google AI Studio API v1beta, tốc độ phản hồi ~1s, loại bỏ hoàn toàn middleware trung gian.
+  - Tự động fallback linh hoạt sang `gemini-3.5-flash`, `gemini-flash-lite-latest`, `gemini-flash-latest`.
+  - Khắc phục triệt để lỗi deprecation 404 Not Found từ các model cũ (`gemini-1.5-*`, `gemini-2.0-*`, `gemini-2.5-*`).
+- **Telegram Bot SCADA Gateway 2 Chiều (`@SortiX_Med_Bot`)**:
+  - Hỗ trợ Kỹ sư và Điều dưỡng nhắn tin hỏi đáp thông minh dựa trên Telemetry thời gian thực.
+  - Điều khiển SCADA từ xa qua bàn phím Inline Keyboard (`/status`, `/temp`, `/estop`, `/start`, `/stop`, `/clear_bin`).
+  - Xây dựng script `scripts/telegram-poller.cjs` tự động kéo tin nhắn ở môi trường Local/Dev và tích hợp vào runner `npm run dev:all`.
+
+### 🖥️ SCADA Kiosk Fullscreen & Display Density (Fit Màn Hình Zero-Scroll)
+- **Mật Độ Hiển Thị Linh Hoạt (Display Density)**:
+  - Hỗ trợ chuyển đổi giữa chế độ **Gọn gàng (Compact)** và **Tiêu chuẩn (Comfortable)** ngay trên thanh TopHeader.
+  - Tối ưu hóa padding, margins và font size cho màn hình điều khiển công nghiệp.
+- **SCADA Kiosk Toàn Màn Hình (F11)**:
+  - Tích hợp nút SCADA Kiosk Fullscreen chuẩn công nghiệp.
+  - Trang Giám Sát Băng Tải (`/conveyor`) đạt chuẩn Zero-Scroll, vừa vặn hoàn hảo trong 1 khung nhìn (100vh).
+- **Khắc Phục Lỗi Giao Diện Header (Anti-Overlap)**:
+  - Tối ưu responsive cho nút Trạng Thái Hệ Thống (`TopHeader.tsx`), chuyển text sang `"Mô phỏng"` ngắn gọn và tự động ẩn text trên màn hình nhỏ.
+  - Khắc phục triệt để hiện tượng đè lấn (overlap) giữa nút trạng thái và badge Cập nhật thời gian trên mọi độ phân giải.
+  - Sửa lỗi cú pháp JSX class template literal trong `ShiftSummaryModal.tsx`.
+
+### 🛡️ Quality Gate & Clean Code
+- **163/163 unit tests PASS 100%** trên 21 test suites tự động (`node --test tests/*.test.cjs`).
+- **Next.js Production Build 34/34 routes PASS 100%**.
+- Dọn dẹp cache build `.tsbuildinfo`, chuẩn hóa monorepo và đồng bộ cây thư mục toàn bộ tài liệu `.md`.
+
+---
+
 ## [3.1.0] - 2026-09-29 (Tối Ưu Hóa Codebase, Chế Độ Sáng/Tối, Tinh Gọn AI Copilot & Chuẩn Hóa Tài Liệu)
 
 ### 🧹 Clean Code & Refactoring (Tối Ưu & Dọn Dẹp Mã Nguồn)

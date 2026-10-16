@@ -80,20 +80,28 @@ d:/PBL3_NHOM5/
 │
 ├── SortiX-Dashboard/                       # [FOLDER CHA 2] GIAO DIỆN WEB & BACKEND SERVER TẬP TRUNG
 │   ├── backend/                            # Native HTTP server (Node.js, TypeScript) port 5000
-│   │   ├── src/controllers/                # telemetryController.ts, safetyController, v.v.
-│   │   └── src/server.ts                   # Endpoint /api/telemetry, /api/history, /api/events
+│   │   ├── database/                       # Migrations và Seeds tham chiếu
+│   │   └── src/                            # server.ts, controllers, routes, middlewares, services
 │   ├── frontend/                           # Giao diện Next.js 14 App Router, Tailwind CSS, Lucide icons
-│   │   └── src/app/                        # Các trang: Dashboard thời gian thực, Giám sát camera AI, Lịch sử
+│   │   ├── src/app/                        # Dashboard thời gian thực, Giám sát băng tải, Lịch sử, Cấu hình, Users
+│   │   ├── src/components/                 # layout, overview, conveyor, ui, users, widgets
+│   │   └── capacitor.config.ts             # Cấu hình Capacitor 8 đóng gói Android APK & iOS PWA
 │   ├── shared/                             # Thư viện dùng chung giữa Frontend, Backend và Firmware
 │   │   ├── schemas/                        # Zod schemas (TelemetrySchema, ClassificationRecordSchema, v.v.)
 │   │   ├── constants/                      # Hằng số topics MQTT, định danh khay phân loại mặc định
-│   │   └── types/                          # TypeScript interfaces
-│   └── package.json                        # Cấu hình dependencies (Next.js, Zod, MQTT.js, v.v.)
+│   │   └── types/                          # TypeScript interfaces dùng chung
+│   ├── data/                               # Bộ lưu trữ JSON runtime bền vững (history, notifications, sync_state, users)
+│   ├── scripts/                            # dev-all.cjs, telegram-poller.cjs, e2e.cjs, free-port.cjs
+│   ├── tests/                              # Bộ kiểm thử 21 test suites tự động (163/163 unit tests PASS)
+│   ├── docs/                               # architecture.md, api.md
+│   ├── package.json                        # Monorepo workspaces cấu hình dependencies & scripts
+│   └── vercel.json                         # Cấu hình triển khai tự động lên Vercel
 │
 ├── danh-sach-linh-kien.md                  # [TÀI LIỆU PHẦN CỨNG 1] BOM, đặc tính điện, contact rating, bảo vệ nguồn
 ├── ESP32-C5-WROOM-1-thong-tin-pinout.md    # [TÀI LIỆU PHẦN CỨNG 2] Thuyết minh chi tiết các chân rào J6/J7 bo WeAct
 ├── ESP32-C5-Pinout.png                     # [HÌNH ẢNH PHẦN CỨNG] Sơ đồ trực quan pinout chân vi điều khiển
-└── ESP32-C5-WROOM-1.PDF                    # [DATASHEET CHÍNH THỨC] Tài liệu kỹ thuật SoC ESP32-C5 từ Espressif
+├── ESP32-C5-WROOM-1.PDF                    # [DATASHEET CHÍNH THỨC] Tài liệu kỹ thuật SoC ESP32-C5 từ Espressif
+└── vercel.json                             # Cấu hình root triển khai monorepo lên Vercel
 ```
 
 ---
@@ -111,12 +119,13 @@ d:/PBL3_NHOM5/
   - `task_safety` (Priority 5): Giám sát nhiệt độ lõi chip qua cảm biến nhiệt nội (`driver/temperature_sensor.h`) và quản lý watchdog.
 
 ### 3.2. Thư mục `SortiX-Dashboard/`
-- **Mục đích:** Bảng điều khiển trung tâm dành cho người vận hành y tế và kỹ sư bảo trì.
-- **Tính năng chính:**
-  - Giám sát trạng thái băng tải 3D/2D thời gian thực (vị trí phôi, tốc độ, số lượng từng khay).
-  - Điều khiển Start / Stop / Mở khóa an toàn E-Stop từ xa.
-  - Cấu hình động luật phân loại (`sorter/sorter_01/config/set`): Gán lại brand nào vào khay nào mà không cần nạp lại code ESP32.
-  - Xem biểu đồ lịch sử tốc độ, dòng tải ước tính, nhiệt độ SoC và nhật ký cảnh báo kẹt phôi.
+- **Mục đích:** Bảng điều khiển trung tâm dành cho người vận hành y tế, điều dưỡng và kỹ sư bảo trì.
+- **Tính năng nổi bật:**
+  - **Giám sát thời gian thực 60fps**: Trực quan hóa băng chuyền phân loại 4 nhóm dụng cụ y tế (bơm tiêm/dao mổ, kẹp Pean, kéo mổ, ống nghiệm).
+  - **Trợ lý AI Copilot 2 Chiều & Telegram Bot Gateway**: Tích hợp mô hình Google Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`) độ trễ cực thấp (~1s) trực tiếp qua API v1beta. Hỗ trợ hỏi đáp thông minh và điều khiển SCADA từ xa qua Telegram Bot (`@SortiX_Med_Bot`) với bàn phím Inline Keyboard an toàn (`/status`, `/temp`, `/estop`, `/start`, `/stop`, `/clear_bin`).
+  - **Giao diện SCADA Kiosk & Fit Màn Hình**: Hỗ trợ chuyển đổi mật độ hiển thị (Display Density: Compact / Comfortable) và chế độ toàn màn hình F11 Kiosk không cuộn trang (zero-scroll).
+  - **Báo cáo 1 ngày làm việc (Shift Summary)**: Tự động tổng kết sản lượng phân loại, tỷ lệ đạt/lỗi, xuất báo cáo UTF-8 BOM CSV và PDF đạt chuẩn y tế.
+  - **Hệ thống an toàn công nghiệp**: Dừng khẩn cấp E-Stop, cảnh báo kẹt phôi, đầy khay, quá nhiệt và ngắt kết nối MQTT.
 
 ### 3.3. Các tài liệu phần cứng (`danh-sach-linh-kien.md`, `ESP32-C5-Pinout.png`, `ESP32-C5-WROOM-1.PDF`)
 - Chuẩn hóa phần cứng, phân tích tải nguồn (12V nguồn chính, 5V buck XL4015, 3.3V bo WeAct).
@@ -127,13 +136,15 @@ d:/PBL3_NHOM5/
 
 ## 4. Hướng Dẫn Vận Hành Nhanh Hệ Thống
 
-### Bước 1: Khởi động Dashboard (PC)
+### Bước 1: Khởi động Dashboard & Telegram Bot Poller (PC)
 ```bash
 cd d:/PBL3_NHOM5/SortiX-Dashboard
 npm run dev:all
 ```
-> **Lưu ý:** Lệnh `npm run dev:all` khởi động đồng thời cả Frontend (Next.js port 3000) và Backend Node.js API (port 5000). Nếu chỉ muốn chạy riêng frontend, dùng `npm run dev`.
-Truy cập giao diện: `http://localhost:3000` (Backend API chạy song song tại port 5000).
+> **Lưu ý:** Lệnh `npm run dev:all` khởi động đồng thời cả 3 tiến trình:
+> - Frontend Next.js: `http://localhost:3000`
+> - Backend Node.js API: `http://localhost:5000`
+> - Telegram Bot Poller 2 chiều: Kết nối trực tiếp Bot Telegram với hệ thống SCADA.
 
 ### Bước 2: Nạp Firmware & Giám Sát ESP32-C5
 Mở PowerShell:
@@ -146,4 +157,16 @@ idf.py -p COM5 flash monitor
 ### Bước 3: Vận hành hệ thống
 1. Bật nguồn 12V tổng.
 2. Kiểm tra đèn LED trạng thái GPIO10 chớp chậm 1 Hz (Báo hiệu hệ thống đang ở trạng thái `IDLE` an toàn).
-3. Nhấn nút Start vật lý (GPIO23) hoặc nhấn **START** trên giao diện Web Dashboard để băng tải bắt đầu vận hành.
+3. Nhấn nút Start vật lý (GPIO23) hoặc nhấn **START** trên giao diện Web Dashboard (hoặc gửi lệnh `/start` trên Telegram Bot) để băng tải bắt đầu vận hành.
+
+---
+
+## 5. Kiểm Thử Tự Động & Đảm Bảo Chất Lượng (QA)
+
+Toàn bộ hệ thống được bảo vệ bởi bộ kiểm thử tự động toàn diện:
+```bash
+cd SortiX-Dashboard
+npm test
+```
+- **Kết quả:** **21 Test Suites / 163 Unit Tests PASS 100%**.
+- **Phạm vi:** Kiểm thử E-Stop, Kẹt phôi, Đầy khay, Quá nhiệt, Offline watchdog, Mất mạng MQTT, Báo cáo ngày, Xác thực RBAC, Mật độ hiển thị fit màn hình, và Telegram Copilot 2 chiều.

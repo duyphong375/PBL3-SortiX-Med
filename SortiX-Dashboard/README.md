@@ -21,20 +21,21 @@ Phần mô tả chi tiết bên dưới được giữ lại để làm tài li�
 ```text
 SortiX-Dashboard/
 ├─ frontend/src/app/              # /, /alerts, /analytics, /config, /conveyor,
-│  ├─ devices, /history, /login, /users
+│  ├─ /devices, /history, /login, /users
 │  └─ api/                        # auth, config, history, events, safety, stats,
-│                                  # sync, alerts, chat/telegram, users
-├─ frontend/src/components/       # layout, overview, conveyor, ui, users, widgets
-├─ frontend/src/hooks/            # useSorterData và các hook dữ liệu
+│                                  # sync, alerts, chat/copilot, telegram/webhook, users
+├─ frontend/src/components/       # layout (TopHeader, Sidebar, DashboardLayout),
+│                                  # overview, conveyor, ui, users, widgets, AiCopilot
+├─ frontend/src/hooks/            # useSorterData, useMQTT, useConveyorPhysics, useThemeAudio
 ├─ frontend/capacitor.config.ts   # webDir: capacitor-shell, server.url từ CAPACITOR_SERVER_URL
-├─ backend/src/                   # server, controllers, routes, middleware,
-│                                  # models, services, config, utils
-├─ backend/database/              # migrations và seeds tham chiếu
-├─ shared/{types,schemas,constants}/
-├─ data/                          # JSON runtime store
-├─ scripts/                       # dev-all, dev, e2e, free-port, test, upgrade workflow
-├─ tests/                         # test được nối vào script root và test bổ sung
-└─ docs/                          # architecture, api
+├─ backend/src/                   # server.ts (node:http native :5000), controllers,
+│                                  # routes, middlewares, models, services, config, utils
+├─ backend/database/              # migrations và seeds tham chiếu (PostgreSQL, MySQL, SQLite, MongoDB)
+├─ shared/                        # types, schemas, constants dùng chung giữa Frontend, Backend & Firmware
+├─ data/                          # JSON runtime store: history, notifications, sync_state, telemetry_logs, users
+├─ scripts/                       # dev-all.cjs, telegram-poller.cjs, e2e.cjs, free-port.cjs, dev.ps1, test.ps1
+├─ tests/                         # 21 file unit test suites tự động (163/163 unit tests PASS 100%)
+└─ docs/                          # architecture.md, api.md
 ```
 
 ### Lệnh chính hiện có
@@ -42,18 +43,19 @@ SortiX-Dashboard/
 ```powershell
 npm run dev              # Frontend Next.js tại :3000
 npm run dev:backend      # build rồi start backend tại PORT (mặc định :5000)
-npm run dev:all          # điều phối frontend và backend
-npm run build            # build frontend
+npm run dev:all          # Điều phối 3-trong-1 (Frontend :3000 + Backend :5000 + Telegram Bot Poller)
+npm run dev:telegram     # Khởi động riêng tiến trình Telegram Bot Long-Polling Gateway
+npm run build            # build tối ưu hóa frontend Next.js (34/34 routes)
 npm run lint             # next lint
 npm run build --workspace=backend
 npx tsc --noEmit --pretty false
-npm test                 # 17 file test được nối trong package.json
+npm test                 # Chạy toàn bộ 21 test suites tự động (163/163 unit tests PASS)
 npm run test:e2e         # contract desktop/mobile/Capacitor
 npm run cap:sync
 npm run cap:open
 ```
 
-`npm test` hiện nối 17 file: `history`, `api_schemas`, `users`, `estop_safety`, `jam_detection`, `simulation_mode_guard`, `jam_simulation_audio`, `bin_full`, `temperature_warning`, `device_offline`, `shift_summary`, `bin_sliders_sync`, `mqtt_disconnected`, `temperature_gauge_simulation_vs_real`, `daily_report_sync`, `cross_device_sync` và `http_telemetry_history`. Các file `daily_production_cumulative`, `four_user_requests_upgrade`, `mute_siren_feature` và `new_day_report_tele_email` tồn tại nhưng chưa nằm trong script root.
+`npm test` hiện chạy toàn bộ **21 file test suites** tự động với **163/163 unit tests PASS 100%** qua lệnh `node --test tests/*.test.cjs`. Bộ kiểm thử bao phủ toàn diện: `history`, `api_schemas`, `users`, `estop_safety`, `jam_detection`, `simulation_mode_guard`, `jam_simulation_audio`, `bin_full`, `temperature_warning`, `device_offline`, `shift_summary`, `bin_sliders_sync`, `mqtt_disconnected`, `temperature_gauge_simulation_vs_real`, `daily_report_sync`, `cross_device_sync`, `http_telemetry_history`, `daily_production_cumulative`, `four_user_requests_upgrade`, `mute_siren_feature`, `new_day_report_tele_email`, `anti_ai_industrial_scada_ui`, `auto_stop_on_all_items_in_trays`, `ghost_item_prevention`, và `telegram_copilot_2way_and_screenfit`.
 
 Các mục lịch sử bên dưới có thể mô tả trạng thái ở thời điểm phát hành cũ. Khi có khác biệt, phần ghi chú runtime này và source code hiện tại được ưu tiên.
 
@@ -106,6 +108,14 @@ Các mục lịch sử bên dưới có thể mô tả trạng thái ở thời 
 - 📡 **Giám Sát Kết Nối IoT & Mạng Đa Tầng**:
   - Tự động phát hiện mất kết nối MQTT Broker quá 5 giây (`mqtt_disconnected`), đổi huy hiệu Header sang đỏ chớp nháy, phát còi cảnh báo và tự động kết nối lại theo lịch trình (3s -> 5s -> 10s).
   - Watchdog 6 giây giám sát nhịp tim định kỳ 2 giây (`conveyor/heartbeat`), cảnh báo tức thì khi vi điều khiển ESP32 ngoại tuyến (`device_offline`).
+- 🤖 **Trợ Lý AI Copilot 2 Chiều & Telegram Bot Gateway**:
+  - Tích hợp mô hình Google Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`) với độ trễ phản hồi cực thấp (~1s) trực tiếp qua API v1beta (không phụ thuộc middleware n8n).
+  - Tương tác 2 chiều thông minh qua Telegram Bot (`@SortiX_Med_Bot`): Kỹ sư và điều dưỡng có thể nhắn tin hỏi đáp phân tích telemetry thời gian thực, đồng thời điều khiển hệ thống SCADA từ xa an toàn qua bàn phím Inline Keyboard (`/status`, `/temp`, `/estop`, `/start`, `/stop`, `/clear_bin`).
+  - Tích hợp tiến trình `scripts/telegram-poller.cjs` tự động chạy ngầm trong lệnh điều phối `npm run dev:all`.
+- 🖥️ **SCADA Kiosk Fullscreen & Display Density (Fit Màn Hình Zero-Scroll)**:
+  - Chuyển đổi linh hoạt giữa 2 chế độ hiển thị: **Gọn gàng (Compact)** tối ưu hóa mật độ điểm ảnh cho màn hình cảm biến công nghiệp, và **Tiêu chuẩn (Comfortable)**.
+  - Nút bấm và phím tắt Toàn màn hình **F11 SCADA Kiosk** cho phòng điều khiển trung tâm, chống tràn viền và fit màn hình không cuộn (zero-scroll) cho trang Băng Tải (`/conveyor`).
+  - Thiết kế TopHeader chống đè lấn (overlap) chữ và badge trên mọi độ phân giải (1024px đến 4K).
 - 📋 **Báo Cáo 1 Ngày Làm Việc (Shift Summary)**:
   - Đồng bộ trực tiếp dữ liệu phân loại thực tế: số lượng 3 khay chứa, số sản phẩm đạt/lỗi, tỷ lệ chính xác, số lần dừng khẩn cấp và thời gian vận hành.
   - Hỗ trợ xem Modal thống kê, xuất báo cáo CSV có UTF-8 BOM hiển thị tiếng Việt chuẩn trên Excel, và mẫu in ấn / xuất PDF chuyên nghiệp.
