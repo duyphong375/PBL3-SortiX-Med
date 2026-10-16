@@ -11,7 +11,7 @@ console.log("\x1b[32m%s\x1b[0m", "  Khởi động SortiX Dashboard (Frontend + 
 console.log("\x1b[36m%s\x1b[0m", "=======================================================");
 console.log("  Frontend: http://localhost:3000");
 console.log("  Backend:  http://localhost:5000");
-console.log("  Đăng nhập: admin1 / 123456 (hoặc nút Admin nhanh trên trang /login)");
+console.log("  Telegram: Bot Poller tự động chạy ngầm lắng nghe tin nhắn 2 chiều");
 console.log("\x1b[36m%s\x1b[0m", "-------------------------------------------------------");
 
 const backend = spawn(npmCmd, ["run", "dev", "--workspace=backend"], {
@@ -26,10 +26,17 @@ const frontend = spawn(npmCmd, ["run", "dev", "--workspace=frontend"], {
   shell: true,
 });
 
+const telegramPoller = spawn("node", ["scripts/telegram-poller.cjs"], {
+  cwd: rootDir,
+  stdio: "inherit",
+  shell: true,
+});
+
 function cleanup() {
   console.log("\nĐang dừng toàn bộ dịch vụ...");
   try { backend.kill("SIGINT"); } catch {}
   try { frontend.kill("SIGINT"); } catch {}
+  try { telegramPoller.kill("SIGINT"); } catch {}
   process.exit(0);
 }
 
