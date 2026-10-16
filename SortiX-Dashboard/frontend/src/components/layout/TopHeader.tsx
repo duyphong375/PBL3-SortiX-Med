@@ -204,11 +204,7 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
 
           {/* Breadcrumb Navigation */}
           <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 shrink-0">
-            <span className="hidden 2xl:inline font-mono tracking-wider text-slate-400 dark:text-slate-500">
-              SortiX OS
-            </span>
-            <ChevronRight className="hidden 2xl:inline h-3.5 w-3.5 text-slate-400" />
-            <span className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[100px] sm:max-w-[140px] md:max-w-none">
+            <span className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[120px] sm:max-w-none">
               {currentPageName}
             </span>
           </div>
@@ -226,10 +222,10 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
                 onClick={() => {
                   if (!isSimulation) onToggleSimulationMode(true);
                 }}
-                className={`flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition-all duration-200 ${
+                className={`flex items-center gap-1 sm:gap-1.5 rounded-full px-2 sm:px-2.5 py-1 text-xs font-bold transition-all duration-200 ${
                   isSimulation
                     ? "bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-xs border border-amber-400/50"
-                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:white"
+                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
                 }`}
                 title="Chế độ Mô phỏng (Test Rig): Cho phép nạp phôi ảo và kiểm thử an toàn"
               >
@@ -244,7 +240,7 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
                 onClick={() => {
                   if (isSimulation) onToggleSimulationMode(false);
                 }}
-                className={`flex items-center gap-1 sm:gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition-all duration-200 ${
+                className={`flex items-center gap-1 sm:gap-1.5 rounded-full px-2 sm:px-2.5 py-1 text-xs font-bold transition-all duration-200 ${
                   !isSimulation
                     ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-xs border border-emerald-400/40"
                     : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
@@ -269,7 +265,7 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
             <button
               type="button"
               onClick={() => setStatusMenuOpen((prev) => !prev)}
-              className={`hidden sm:flex items-center gap-1.5 sm:gap-2 rounded-full px-2.5 sm:px-3 py-1 text-xs font-bold border transition-all shadow-2xs ${
+              className={`hidden sm:flex items-center gap-1 sm:gap-1.5 rounded-full px-2 sm:px-2.5 py-1 text-xs font-bold border transition-all shadow-2xs ${
                 isSimulation
                   ? "border-amber-500/40 bg-amber-500/15 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20"
                   : isRealOnline
@@ -292,13 +288,11 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
                   }`}
                 />
               </span>
-              <span className="tracking-wide hidden lg:inline">
-                {isSimulation
-                  ? "Mô phỏng"
-                  : isRealOnline
-                  ? `Trực tuyến (${pingMs}ms)`
-                  : "Mất kết nối MQTT/ESP32"}
-              </span>
+              {!isSimulation && (
+                <span className="tracking-wide hidden md:inline">
+                  {isRealOnline ? `${pingMs}ms` : "Mất kết nối"}
+                </span>
+              )}
               <ChevronDown
                 className={`h-3 w-3 transition-transform duration-200 ${
                   statusMenuOpen ? "rotate-180" : ""
@@ -388,16 +382,16 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
           </div>
         </div>
 
-        {/* Right Section: Cập nhật gần nhất | Tìm kiếm | Bell | Theme | Audio */}
+        {/* Right Section: Cập nhật gần nhất | Báo cáo | Đồng bộ | Tìm kiếm | Bell | Theme | Density | Fullscreen | Audio */}
         <div className="flex items-center gap-1 sm:gap-1.5 2xl:gap-2 shrink-0">
           {/* CẬP NHẬT GẦN NHẤT */}
           <div
             data-testid="telemetry-last-updated"
-            className="hidden sm:flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50/80 px-2 sm:px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-300 shrink-0"
-            title="Thời gian nhận dữ liệu cập nhật gần nhất từ hệ thống"
+            className="hidden sm:flex items-center gap-1 sm:gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50/80 px-2 sm:px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-300 shrink-0"
+            title={`Thời gian nhận dữ liệu cập nhật gần nhất từ hệ thống (Cập nhật: ${lastUpdated || currentTime || "--:--:--"})`}
           >
-            <Clock className="h-3.5 w-3.5 text-slate-400" />
-            <span className="text-[11px] text-slate-400 hidden xl:inline">Cập nhật:</span>
+            <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            <span className="sr-only">Cập nhật:</span>
             <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
               {lastUpdated || currentTime || "--:--:--"}
             </span>
@@ -410,10 +404,11 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
               aria-label="Xem báo cáo 1 ngày làm việc & Đồng bộ dữ liệu"
               onClick={onTriggerShiftSummary}
               title="Xem báo cáo 1 ngày làm việc & Đồng bộ dữ liệu"
-              className="flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-500/20 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25 transition-all shadow-xs shrink-0"
+              className="flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-2 sm:px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-500/20 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25 transition-all shadow-xs shrink-0"
             >
-              <ClipboardCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span className="hidden xl:inline">Báo cáo 1 ngày làm việc</span>
+              <ClipboardCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="sr-only">Báo cáo 1 ngày làm việc</span>
+              <span className="hidden sm:inline">Báo cáo</span>
             </button>
           )}
 
@@ -425,10 +420,10 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
               onClick={onManualSync}
               disabled={isSyncing}
               title="Đồng bộ dữ liệu tức thời với máy chủ và thiết bị"
-              className="flex items-center gap-1.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1.5 text-xs font-semibold text-cyan-700 hover:bg-cyan-500/20 dark:border-cyan-500/30 dark:bg-cyan-500/15 dark:text-cyan-300 dark:hover:bg-cyan-500/25 transition-all shadow-xs shrink-0 cursor-pointer active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-2 sm:px-2.5 py-1.5 text-xs font-semibold text-cyan-700 hover:bg-cyan-500/20 dark:border-cyan-500/30 dark:bg-cyan-500/15 dark:text-cyan-300 dark:hover:bg-cyan-500/25 transition-all shadow-xs shrink-0 cursor-pointer active:scale-95 disabled:opacity-50"
             >
-              <RefreshCw className={`h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400 ${isSyncing ? "animate-spin" : ""}`} />
-              <span className="hidden xl:inline">{isSyncing ? "Đang đồng bộ..." : "Đồng bộ dữ liệu"}</span>
+              <RefreshCw className={`h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400 shrink-0 ${isSyncing ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">{isSyncing ? "Đang đồng bộ..." : "Đồng bộ"}</span>
             </button>
           )}
 
@@ -437,11 +432,11 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
             type="button"
             aria-label="Tìm kiếm trong hệ thống (nhấn Ctrl+K hoặc Cmd+K)"
             onClick={() => setSearchOpen(true)}
-            className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-slate-50/80 px-2.5 sm:px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-800 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-400 dark:hover:border-white/10 dark:hover:text-slate-200 shrink-0"
+            title="Tìm kiếm trong hệ thống (Ctrl+K)"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50/80 px-2 sm:px-2.5 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-800 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-400 dark:hover:border-white/10 dark:hover:text-slate-200 shrink-0"
           >
-            <Search className="h-3.5 w-3.5" />
-            <span className="hidden xl:inline">Tìm kiếm</span>
-            <kbd className="hidden 2xl:inline-block rounded border border-slate-300/80 bg-white px-1.5 py-0.2 text-[10px] font-mono font-bold text-slate-600 shadow-2xs dark:border-white/10 dark:bg-white/[0.08] dark:text-slate-300">
+            <Search className="h-3.5 w-3.5 shrink-0" />
+            <kbd className="hidden sm:inline-block rounded border border-slate-300/80 bg-white px-1.5 py-0.2 text-[10px] font-mono font-bold text-slate-600 shadow-2xs dark:border-white/10 dark:bg-white/[0.08] dark:text-slate-300">
               ⌘K
             </kbd>
           </button>
@@ -452,9 +447,9 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
             aria-label={`Xem cảnh báo${alertCount > 0 ? ` (${alertCount} cảnh báo chưa xử lý)` : ""}`}
             onClick={() => router.push("/alerts")}
             title="Xem danh sách cảnh báo"
-            className="relative rounded-xl border border-slate-200/80 p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-400 dark:hover:bg-[#1E212D] dark:hover:text-white shrink-0"
+            className="relative rounded-xl border border-slate-200/80 p-1.5 sm:p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-400 dark:hover:bg-[#1E212D] dark:hover:text-white shrink-0"
           >
-            <Bell className="h-4 w-4" />
+            <Bell className="h-4 w-4 shrink-0" />
             {alertCount > 0 && (
               <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-sm shadow-rose-500/30">
                 {alertCount > 9 ? "9+" : alertCount}
@@ -468,12 +463,12 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
             aria-label={themeMode === "dark" ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối"}
             onClick={onToggleTheme}
             title={themeMode === "dark" ? "Chuyển sang giao diện Sáng" : "Chuyển sang giao diện Tối"}
-            className="flex items-center justify-center rounded-xl border border-slate-200/80 p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-400 dark:hover:bg-[#1E212D] dark:hover:text-white shrink-0"
+            className="flex items-center justify-center rounded-xl border border-slate-200/80 p-1.5 sm:p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-400 dark:hover:bg-[#1E212D] dark:hover:text-white shrink-0"
           >
             {themeMode === "dark" ? (
-              <Sun className="h-4 w-4 text-amber-400 hover:rotate-45 transition-transform" />
+              <Sun className="h-4 w-4 text-amber-400 hover:rotate-45 transition-transform shrink-0" />
             ) : (
-              <Moon className="h-4 w-4 text-slate-700 hover:-rotate-12 transition-transform" />
+              <Moon className="h-4 w-4 text-slate-700 hover:-rotate-12 transition-transform shrink-0" />
             )}
           </button>
 
@@ -488,12 +483,12 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
                   ? "Mật độ hiển thị: Đang ở chế độ Gọn (Compact) - Bấm để chuyển sang Tiêu chuẩn"
                   : "Mật độ hiển thị: Đang ở chế độ Tiêu chuẩn - Bấm để chuyển sang Gọn gàng (Fit màn hình)"
               }
-              className="flex items-center justify-center rounded-xl border border-slate-200/80 p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-400 dark:hover:bg-[#1E212D] dark:hover:text-white shrink-0"
+              className="flex items-center justify-center rounded-xl border border-slate-200/80 p-1.5 sm:p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-400 dark:hover:bg-[#1E212D] dark:hover:text-white shrink-0"
             >
               {displayDensity === "compact" ? (
-                <Minimize2 className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <Minimize2 className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
               ) : (
-                <Maximize2 className="h-4 w-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200" />
+                <Maximize2 className="h-4 w-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 shrink-0" />
               )}
             </button>
           )}
@@ -505,12 +500,12 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
               aria-label={isFullscreen ? "Thoát toàn màn hình SCADA" : "Toàn màn hình SCADA"}
               onClick={onToggleFullscreen}
               title={isFullscreen ? "Thoát toàn màn hình (Esc)" : "Toàn màn hình SCADA (F11 Kiosk)"}
-              className="flex items-center justify-center rounded-xl border border-slate-200/80 p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-400 dark:hover:bg-[#1E212D] dark:hover:text-white shrink-0"
+              className="flex items-center justify-center rounded-xl border border-slate-200/80 p-1.5 sm:p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-400 dark:hover:bg-[#1E212D] dark:hover:text-white shrink-0"
             >
               {isFullscreen ? (
-                <Minimize className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                <Minimize className="h-4 w-4 text-cyan-600 dark:text-cyan-400 shrink-0" />
               ) : (
-                <Maximize className="h-4 w-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200" />
+                <Maximize className="h-4 w-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 shrink-0" />
               )}
             </button>
           )}
@@ -521,12 +516,12 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
             aria-label={isMuted ? "Bật âm thanh" : "Tắt âm thanh"}
             onClick={onToggleSound}
             title={isMuted ? "Bật âm thanh cơ khí & cảm biến" : "Tắt âm thanh"}
-            className="flex items-center justify-center rounded-xl border border-slate-200/80 p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-400 dark:hover:bg-[#1E212D] dark:hover:text-white shrink-0"
+            className="flex items-center justify-center rounded-xl border border-slate-200/80 p-1.5 sm:p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-400 dark:hover:bg-[#1E212D] dark:hover:text-white shrink-0"
           >
             {!isMuted ? (
-              <Volume2 className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+              <Volume2 className="h-4 w-4 text-cyan-600 dark:text-cyan-400 shrink-0" />
             ) : (
-              <VolumeX className="h-4 w-4 text-slate-400" />
+              <VolumeX className="h-4 w-4 text-slate-400 shrink-0" />
             )}
           </button>
         </div>

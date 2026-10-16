@@ -67,3 +67,5 @@ pnpm-debug.log*
 # VS Code (preserve settings.json if needed, ignore workspace caches)
 .vscode/*
 !.vscode/settings.json
+
+.vercel
