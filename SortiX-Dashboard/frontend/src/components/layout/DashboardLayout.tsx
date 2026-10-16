@@ -192,6 +192,13 @@ export interface DashboardState {
   // Manual sync
   isSyncing: boolean;
   handleManualSync: () => Promise<void>;
+
+  // Display Density & Screen Fit
+  displayDensity: "compact" | "comfortable";
+  setDisplayDensity: (density: "compact" | "comfortable") => void;
+  toggleDisplayDensity: () => void;
+  isFullscreen: boolean;
+  toggleFullscreen: () => void;
 }
 
 export const DashboardContext = React.createContext<DashboardState | null>(null);
@@ -279,6 +286,50 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Hook 1: Theme and Audio Management
   const { themeMode, toggleTheme, isMuted, handleToggleSound } = useThemeAudio();
+
+  // Display Density: compact vs comfortable
+  const [displayDensity, setDisplayDensityState] = useState<"compact" | "comfortable">("comfortable");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("sortix_display_density") as "compact" | "comfortable" | null;
+    if (saved === "compact" || saved === "comfortable") {
+      setDisplayDensityState(saved);
+    } else if (typeof window !== "undefined" && window.innerWidth <= 1366) {
+      setDisplayDensityState("compact");
+    }
+  }, []);
+
+  const setDisplayDensity = useCallback((density: "compact" | "comfortable") => {
+    setDisplayDensityState(density);
+    localStorage.setItem("sortix_display_density", density);
+  }, []);
+
+  const toggleDisplayDensity = useCallback(() => {
+    setDisplayDensityState((prev) => {
+      const next = prev === "compact" ? "comfortable" : "compact";
+      localStorage.setItem("sortix_display_density", next);
+      return next;
+    });
+  }, []);
+
+  // Fullscreen HMI SCADA Mode
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", handleFsChange);
+    return () => document.removeEventListener("fullscreenchange", handleFsChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, []);
 
   // Khi ở trang Login hoặc chưa đăng nhập, lập tức dập tắt toàn bộ còi hú báo động và hủy các trạng thái sự cố
   useEffect(() => {
@@ -2088,6 +2139,11 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     handleToggleSound,
     isSyncing,
     handleManualSync,
+    displayDensity,
+    setDisplayDensity,
+    toggleDisplayDensity,
+    isFullscreen,
+    toggleFullscreen,
   };
 
   // Skip layout on login page
@@ -2114,11 +2170,11 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   return (
     <DashboardContext.Provider value={dashboardState}>
       <div
-        className={`flex h-screen w-screen overflow-hidden transition-colors duration-300 ${
+        className={`flex h-[100dvh] w-screen overflow-hidden transition-colors duration-300 ${
           themeMode === "light"
             ? "light bg-slate-50 text-slate-900"
             : "dark bg-[#0D0F12] text-slate-100"
-        }`}
+        } ${displayDensity === "compact" ? "density-compact" : "density-comfortable"}`}
       >
         {/* Sidebar — Responsive with mobile open/close */}
         <Sidebar
@@ -2181,10 +2237,18 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
             onManualSync={handleManualSync}
             isSyncing={isSyncing}
             lastUpdated={lastTelemetryTime}
+            displayDensity={displayDensity}
+            onToggleDensity={toggleDisplayDensity}
+            isFullscreen={isFullscreen}
+            onToggleFullscreen={toggleFullscreen}
           />
 
           {/* Page Content with smooth GPU-accelerated transition */}
-          <main className="flex-1 overflow-auto p-4 lg:p-6">
+          <main
+            className={`flex-1 overflow-auto transition-all duration-200 ${
+              displayDensity === "compact" ? "p-2 sm:p-2.5 lg:p-3" : "p-4 lg:p-6"
+            }`}
+          >
             <div key={pathname} className="page-transition-enter">
               {children}
             </div>

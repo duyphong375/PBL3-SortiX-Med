@@ -46,7 +46,7 @@ export default function ConveyorPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-7.5rem)] w-full flex flex-col pb-4 animate-in fade-in duration-300">
+    <div className="h-full w-full flex flex-col overflow-y-auto lg:overflow-hidden animate-in fade-in duration-300">
       {/* Permission warning cho User */}
       {!canEstop && (
         <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-medium text-amber-600 dark:text-amber-400">

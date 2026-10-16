@@ -270,7 +270,7 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
         )}
 
         {/* DÂY ĐAI BĂNG TẢI CHÍNH & VẬT PHẨM CHẠY 2D */}
-        <div className="relative my-6 flex items-center">
+        <div className="relative my-2 sm:my-3 lg:my-4 flex items-center">
           {/* Rulo truyền động đầu băng (Drive Drum - Tiện CNC nhôm thép với bạc đạn đồng) */}
           <div className="relative z-20 flex h-32 w-14 shrink-0 flex-col items-center justify-between rounded-l-2xl border-y-4 border-l-4 border-slate-700 bg-gradient-to-r from-slate-600 via-slate-500 to-slate-700 shadow-xl overflow-hidden py-1">
             {/* Gờ giữ đai trên */}

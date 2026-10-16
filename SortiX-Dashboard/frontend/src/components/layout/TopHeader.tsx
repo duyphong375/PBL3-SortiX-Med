@@ -30,6 +30,10 @@ import {
   ChevronDown,
   CheckCircle2,
   AlertTriangle,
+  Maximize,
+  Minimize,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 
 // Map path → breadcrumb labels
@@ -78,6 +82,10 @@ interface TopHeaderProps {
   teamName?: string;
   projectName?: string;
   lastUpdated?: string;
+  displayDensity?: "compact" | "comfortable";
+  onToggleDensity?: () => void;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }
 
 const TopHeaderComponent: React.FC<TopHeaderProps> = ({
@@ -100,6 +108,10 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
   teamName: propTeamName,
   projectName = "SortiX-Med (IoT Phân Loại Y Tế)",
   lastUpdated,
+  displayDensity = "comfortable",
+  onToggleDensity,
+  isFullscreen = false,
+  onToggleFullscreen,
 }) => {
   const pathname = usePathname();
   const router = useRouter();
@@ -470,6 +482,44 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
               <Moon className="h-4 w-4 text-slate-700 hover:-rotate-12 transition-transform" />
             )}
           </button>
+
+          {/* Display Density Toggle (Compact vs Comfortable) */}
+          {onToggleDensity && (
+            <button
+              type="button"
+              aria-label={displayDensity === "compact" ? "Chuyển sang chế độ hiển thị tiêu chuẩn (Mật độ hiển thị)" : "Chuyển sang chế độ hiển thị gọn gàng (Mật độ hiển thị)"}
+              onClick={onToggleDensity}
+              title={
+                displayDensity === "compact"
+                  ? "Mật độ hiển thị: Đang ở chế độ Gọn (Compact) - Bấm để chuyển sang Tiêu chuẩn"
+                  : "Mật độ hiển thị: Đang ở chế độ Tiêu chuẩn - Bấm để chuyển sang Gọn gàng (Fit màn hình)"
+              }
+              className="flex items-center justify-center rounded-xl border border-slate-200/80 p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-400 dark:hover:bg-[#1E212D] dark:hover:text-white shrink-0"
+            >
+              {displayDensity === "compact" ? (
+                <Minimize2 className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              ) : (
+                <Maximize2 className="h-4 w-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200" />
+              )}
+            </button>
+          )}
+
+          {/* Fullscreen SCADA Kiosk Toggle */}
+          {onToggleFullscreen && (
+            <button
+              type="button"
+              aria-label={isFullscreen ? "Thoát toàn màn hình SCADA" : "Toàn màn hình SCADA"}
+              onClick={onToggleFullscreen}
+              title={isFullscreen ? "Thoát toàn màn hình (Esc)" : "Toàn màn hình SCADA (F11 Kiosk)"}
+              className="flex items-center justify-center rounded-xl border border-slate-200/80 p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-400 dark:hover:bg-[#1E212D] dark:hover:text-white shrink-0"
+            >
+              {isFullscreen ? (
+                <Minimize className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+              ) : (
+                <Maximize className="h-4 w-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200" />
+              )}
+            </button>
+          )}
 
           {/* Sound Toggle */}
           <button

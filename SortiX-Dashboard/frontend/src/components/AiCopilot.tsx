@@ -33,6 +33,7 @@ import {
   Moon,
   UserCheck,
   Trash2,
+  ExternalLink,
 } from "lucide-react";
 
 interface ChatMessage {
@@ -1930,6 +1931,63 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Xóa lịch sử chat</span>
                 </button>
+              </div>
+
+              {/* Kênh Telegram Bot 2 Chiều */}
+              <div
+                className={`pt-2.5 mt-1 border-t space-y-2 ${
+                  isLight ? "border-slate-200" : "border-slate-800"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <SendHorizontal className={`w-3.5 h-3.5 ${isLight ? "text-sky-600" : "text-sky-400"}`} />
+                    <span className={`font-semibold text-[11px] ${isLight ? "text-slate-800" : "text-slate-200"}`}>
+                      Telegram Bot 2 Chiều:
+                    </span>
+                  </div>
+                  <a
+                    href="https://t.me/SortiX_Med_Bot"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-[11px] font-bold text-sky-600 dark:text-sky-400 hover:underline"
+                    title="Mở ứng dụng Telegram để chat và điều khiển"
+                  >
+                    <span>@SortiX_Med_Bot</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <p className={`text-[10px] leading-relaxed ${isLight ? "text-slate-500" : "text-slate-400"}`}>
+                  Nhắn tin trực tiếp từ điện thoại để hỏi đáp AI Telemetry hoặc bấm nút điều khiển SCADA từ xa (/status, /temp, /estop, /start, /stop, /clear_bin).
+                </p>
+                <div className="flex items-center justify-between gap-2 pt-0.5">
+                  <span className={`text-[10px] font-mono truncate ${isLight ? "text-slate-400" : "text-slate-500"}`}>
+                    Webhook: /api/telegram/webhook
+                  </span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch("/api/telegram/webhook");
+                        const data = await res.json();
+                        setToastMessage({
+                          text: data.bot_configured ? "Bot đã kết nối sẵn sàng!" : "Chưa cấu hình TELEGRAM_BOT_TOKEN trong .env",
+                          type: data.bot_configured ? "success" : "error",
+                        });
+                      } catch {
+                        setToastMessage({ text: "Lỗi kết nối Webhook", type: "error" });
+                      }
+                      setTimeout(() => setToastMessage(null), 2500);
+                    }}
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition border cursor-pointer ${
+                      isLight
+                        ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+                        : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
+                    }`}
+                  >
+                    Kiểm tra Webhook
+                  </button>
+                </div>
               </div>
             </div>
           )}
