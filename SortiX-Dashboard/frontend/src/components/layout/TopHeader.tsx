@@ -187,9 +187,9 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200/80 bg-white/85 px-3.5 backdrop-blur-md transition-colors dark:border-white/[0.07] dark:bg-[#0E1017]/85 sm:px-5">
+      <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between gap-2 sm:gap-4 border-b border-slate-200/80 bg-white/85 px-3.5 backdrop-blur-md transition-colors dark:border-white/[0.07] dark:bg-[#0E1017]/85 sm:px-5">
         {/* Left Section: Breadcrumb + Chế độ (Mode switch duy nhất) + Trạng thái hệ thống */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 shrink-0">
           {/* Mobile Menu Button */}
           {onMobileMenuToggle && (
             <button
@@ -204,11 +204,11 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
 
           {/* Breadcrumb Navigation */}
           <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 shrink-0">
-            <span className="hidden xl:inline font-mono tracking-wider text-slate-400 dark:text-slate-500">
+            <span className="hidden 2xl:inline font-mono tracking-wider text-slate-400 dark:text-slate-500">
               SortiX OS
             </span>
-            <ChevronRight className="hidden xl:inline h-3.5 w-3.5 text-slate-400" />
-            <span className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[120px] sm:max-w-none">
+            <ChevronRight className="hidden 2xl:inline h-3.5 w-3.5 text-slate-400" />
+            <span className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[100px] sm:max-w-[140px] md:max-w-none">
               {currentPageName}
             </span>
           </div>
@@ -269,7 +269,7 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
             <button
               type="button"
               onClick={() => setStatusMenuOpen((prev) => !prev)}
-              className={`hidden sm:flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold border transition-all shadow-2xs ${
+              className={`hidden sm:flex items-center gap-1.5 sm:gap-2 rounded-full px-2.5 sm:px-3 py-1 text-xs font-bold border transition-all shadow-2xs ${
                 isSimulation
                   ? "border-amber-500/40 bg-amber-500/15 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20"
                   : isRealOnline
@@ -292,9 +292,9 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
                   }`}
                 />
               </span>
-              <span className="tracking-wide">
+              <span className="tracking-wide hidden lg:inline">
                 {isSimulation
-                  ? "Chế độ mô phỏng"
+                  ? "Mô phỏng"
                   : isRealOnline
                   ? `Trực tuyến (${pingMs}ms)`
                   : "Mất kết nối MQTT/ESP32"}
@@ -389,19 +389,13 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
         </div>
 
         {/* Right Section: Cập nhật gần nhất | Tìm kiếm | Bell | Theme | Audio */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-1 sm:gap-1.5 2xl:gap-2 shrink-0">
           {/* CẬP NHẬT GẦN NHẤT */}
           <div
             data-testid="telemetry-last-updated"
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50/80 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-300 shrink-0"
+            className="hidden sm:flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50/80 px-2 sm:px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-white/[0.07] dark:bg-[#161822] dark:text-slate-300 shrink-0"
             title="Thời gian nhận dữ liệu cập nhật gần nhất từ hệ thống"
           >
-            <span className="relative flex h-2 w-2">
-              {isRealIssue && (
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 bg-rose-400" />
-              )}
-              <span className={`relative inline-flex h-2 w-2 rounded-full ${isRealOnline ? "bg-emerald-500" : isSimulation ? "bg-amber-500" : "bg-rose-500"}`} />
-            </span>
             <Clock className="h-3.5 w-3.5 text-slate-400" />
             <span className="text-[11px] text-slate-400 hidden xl:inline">Cập nhật:</span>
             <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
