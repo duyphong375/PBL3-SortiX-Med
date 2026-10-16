@@ -325,45 +325,56 @@ export const TelegramBotService = {
     const telemetryContext = this.buildTelemetrySummary();
     const promptWithContext = `${telemetryContext}\n\n[CÂU HỎI TỪ KỸ SƯ / ĐIỀU DƯỠNG TRÊN TELEGRAM]:\n${userPrompt}`;
 
-    const model = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-      model
-    )}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const primaryModel = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+    const candidateModels = Array.from(
+      new Set([primaryModel, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"])
+    );
 
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION_TELEGRAM }] },
-          contents: [{ role: "user", parts: [{ text: promptWithContext }] }],
-          generationConfig: {
-            temperature: 0.2,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 600,
-          },
-        }),
-        signal: AbortSignal.timeout(12000),
-      });
+    let lastError = "";
 
-      if (!res.ok) {
-        return `⚠️ <i>Lỗi kết nối Gemini API (HTTP ${res.status}). Vui lòng thử lại sau.</i>`;
+    for (const model of candidateModels) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+        model
+      )}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION_TELEGRAM }] },
+            contents: [{ role: "user", parts: [{ text: promptWithContext }] }],
+            generationConfig: {
+              temperature: 0.2,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 600,
+            },
+          }),
+          signal: AbortSignal.timeout(12000),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          lastError = errData?.error?.message || `HTTP ${res.status}`;
+          continue; // thử model tiếp theo
+        }
+
+        const data = await res.json();
+        const reply = data.candidates?.[0]?.content?.parts?.map((p: { text: string }) => p.text).join("\n");
+        if (!reply) continue;
+
+        // Chuyển đổi Markdown cơ bản sang HTML an toàn cho Telegram
+        return reply
+          .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>")
+          .replace(/\*(.*?)\*/g, "<i>$1</i>")
+          .replace(/`([^`]+)`/g, "<code>$1</code>");
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : "Timeout";
       }
-
-      const data = await res.json();
-      const reply = data.candidates?.[0]?.content?.parts?.map((p: { text: string }) => p.text).join("\n");
-      if (!reply) return "<i>Đã ghi nhận câu hỏi nhưng không nhận được nội dung từ mô hình AI.</i>";
-
-      // Chuyển đổi Markdown cơ bản sang HTML an toàn cho Telegram
-      return reply
-        .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>")
-        .replace(/\*(.*?)\*/g, "<i>$1</i>")
-        .replace(/`([^`]+)`/g, "<code>$1</code>");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Timeout";
-      return `⚠️ <i>Lỗi xử lý AI: ${msg}</i>`;
     }
+
+    return `⚠️ <i>Lỗi xử lý AI: ${lastError || "Không có phản hồi từ máy chủ Gemini"}. Vui lòng thử lại sau.</i>`;
   },
 
   /**
