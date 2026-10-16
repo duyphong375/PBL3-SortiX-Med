@@ -267,7 +267,7 @@ export const ShiftSummaryModal: React.FC<ShiftSummaryModalProps> = ({
             </div>
 
             {/* Thông báo phân quyền */}
-            <div className="rounded-xl border p-2 text-[11px] font-medium flex items-center gap-2 ${isAdmin ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400'}">
+            <div className={`rounded-xl border p-2 text-[11px] font-medium flex items-center gap-2 ${isAdmin ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400'}`}>
               {isAdmin ? (
                 <>
                   <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />

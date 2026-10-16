@@ -125,20 +125,20 @@ Hệ thống **SortiX-Med Copilot** đã sẵn sàng hoạt động ở chế đ
 2. Mở file \`.env.local\` trong thư mục \`SortiX-Dashboard\` và thêm:
 \`\`\`env
 GEMINI_API_KEY=AIzaSy...của_bạn
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.5-flash-lite
 \`\`\`
 3. Sau khi lưu, bạn có thể chat trực tiếp với AI Agent với tốc độ cao và ổn định 100%!`,
         model: "unconfigured",
       });
     }
 
-    const primaryModel = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+    const primaryModel = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
     const candidateModels = [
       primaryModel,
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-1.5-flash",
-      "gemini-1.5-flash-8b",
+      "gemini-3.5-flash-lite",
+      "gemini-3.5-flash",
+      "gemini-flash-lite-latest",
+      "gemini-flash-latest",
     ];
     // Loại bỏ các model trùng lặp
     const uniqueModels = Array.from(new Set(candidateModels));
