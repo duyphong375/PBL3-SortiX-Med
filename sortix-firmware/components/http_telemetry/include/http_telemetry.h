@@ -7,17 +7,16 @@ extern "C" {
 #endif
 
 /**
- * @brief Initialize HTTP Telemetry client.
- * @return ESP_OK on success.
+ * @brief Khởi tạo client gửi dữ liệu đo đạc từ xa HTTP Telemetry.
+ * @return ESP_OK nếu thành công.
  */
 esp_err_t http_telemetry_init(void);
 
 /**
- * @brief Send one HTTP POST telemetry payload to the backend server (port 5000).
- *        Payload includes device_id, valid CPU temperature, commanded motor state,
- *        encoder speed when fresh, S1 state, encoder count, and unknown S2/S3 state.
- *        DOES NOT include "optical_sensor".
- * @return ESP_OK on success, error code otherwise.
+ * @brief Gửi một gói dữ liệu HTTP POST telemetry tới máy chủ backend.
+ *        Gói tin bao gồm: device_id, nhiệt độ CPU hợp lệ, trạng thái lệnh động cơ,
+ *        tốc độ encoder tức thời, trạng thái cảm biến S1, số xung encoder và trạng thái chưa xác định của S2/S3.
+ * @return ESP_OK nếu gửi thành công, mã lỗi nếu thất bại.
  */
 esp_err_t http_telemetry_send_post(void);
 

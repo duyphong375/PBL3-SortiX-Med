@@ -13,7 +13,7 @@ function loadModule(relativePath) {
   const requireMock = (id) => {
     if (id === "zod") return require("zod");
     if (id.includes("schemas")) return loadModule("../shared/schemas/index.ts");
-    if (id.startsWith("@/services/historyService")) return loadModule("../src/services/historyService.ts");
+    if (id.startsWith("@/services/historyService")) return loadModule("../backend/src/services/historyService.ts");
     return {};
   };
   new Function("exports", "require", outputText)(exports, requireMock);
@@ -21,7 +21,7 @@ function loadModule(relativePath) {
 }
 
 test("SorterConfigSchema validates valid config and passthrough fields", () => {
-  const schemas = loadModule("../src/lib/schemas.ts");
+  const schemas = loadModule("../shared/schemas/index.ts");
   const validConfig = {
     schema_version: 1,
     config_version: 2,
@@ -43,7 +43,7 @@ test("SorterConfigSchema validates valid config and passthrough fields", () => {
 });
 
 test("ClassificationRecordSchema rejects invalid bins and validates status", () => {
-  const schemas = loadModule("../src/lib/schemas.ts");
+  const schemas = loadModule("../shared/schemas/index.ts");
   const validRecord = {
     id: "rec_100",
     product_id: "prod_100",
@@ -63,7 +63,7 @@ test("ClassificationRecordSchema rejects invalid bins and validates status", () 
 });
 
 test("HistoryQuerySchema correctly coerces query string params", () => {
-  const schemas = loadModule("../src/lib/schemas.ts");
+  const schemas = loadModule("../shared/schemas/index.ts");
   const query = {
     limit: "25",
     offset: "50",

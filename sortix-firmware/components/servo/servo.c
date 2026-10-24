@@ -13,8 +13,8 @@ static const char *TAG = "SERVO_MG996R";
 #define LEDC_SERVO_MODE         LEDC_LOW_SPEED_MODE
 #define LEDC_SERVO_TIMER        LEDC_TIMER_0
 #define LEDC_SERVO_RES          LEDC_TIMER_14_BIT
-#define LEDC_SERVO_FREQ_HZ      50      // 50Hz = 20,000 us period
-#define LEDC_MAX_DUTY           16383   // (2^14 - 1)
+#define LEDC_SERVO_FREQ_HZ      50      // Tần số 50Hz = chu kỳ 20,000 us
+#define LEDC_MAX_DUTY           16383   // Giá trị duty tối đa (2^14 - 1)
 
 typedef struct {
     gpio_num_t pin;
@@ -28,11 +28,11 @@ static servo_channel_ctx_t s_servos[SERVO_COUNT] = {
     { .pin = SERVO_PIN_2, .channel = LEDC_CHANNEL_1, .state = SERVO_STATE_IDLE, .state_start_us = 0 }
 };
 
-static uint32_t s_rest_us = 1000;       // Rest position ~0 degrees
-static uint32_t s_active_us = 2000;     // Divert position ~90 degrees
-static uint32_t s_open_time_ms = 200;   // Physical transit time to open
-static uint32_t s_hold_time_ms = 600;   // Diverter dwell time
-static uint32_t s_close_time_ms = 250;  // Physical transit time to return
+static uint32_t s_rest_us = 1000;       // Vị trí nghỉ ~0 độ
+static uint32_t s_active_us = 2000;     // Vị trí gạt ~90 độ
+static uint32_t s_open_time_ms = 200;   // Thời gian cơ cấu di chuyển để mở ra
+static uint32_t s_hold_time_ms = 600;   // Thời gian giữ cần gạt tại vị trí gạt
+static uint32_t s_close_time_ms = 250;  // Thời gian cơ cấu di chuyển thu về vị trí cũ
 
 static esp_timer_handle_t s_fsm_timer = NULL;
 static SemaphoreHandle_t s_servo_mutex = NULL;
@@ -61,7 +61,7 @@ static void servo_fsm_timer_cb(void *arg)
 
             switch (ctx->state) {
                 case SERVO_STATE_IDLE:
-                    // Nothing to do
+                    // Không có hành động nào khi ở trạng thái chờ
                     break;
 
                 case SERVO_STATE_OPENING:
@@ -135,10 +135,18 @@ esp_err_t servo_init(void)
             ESP_LOGE(TAG, "Failed to configure LEDC channel %d: %s", i, esp_err_to_name(ret));
             return ret;
         }
+
+        // Cập nhật giá trị duty ra thanh ghi phần cứng ngay khi khởi động để chân GPIO phát xung liền
+        ret = ledc_update_duty(LEDC_SERVO_MODE, s_servos[i].channel);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to update duty for LEDC channel %d: %s", i, esp_err_to_name(ret));
+            return ret;
+        }
+
         s_servos[i].state = SERVO_STATE_IDLE;
     }
 
-    // Start 20ms non-blocking FSM timer
+    // Khởi chạy software timer chu kỳ 20ms cho máy trạng thái FSM (không chặn CPU)
     const esp_timer_create_args_t timer_args = {
         .callback = &servo_fsm_timer_cb,
         .name = "servo_fsm_timer"
@@ -148,7 +156,7 @@ esp_err_t servo_init(void)
         ESP_LOGE(TAG, "Failed to create servo FSM timer: %s", esp_err_to_name(ret));
         return ret;
     }
-    esp_timer_start_periodic(s_fsm_timer, 20000); // 20 ms period
+    esp_timer_start_periodic(s_fsm_timer, 20000); // Chu kỳ định thời 20 ms
 
     ESP_LOGI(TAG, "Servos initialized at rest position (duty=%lu)", pulse_to_duty(s_rest_us));
     return ESP_OK;

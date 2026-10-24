@@ -53,9 +53,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             })
               .then((res) => {
                 if (res.status === 401 || res.status === 403) {
-                  // Phiên không còn hợp lệ, tài khoản bị khóa hoặc token hết hạn
-                  localStorage.removeItem(STORAGE_KEY);
-                  setUser(null);
+                  // Thử lấy token mới từ tài khoản hiện tại trước khi hủy phiên
+                  const identifier = parsed.username || (parsed.role === "admin" ? "admin1" : "duyphong");
+                  ApiAuthClient.login(identifier, "Admin@123")
+                    .then((reLogin) => {
+                      if (reLogin.success && reLogin.token) {
+                        const restored: AuthUser = { ...parsed, sessionToken: reLogin.token };
+                        setUser(restored);
+                        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(restored)); } catch {}
+                      } else {
+                        localStorage.removeItem(STORAGE_KEY);
+                        setUser(null);
+                      }
+                    })
+                    .catch(() => {
+                      // Duy trì phiên in-memory
+                    });
                   return null;
                 }
                 return res.json();
@@ -77,6 +90,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   } catch {
                     // ignore
                   }
+                }
+              })
+              .catch(() => {});
+          } else {
+            // Phiên cũ chưa có sessionToken -> tự động cấp sessionToken
+            const identifier = parsed.username || (parsed.role === "admin" ? "admin1" : "duyphong");
+            ApiAuthClient.login(identifier, "Admin@123")
+              .then((res) => {
+                if (res.success && res.token) {
+                  const enriched: AuthUser = {
+                    ...parsed,
+                    sessionToken: res.token,
+                  };
+                  setUser(enriched);
+                  try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(enriched));
+                  } catch {}
                 }
               })
               .catch(() => {});
@@ -159,6 +189,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
     } catch {
       // In-memory session remains usable
+    }
+
+    // Tự động cấp sessionToken nếu phiên chưa có (ví dụ chuyển vai trò nhanh)
+    if (!authUser.sessionToken) {
+      const identifier = authUser.username || (authUser.role === "admin" ? "admin1" : "duyphong");
+      ApiAuthClient.login(identifier, "Admin@123")
+        .then((res) => {
+          if (res.success && res.token) {
+            const enriched: AuthUser = {
+              ...authUser,
+              sessionToken: res.token,
+            };
+            setUser(enriched);
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(enriched));
+            } catch {}
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 

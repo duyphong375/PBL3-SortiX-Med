@@ -28,8 +28,8 @@ static float s_counts_per_mm = 31.5f;
 
 static bool IRAM_ATTR pcnt_on_reach(pcnt_unit_handle_t unit, const pcnt_watch_event_data_t *edata, void *user_ctx)
 {
-    // With accum_count enabled, the PCNT driver accounts for the limit value
-    // and clears the hardware counter itself. Do not clear it again here.
+    // Khi bật cờ accum_count, driver PCNT sẽ tự động bù trừ giá trị giới hạn
+    // và tự xóa bộ đếm phần cứng. Không cần xóa thủ công tại đây.
     (void)unit;
     (void)edata;
     (void)user_ctx;
@@ -52,7 +52,7 @@ esp_err_t encoder_init(void)
         return ret;
     }
 
-    // Channel A: Edge on Pin A, Level on Pin B
+    // Kênh A: Bắt cạnh trên chân A, mức logic trên chân B
     pcnt_chan_config_t chan_a_config = {
         .edge_gpio_num = ENCODER_PIN_A,
         .level_gpio_num = ENCODER_PIN_B,
@@ -63,7 +63,7 @@ esp_err_t encoder_init(void)
         return ret;
     }
 
-    // Channel B: Edge on Pin B, Level on Pin A
+    // Kênh B: Bắt cạnh trên chân B, mức logic trên chân A
     pcnt_chan_config_t chan_b_config = {
         .edge_gpio_num = ENCODER_PIN_B,
         .level_gpio_num = ENCODER_PIN_A,
@@ -74,20 +74,20 @@ esp_err_t encoder_init(void)
         return ret;
     }
 
-    // Set edge and level actions for full quadrature x4
+    // Thiết lập hành vi xung và mức logic cho chế độ nhân 4 (full quadrature x4)
     PCNT_CHECK(pcnt_channel_set_edge_action(s_pcnt_chan_a, PCNT_CHANNEL_EDGE_ACTION_DECREASE, PCNT_CHANNEL_EDGE_ACTION_INCREASE));
     PCNT_CHECK(pcnt_channel_set_level_action(s_pcnt_chan_a, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
 
     PCNT_CHECK(pcnt_channel_set_edge_action(s_pcnt_chan_b, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_DECREASE));
     PCNT_CHECK(pcnt_channel_set_level_action(s_pcnt_chan_b, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
 
-    // Glitch filter (1000ns)
+    // Bộ lọc khử nhiễu xung ngắn (1000ns)
     pcnt_glitch_filter_config_t filter_config = {
         .max_glitch_ns = 1000,
     };
     PCNT_CHECK(pcnt_unit_set_glitch_filter(s_pcnt_unit, &filter_config));
 
-    // Watchpoints for high and low limit overflow
+    // Điểm theo dõi (watchpoint) khi xảy ra tràn ngưỡng trên và ngưỡng dưới
     PCNT_CHECK(pcnt_unit_add_watch_point(s_pcnt_unit, PCNT_HIGH_LIMIT));
     PCNT_CHECK(pcnt_unit_add_watch_point(s_pcnt_unit, PCNT_LOW_LIMIT));
 

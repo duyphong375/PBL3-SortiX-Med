@@ -129,86 +129,223 @@ Các mục lịch sử bên dưới có thể mô tả trạng thái ở thời 
 
 ---
 
-## 2. Kiến Trúc Hệ Thống (Monorepo & 1-Codebase Architecture)
+## 2. Kiến Trúc Hệ Thống & Cây Thư Mục Chi Tiết (Architecture & Directory Structure)
 
-Mã nguồn được tổ chức theo chuẩn **Monorepo (npm workspaces)** với mô hình **1-Codebase**: toàn bộ Web máy tính, Cloud Vercel, ứng dụng di động Android APK và iOS PWA đều chia sẻ 100% logic và giao diện:
+Mã nguồn được tổ chức theo chuẩn **Monorepo (npm workspaces)** với mô hình **1-Codebase**: toàn bộ Web máy tính, Cloud Vercel, ứng dụng di động Android APK và iOS PWA đều chia sẻ 100% logic và giao diện.
 
-```
+### 2.1. Sơ Đồ Cây Thư Mục Tổng Thể
+
+```text
 SortiX-Dashboard/
-├── backend/                  # Standalone Backend Server (Node.js node:http + TypeScript)
-│   ├── database/             # File migrations (SQLite, PostgreSQL, MySQL, MongoDB) & Seeds
-│   │   ├── migrations/       # SQL scripts tạo bảng Users & Schema
-│   │   └── seeds/            # Khởi tạo 4 tài khoản Quản trị viên ban đầu
-│   ├── scripts/              # Build helper scripts (patch-dist-aliases.cjs)
-│   ├── src/
-│   │   ├── config/           # Cấu hình biến môi trường (env.ts)
-│   │   ├── controllers/      # Điều phối nghiệp vụ (user, config, history, stats, alert, safety)
-│   │   ├── middlewares/      # Auth JWT/Bearer, Zod validator, Error Handler
-│   │   ├── models/           # Quản lý tầng dữ liệu (userModel, historyModel, configModel, notificationModel)
-│   │   ├── routes/           # RESTful API endpoints (/api/auth, /api/users, /api/safety, ...)
-│   │   ├── services/         # Logic nghiệp vụ (safetyService, sseService, alertNotificationService, mqttService, ...)
-│   │   ├── utils/            # Tiện ích chuyển đổi dữ liệu và định dạng thông báo
-│   │   └── server.ts         # Điểm khởi động HTTP node:http Server (Port 5000)
-│   ├── package.json
-│   └── tsconfig.json
-├── frontend/                 # Client UI Next.js 14 App Router & Mobile Shell
-│   ├── android/              # Native Android Studio Project (Capacitor Bridge)
-│   │   ├── app/
-│   │   │   ├── build/outputs/apk/debug/app-debug.apk # File APK cài đặt (SortiX-Dashboard.apk)
-│   │   │   └── src/main/AndroidManifest.xml          # Cấu hình quyền & Cleartext Traffic
-│   │   └── build.gradle
-│   ├── capacitor.config.ts   # Cấu hình Capacitor (App ID, App Name, Server URL, Cleartext)
-│   ├── capacitor-shell/      # index.html tối thiểu để Capacitor đồng bộ WebView
-│   ├── public/               # Tài nguyên tĩnh, biểu tượng app, manifest
-│   ├── src/
-│   │   ├── app/              # Page routes và API route handlers (/api/auth, /api/safety, /api/events, ...)
-│   │   │   ├── layout.tsx    # Cấu hình Viewport chống zoom, theme-color, HTML layout
-│   │   │   ├── page.tsx      # Trang Tổng Quan Dashboard
-│   │   │   ├── conveyor/     # Trang Giám Sát Băng Tải Canvas 60fps
-│   │   │   ├── config/       # Trang Cấu Hình Quy Tắc Phân Loại & Dung Lượng Khay
-│   │   │   ├── analytics/    # Trang Phân Tích Số Liệu & Biểu Đồ Recharts
-│   │   │   ├── devices/      # Trang Giám Sát Thiết Bị & Telemetry IoT
-│   │   │   ├── history/      # Trang Bảng Lịch Sử Phân Loại & Xuất CSV
-│   │   │   ├── alerts/       # Trang Quản Lý Cảnh Báo Sự Cố
-│   │   │   ├── users/        # Trang Quản Trị Thành Viên & Phân Quyền (Admin Only)
-│   │   │   └── login/        # Trang Đăng Nhập, Đăng Ký & Quên Mật Khẩu
-│   │   ├── components/       # Components mô-đun hóa
-│   │   │   ├── conveyor/     # ActuatorTestPanel, ConveyorStations, ConveyorToolbar, VisualItemRenderer
-│   │   │   ├── layout/       # DashboardLayout, TopHeader (Light/Dark Toggle, Mobile Pill), Sidebar, Banners
-│   │   │   ├── overview/     # KpiStatGrid, LiveHealthAndBinWidget, RecentActivityList
-│   │   │   ├── ui/           # TemperatureGaugeWidget, ShiftSummaryModal, Modals & Toasts
-│   │   │   ├── AiCopilot.tsx # Trợ lý Y tế & IoT AI Copilot (Tích hợp Gemini & n8n)
-│   │   │   ├── ConfigAndDiagnostics.tsx # Chẩn đoán & cấu hình thiết bị
-│   │   │   └── ConveyorVisualizer.tsx    # Khối trực quan băng chuyền 60fps
-│   │   ├── contexts/         # React Contexts (AuthContext, DashboardContext)
-│   │   ├── hooks/            # useConveyorPhysics, useMQTT, useSorterData
-│   │   ├── lib/              # Client utilities, Audio Service, CSV Exporter
-│   │   └── services/         # API Clients (apiAuthClient, apiSafetyClient, apiSyncClient, apiUsersClient, sseService)
-│   ├── package.json
-│   └── tsconfig.json
-├── src/                      # Tương thích cho các test loader TypeScript hiện có
-│   ├── lib/
-│   │   ├── history.ts        # Bản đồng bộ với frontend/src/lib/history.ts
-│   │   ├── schemas.ts        # Re-export shared/schemas
-│   │   └── types.ts          # Re-export shared/types
-│   └── services/
-│       └── historyService.ts # Re-export backend history service
-├── shared/                   # Tầng dùng chung giữa Frontend và Backend
-│   ├── constants/            # Hằng số toàn hệ thống (Topics MQTT, mã màu khay, role, default configs)
-│   ├── schemas/              # Zod validation schemas (.passthrough() linh hoạt cho firmware)
-│   ├── types/                # TypeScript interfaces chuẩn mực
-│   └── package.json
-├── data/                     # Dữ liệu cục bộ bền vững (users.json, notifications.json)
-├── docs/                     # Tài liệu kỹ thuật chi tiết
-│   ├── architecture.md       # Thiết kế kiến trúc phân tầng, Mobile Shell & An toàn
-│   └── api.md                # Đặc tả API routes, aliases safety và SSE
-├── scripts/                  # Root orchestration scripts (dev-all.cjs)
-├── tests/                    # Contract & Integration tests (23 suites kiểm thử tự động)
-├── CHANGELOG.md              # Nhật ký thay đổi hệ thống chi tiết qua các phiên bản
-├── AGENTS.md                 # Quy chuẩn kỹ thuật, Mobile Rules & Bảo mật bắt buộc
-├── .env.example              # Mẫu biến môi trường cho Frontend Next.js
-└── package.json              # Root package quản lý Monorepo Workspaces & Scripts di động
+├── backend/                  # Workspace Máy chủ Backend độc lập (node:http + TypeScript, Port 5000)
+│   ├── database/             # Quản lý cấu trúc dữ liệu và tài khoản quản trị
+│   │   ├── migrations/       # Scripts SQL/JS tạo bảng và chỉ mục (PostgreSQL, SQLite, MySQL, MongoDB)
+│   │   └── seeds/            # Dữ liệu hạt giống (Seed 4 tài khoản Admin cố định băm mật khẩu Bcrypt)
+│   ├── scripts/              # Scripts hỗ trợ đóng gói bản build (patch-dist-aliases.cjs)
+│   ├── src/                  # Mã nguồn TypeScript máy chủ API
+│   │   ├── config/           # Nạp, kiểm tra và bảo vệ biến môi trường (env.ts)
+│   │   ├── controllers/      # Tầng điều phối HTTP request/response cho từng phân hệ
+│   │   ├── middlewares/      # Lớp lọc trung gian: Xác thực JWT, Kiểm tra Zod, Bắt lỗi tập trung
+│   │   ├── models/           # Tầng truy xuất và thao tác tệp dữ liệu bền vững (Atomic File I/O)
+│   │   ├── routes/           # Định tuyến RESTful API endpoints (/api/auth, /api/safety, ...)
+│   │   ├── services/         # Tầng lõi nghiệp vụ: Safety Engine, SSE Broadcast, Mqtt, Email/Tele Alert
+│   │   ├── utils/            # Tiện ích định dạng thông báo sự cố, rate limiter, lọc bảo mật
+│   │   └── server.ts         # Điểm khởi động HTTP Server, đăng ký routes, thiết lập CORS và Watchdog
+│   ├── package.json          # Cấu hình phụ thuộc và scripts cho package @sortix/backend
+│   └── tsconfig.json         # Cấu hình biên dịch TypeScript cho backend
+├── frontend/                 # Workspace Giao diện Web Next.js 14 App Router & Mobile Shell
+│   ├── android/              # Dự án Native Android Studio (Capacitor Bridge đóng gói APK)
+│   │   ├── app/              # Mã nguồn native Android, AndroidManifest.xml, output file APK
+│   │   └── build.gradle      # Cấu hình Gradle build hệ điều hành Android
+│   ├── capacitor-shell/      # Vỏ WebView tối thiểu (index.html) để Capacitor đồng bộ Native App
+│   ├── public/               # Tài nguyên tĩnh công khai (SortiX-Dashboard.apk, icon, ảnh hero, QR code)
+│   ├── src/                  # Mã nguồn TypeScript & React
+│   │   ├── app/              # Định tuyến trang Next.js App Router và Next.js API Route Handlers
+│   │   ├── components/       # Thư viện thành phần giao diện UI mô-đun hóa cao
+│   │   ├── contexts/         # Quản lý trạng thái xác thực và phân quyền (AuthContext.tsx)
+│   │   ├── hooks/            # Custom React Hooks: vật lý băng tải, kết nối MQTT, dữ liệu telemetry
+│   │   ├── lib/              # Thư viện tiện ích client: Web Audio synthesizer, xuất CSV, LocalStorage history
+│   │   └── services/         # API Client SDK giao tiếp với Backend REST API và Server-Sent Events (SSE)
+│   ├── capacitor.config.ts   # Cấu hình ứng dụng di động Capacitor (App ID, Server URL, Cleartext)
+│   ├── next.config.mjs       # Cấu hình máy chủ Next.js và tối ưu hóa đóng gói
+│   ├── package.json          # Cấu hình phụ thuộc và scripts cho package @sortix/frontend
+│   ├── tailwind.config.ts    # Thiết lập hệ thống màu sắc HSL, hiệu ứng SCADA và giao diện Dark/Light
+│   └── tsconfig.json         # Cấu hình TypeScript với Path Aliases (@/* và @shared/*)
+├── shared/                   # Workspace Thư viện Dùng Chung giữa Frontend, Backend và Firmware
+│   ├── constants/            # Hằng số toàn hệ thống: Danh sách Topic MQTT, mã màu khay, danh mục đồ y tế
+│   ├── schemas/              # Zod validation schemas kiểm tra tính toàn vẹn payload (hỗ trợ .passthrough())
+│   ├── types/                # Khai báo kiểu dữ liệu tĩnh TypeScript chuẩn hóa cho toàn dự án
+│   ├── package.json          # Cấu hình package @sortix/shared
+│   └── tsconfig.json         # Cấu hình TypeScript cho shared workspace
+├── data/                     # Cơ sở dữ liệu JSON cục bộ bền vững (Persistence Data Store)
+│   ├── users.json            # Hồ sơ thành viên, mật khẩu băm, vai trò phân quyền (RBAC)
+│   ├── notifications.json    # Nhật ký các thông báo sự cố (E-Stop, Jam, Đầy khay, Quá nhiệt)
+│   ├── history.json          # Nhật ký phân loại sản phẩm thực tế từ băng chuyền
+│   ├── sync_state.json       # Lưu trữ trạng thái đồng bộ cấu hình giữa Web, App và ESP32
+│   └── telemetry_logs.json   # Lưu trữ telemetry thời gian thực phục vụ giám sát
+├── docs/                     # Tài liệu kỹ thuật chi tiết phục vụ phát triển và chuyển giao
+│   ├── architecture.md       # Thiết kế kiến trúc phân tầng, nguyên tắc an toàn công nghiệp và SCADA
+│   └── api.md                # Đặc tả toàn diện RESTful API routes, format payload, SSE và mã lỗi HTTP
+├── scripts/                  # Bộ công cụ tự động hóa, điều phối môi trường dev và kiểm thử
+│   ├── dev-all.cjs           # Khởi động song song cả Frontend Next.js và Backend Node.js
+│   ├── free-port.cjs         # Tự động quét và giải phóng cổng mạng 3000/5000 bị kẹt trước khi chạy
+│   ├── e2e.cjs               # Kịch bản kiểm thử luồng tích hợp tự động đầu-cuối (End-to-End)
+│   ├── telegram-poller.cjs   # Bộ lắng nghe webhook Telegram độc lập phục vụ debug tại mạng local
+│   ├── dev.ps1               # Lệnh PowerShell chạy nhanh môi trường phát triển trên Windows
+│   └── test.ps1              # Lệnh PowerShell thực thi nhanh toàn bộ bộ kiểm thử tự động
+├── tests/                    # Bộ 26 suite kiểm thử tự động Contract & Integration Tests (*.test.cjs)
+├── .env.example              # Mẫu khai báo biến môi trường chuẩn cho dự án
+├── .env.local                # Biến môi trường cục bộ phục vụ chạy thử nghiệm
+├── .gitignore                # Khai báo các tệp và thư mục loại trừ khỏi Git (node_modules, .next, dist)
+├── .vercel/                  # Metadata liên kết dự án triển khai tự động lên Vercel Cloud
+├── vercel.json               # Cấu hình chỉ thị build Monorepo Workspace cho Vercel
+├── package.json              # Tệp quản lý Monorepo root: workspaces, dependencies dùng chung và lệnh chạy
+├── package-lock.json         # Khóa phiên bản gói phụ thuộc chính xác của npm
+├── tsconfig.json             # Cấu hình TypeScript gốc định nghĩa đường dẫn tắt toàn hệ thống
+├── README.md                 # Tài liệu hướng dẫn sử dụng, cài đặt và vận hành hệ thống
+├── CHANGELOG.md              # Nhật ký phát triển và lịch sử cập nhật phiên bản chi tiết
+├── AGENTS.md                 # Quy chuẩn kỹ thuật, tiêu chuẩn giao diện SCADA và quy tắc bảo mật
+└── SortiX_Dashboard.png      # Mã QR kết nối nhanh ứng dụng di động cho nhân viên vận hành
 ```
+
+---
+
+### 2.2. Vai Trò & Tác Dụng Chi Tiết Của Từng Thư Mục
+
+#### 🏢 1. Phân hệ Máy chủ Backend (`backend/`)
+Chịu trách nhiệm xử lý logic nghiệp vụ trung tâm, lưu trữ dữ liệu bền vững, kết nối MQTT Broker với vi điều khiển ESP32, giám sát nhịp tim (watchdog), và phát tín hiệu cảnh báo khẩn cấp:
+- **`backend/database/`**:
+  - `migrations/`: Chứa các script SQL/JS để tự động khởi tạo bảng cơ sở dữ liệu nếu chuyển từ JSON Store sang SQLite, PostgreSQL, MySQL hoặc MongoDB.
+  - `seeds/`: Tệp hạt giống khởi tạo cố định 4 tài khoản Quản trị viên (`admin1` đến `admin4`) kèm mật khẩu băm Bcrypt an toàn.
+- **`backend/scripts/`**: Chứa `patch-dist-aliases.cjs`, script tự động chuyển đổi các alias TypeScript thành đường dẫn tương đối Node.js sau khi biên dịch vào thư mục `dist/`.
+- **`backend/src/config/`**: Quản lý biến môi trường (`env.ts`), đảm bảo các biến nhạy cảm như `JWT_SECRET`, cổng kết nối và thông tin MQTT broker được nạp đúng chuẩn.
+- **`backend/src/controllers/`**: Các bộ điều khiển HTTP (Request Handlers):
+  - `alertController.ts`: Tiếp nhận và xử lý cảnh báo khẩn cấp gửi về từ client hoặc IoT.
+  - `configController.ts`: Tiếp nhận, xác thực và xuất bản cấu hình phân loại (`SorterConfig`).
+  - `historyController.ts`: Truy vấn, lọc và phân trang lịch sử phân loại sản phẩm.
+  - `safetyController.ts`: Xử lý kích hoạt/giải trừ Dừng khẩn cấp (E-Stop), Kẹt phôi (Jam), Quá nhiệt và Đầy khay.
+  - `statsController.ts` & `telemetryController.ts`: Tổng hợp số liệu KPI và đọc ghi telemetry.
+  - `userController.ts`: Đăng nhập, đăng ký, đổi mật khẩu, quản lý thành viên và phân quyền RBAC.
+- **`backend/src/middlewares/`**:
+  - `authMiddleware.ts`: Kiểm tra JSON Web Token (JWT) trong header Authorization và phân định vai trò `admin` / `user`.
+  - `validateMiddleware.ts`: Tự động kiểm tra payload HTTP body dựa trên Zod Schema trước khi đưa vào controller.
+  - `errorMiddleware.ts`: Bắt lỗi ngoại lệ toàn cục, bảo đảm server không bao giờ bị crash khi có lỗi bất ngờ.
+- **`backend/src/models/`**: Tầng thao tác tệp dữ liệu bền vững (Data Access Layer) với cơ chế ghi nguyên tử (**Atomic Write via Temporary File + Rename**) giúp chống hỏng tệp khi mất điện đột ngột:
+  - `userModel.ts`: Đọc/ghi và cập nhật danh sách người dùng trong `data/users.json`.
+  - `notificationModel.ts`: Quản lý các bản ghi thông báo sự cố trong `data/notifications.json`.
+  - `configModel.ts`, `historyModel.ts`, `telemetryModel.ts`: Quản lý cấu hình, lịch sử và telemetry.
+- **`backend/src/routes/`**: Tập hợp các tệp khai báo route RESTful (`authRoutes.ts`, `safetyRoutes.ts`, `userRoutes.ts`, ...).
+- **`backend/src/services/`**: Trái tim logic nghiệp vụ của hệ thống:
+  - `safetyService.ts`: Xử lý logic khóa an toàn E-Stop, mở khóa kèm lý do hiện trường, cơ chế chống kẹt echo loop 5s, và kích hoạt còi báo động.
+  - `sseService.ts`: Quản lý các kết nối thời gian thực Server-Sent Events (`/api/events`), đẩy thông báo sự cố tức thì đến mọi màn hình giám sát.
+  - `alertNotificationService.ts`: Tự động soạn thảo và gửi tin nhắn cảnh báo qua Telegram Bot và Email SMTP khi xảy ra sự cố nghiêm trọng.
+  - `mqttService.ts`: Kết nối trực tiếp tới MQTT Broker, subscribe các topic telemetry/vision từ ESP32 và kích hoạt watchdog khi thiết bị offline > 6 giây.
+  - `userService.ts`: Logic mã hóa Bcrypt, xác thực mật khẩu, quản lý mã OTP khôi phục tài khoản.
+- **`backend/src/server.ts`**: Tệp khởi động chính của Backend, tích hợp HTTP server native (`node:http`), xử lý CORS, phân phối route và kích hoạt dịch vụ MQTT.
+
+---
+
+#### 💻 2. Phân hệ Giao diện Khách & Ứng dụng Di động (`frontend/`)
+Xây dựng trên nền tảng **Next.js 14 App Router** kết hợp **Capacitor Mobile Shell**, mang lại trải nghiệm màn hình giám sát công nghiệp SCADA trên Web và ứng dụng di động bản địa:
+- **`frontend/android/`**: Dự án mã nguồn native Android Studio hoàn chỉnh. Cho phép biên dịch trực tiếp ra file cài đặt `SortiX-Dashboard.apk` với cấu hình bật kết nối mạng nội bộ Cleartext Traffic và giao diện SCADA toàn màn hình.
+- **`frontend/capacitor-shell/`**: Chứa tệp `index.html` tối thiểu làm trang neo (webDir) cho bộ công cụ Capacitor CLI đồng bộ cấu hình sang nền tảng native.
+- **`frontend/public/`**: Thư mục lưu trữ tài nguyên tĩnh được máy chủ Next.js phân phối công khai:
+  - `SortiX-Dashboard.apk`: File cài đặt ứng dụng Android để người dùng tải trực tiếp từ nút bấm trên Dashboard.
+  - `SortiX_Dashboard.png`: Ảnh mã QR để nhân viên dùng camera điện thoại quét và mở ứng dụng ngay lập tức.
+  - `smart_sorter_hero.jpg`: Hình ảnh đồ họa hệ thống băng tải y tế hiển thị trên giao diện trang chủ.
+- **`frontend/src/app/`**: Hệ thống phân trang (Page Routes) và API Serverless:
+  - `page.tsx`: Trang Tổng Quan Hệ Thống với các thẻ thống kê KPI, biểu đồ phân loại, widget nhịp tim thiết bị và danh sách hoạt động gần nhất.
+  - `conveyor/page.tsx`: Trang Giám Sát Băng Tải trực quan thời gian thực với khung vẽ **Canvas 60fps**, hiển thị vật thể di chuyển mượt mà, thanh điều khiển actuator và giám sát cảm biến quang S1/S2/S3.
+  - `analytics/page.tsx`: Trang Phân Tích Dữ Liệu Chuyên Sâu với biểu đồ cột, biểu đồ tròn (Recharts) theo dõi năng suất ca làm việc, tỷ lệ thành công và phân bổ khay.
+  - `history/page.tsx`: Bảng tra cứu toàn bộ lịch sử phân loại dụng cụ y tế, hỗ trợ lọc đa tiêu chí và xuất báo cáo CSV chuẩn UTF-8 BOM tiếng Việt.
+  - `alerts/page.tsx`: Trung tâm quản lý cảnh báo và sự cố công nghiệp, phân loại theo mức độ Nghiêm trọng (Critical), Cảnh báo (Warning) và Thông tin (Info).
+  - `users/page.tsx`: Trang Quản trị Thành viên & Phân quyền (Dành riêng cho Admin): Tạo mới, sửa vai trò, khóa tài khoản và thiết lập lại mật khẩu.
+  - `login/page.tsx`: Giao diện đăng nhập hiện đại, đăng ký tài khoản mới và quên mật khẩu qua mã xác thực OTP.
+  - `settings/config/page.tsx`: Trang Cấu hình Quy tắc Phân loại (gán loại dụng cụ vào khay 1, khay 2 hoặc khay 3 mặc định) và dung lượng tối đa của từng khay.
+  - `settings/devices/page.tsx`: Trang Giám sát Telemetry Phần cứng IoT (tốc độ encoder, nhiệt độ vi xử lý, cường độ WiFi RSSI, trạng thái kết nối MQTT).
+  - `config/` & `devices/` & `settings/`: Các trang điều hướng ngược thông minh (Redirect Pages) đảm bảo người dùng hoặc liên kết cũ luôn được chuyển tiếp tự động về đúng địa chỉ mới mà không gặp lỗi 404.
+  - `frontend/src/app/api/`: Các Next.js Route Handlers cung cấp các API độc lập khi chạy trên Vercel Serverless (`/api/auth`, `/api/safety`, `/api/events`, `/api/sync`, `/api/telegram-alert`, ...).
+- **`frontend/src/components/`**: Các khối giao diện tái sử dụng:
+  - `conveyor/`: `ActuatorTestPanel` (bảng kích hoạt thử nghiệm tay gạt servo), `ConveyorStations` (vị trí các trạm cảm biến), `VisualItemRenderer` (vẽ hình ảnh ống tiêm, kẹp phẫu thuật, kéo y tế).
+  - `layout/`: `DashboardLayout` (bộ khung tổng thể, hỗ trợ chuyển đổi chế độ xem SCADA Kiosk toàn màn hình F11), `TopHeader` (nút chuyển Dark/Light, hiển thị trạng thái khẩn cấp Mobile Pill), `Sidebar` (menu điều hướng), các Banner cảnh báo (`EmergencyStopBanner`, `BinFullIncidentBanner`).
+  - `overview/`: `KpiStatGrid` (lưới chỉ số sản xuất), `LiveHealthAndBinWidget` (thanh đo nhiệt độ và dung lượng khay), `RecentActivityList` (danh sách sự kiện trực tiếp).
+  - `ui/`: Các cửa sổ tương tác an toàn (`EmergencyConfirmModal` xác nhận mở khóa E-Stop kèm nhập lý do, `TemperatureGaugeWidget` đồng hồ đo nhiệt độ, `ShiftSummaryModal` tổng kết ca sản xuất, và các Toast thông báo trạng thái).
+  - `AiCopilot.tsx`: Trợ lý Trí tuệ Nhân tạo thông minh tích hợp Google Gemini AI và n8n workflow, hỗ trợ hỏi đáp kỹ thuật và hướng dẫn vận hành thiết bị.
+  - `ConveyorVisualizer.tsx`: Khối vẽ Canvas thời gian thực mô phỏng chuyển động vật lý của băng chuyền theo vận tốc encoder.
+- **`frontend/src/contexts/`**: `AuthContext.tsx` quản lý phiên đăng nhập của người dùng, tự động làm mới JWT token và cung cấp hook phân quyền `usePermission("user.manage")` để bảo vệ các nút chức năng nhạy cảm.
+- **`frontend/src/hooks/`**: Chứa logic xử lý tương tác độc lập:
+  - `useConveyorPhysics.ts`: Tính toán tọa độ và gia tốc di chuyển của phôi trên băng tải 60 lần mỗi giây.
+  - `useMQTT.ts`: Quản lý kết nối WebSocket MQTT bảo đảm dữ liệu telemetry từ broker EMQX đổ về UI liên tục.
+  - `useSorterData.ts`: Quản lý dữ liệu phân loại, bộ đếm khay và chuyển đổi linh hoạt giữa chế độ Mô phỏng và Thực tế.
+- **`frontend/src/lib/`**: Bộ công cụ kỹ thuật client:
+  - `audioService.ts`: Bộ tổng hợp âm thanh Web Audio API (không cần tải file mp3 bên ngoài), phát âm thanh còi hú báo động E-Stop, tiếng gạt khay và âm thanh click giao diện.
+  - `history.ts`: Hệ thống lưu trữ dữ liệu lịch sử vào LocalStorage có khả năng phân tách độc lập giữa chế độ Giả lập và Thực tế, tự động dọn dẹp dữ liệu cũ khi khởi động lại.
+  - `exportCsv.ts`: Bộ tạo file Excel/CSV chuẩn UTF-8 có BOM (Byte Order Mark) chống lỗi font tiếng Việt khi mở bằng Microsoft Excel.
+- **`frontend/src/services/`**: Các lớp API Client (SDK) trừu tượng hóa các cuộc gọi mạng HTTP fetch tới máy chủ backend (`apiAuthClient`, `apiSafetyClient`, `apiUsersClient`, `sseService`).
+
+---
+
+#### 🔗 3. Tầng Dùng Chung (`shared/`)
+Đảm bảo tính nhất quán dữ liệu tuyệt đối giữa giao diện Web, máy chủ Backend và firmware điều khiển:
+- **`shared/constants/`**: Khai báo các hằng số không thay đổi: Danh mục định danh dụng cụ phẫu thuật (`CATALOG_BRANDS`), bảng màu sắc chuẩn nhận diện khay (`BIN_THEMES`), danh sách các chủ đề MQTT chuẩn mực (`conveyor/safety/estop`, `sorter/sorter_01/telemetry`, ...) và cấu hình mặc định ban đầu.
+- **`shared/schemas/`**: Tập hợp các Zod Schema kiểm định cấu trúc dữ liệu:
+  - `TelemetrySchema`: Kiểm tra nhịp tim, tốc độ băng tải, nhiệt độ CPU, trạng thái cảm biến.
+  - `VisionDetectionSchema`: Kiểm tra kết quả AI Camera (tên dụng cụ, độ tin cậy confidence).
+  - `SorterConfigSchema`: Kiểm tra tính hợp lệ của quy tắc chia khay, sử dụng `.passthrough()` để cho phép firmware ESP32 bổ sung trường tùy biến mà không gây lỗi phân tích.
+  - `AlertPayloadSchema`: Kiểm định dữ liệu gửi tin nhắn Telegram và Email.
+- **`shared/types/`**: Định nghĩa các TypeScript Interface chuẩn mực (`ClassificationRecord`, `TelemetryData`, `AlertEvent`, `UserSession`, ...), giúp các lập trình viên frontend và backend luôn hiểu chung một định dạng dữ liệu.
+
+---
+
+#### 🗄️ 4. Lưu Trữ Dữ Liệu Bền Vững (`data/`)
+Nơi lưu trữ dữ liệu thực tế của hệ thống ở định dạng JSON bền vững, không phụ thuộc vào cài đặt database bên ngoài, phù hợp cho triển khai nhẹ và chạy demo:
+- **`users.json`**: Lưu trữ danh sách tài khoản thành viên, vai trò `admin`/`user`, mật khẩu đã băm Bcrypt, và trạng thái hoạt động.
+- **`notifications.json`**: Lưu trữ lịch sử toàn bộ các thông báo sự cố công nghiệp (E-Stop, kẹt vật phẩm, đầy khay, quá nhiệt) kèm trạng thái đã giải quyết hay chưa.
+- **`history.json`**: Bản ghi lịch sử các đợt phân loại dụng cụ y tế thực tế từ băng chuyền.
+- **`sync_state.json`**: Lưu phiên bản cấu hình phân loại và trạng thái đồng bộ giữa máy chủ và vi điều khiển.
+- **`telemetry_logs.json`**: Nhật ký lưu vết các thông số đo đạc vi điều khiển theo thời gian.
+
+---
+
+#### 📚 5. Tài Liệu Kỹ Thuật Dự Án (`docs/`)
+- **`architecture.md`**: Bản thiết kế kiến trúc chi tiết, giải thích các tầng công nghệ, quy tắc an toàn công nghiệp E-Stop, giải pháp SCADA hiển thị không cuộn trang (zero-scroll), và luồng đồng bộ đa thiết bị.
+- **`api.md`**: Đặc tả kỹ thuật toàn diện của tất cả các REST API endpoints trong hệ thống: Phương thức HTTP (GET/POST/PUT/DELETE), cấu trúc Header, dữ liệu Body mẫu, phản hồi thành công và định dạng lỗi.
+
+---
+
+#### ⚙️ 6. Bộ Scripts Điều Phối & Tự Động Hóa (`scripts/`)
+- **`dev-all.cjs`**: Script điều phối trung tâm, tự động giải phóng cổng mạng và khởi động song song cả Frontend Next.js (port 3000) và Backend Node.js (port 5000) chỉ bằng một lệnh duy nhất.
+- **`free-port.cjs`**: Tiện ích quét và tắt các tiến trình Node.js chạy ngầm đang chiếm dụng cổng 3000 hoặc 5000 trên Windows, tránh lỗi `EADDRINUSE`.
+- **`e2e.cjs`**: Kịch bản chạy kiểm thử luồng tích hợp đầu-cuối: Tự động khởi động server, giả lập người dùng đăng nhập, kích hoạt E-Stop, kiểm tra còi hú, và xác nhận tắt hệ thống an toàn.
+- **`telegram-poller.cjs`**: Công cụ lắng nghe tin nhắn Telegram 2 chiều độc lập phục vụ việc kiểm thử trợ lý điều khiển từ xa khi chạy ở môi trường máy tính cá nhân (localhost).
+- **`dev.ps1`** & **`test.ps1`**: Các tệp lệnh tắt PowerShell tối ưu hóa cho môi trường phát triển Windows, giúp khởi động dev server hoặc chạy test suite nhanh chóng.
+
+---
+
+#### 🧪 7. Bộ Kiểm Thử Tự Động (`tests/`)
+Chứa **26 test suites kiểm thử tự động** (thực thi thông qua lệnh `npm test` bằng Node.js Test Runner):
+- Kiểm thử logic an toàn E-Stop, cơ chế chống lặp echo và mở khóa có lý do (`estop_safety.test.cjs`, `security_audit_remediation.test.cjs`).
+- Kiểm thử phân biệt Đầy khay vs Kẹt phôi (`bin_full.test.cjs`, `jam_detection.test.cjs`).
+- Kiểm thử cảnh báo quá nhiệt động cơ và máy chủ AI (`temperature_warning.test.cjs`, `temperature_gauge_simulation_vs_real.test.cjs`).
+- Kiểm thử mất kết nối MQTT và vi điều khiển ngoại tuyến (`mqtt_disconnected.test.cjs`, `device_offline.test.cjs`).
+- Kiểm thử phân quyền tài khoản, chống leo thang đặc quyền và xác thực OTP (`users.test.cjs`).
+- Kiểm thử xuất báo cáo ca sản xuất và đồng bộ Telegram/Email (`shift_summary.test.cjs`, `new_day_report_tele_email.test.cjs`).
+- Kiểm thử đồng bộ dữ liệu lịch sử và schema API (`history.test.cjs`, `api_schemas.test.cjs`).
+- Kiểm thử giao diện công nghiệp SCADA không tràn màn hình và âm thanh báo động (`telegram_copilot_2way_and_screenfit.test.cjs`, `jam_simulation_audio.test.cjs`, `mute_siren_feature.test.cjs`).
+
+---
+
+#### 📄 8. Các Tệp Tin Cấu Hình Cấp Gốc (Root Configuration Files)
+- **`package.json`**: Định nghĩa cấu hình Monorepo Workspaces (`"workspaces": ["frontend", "backend", "shared"]`), quản lý các lệnh chạy tổng thể (`npm run dev:all`, `npm test`, `npm run build`).
+- **`package-lock.json`**: Tệp khóa cây phân giải thư viện bảo đảm toàn bộ thành viên nhóm phát triển cài đặt đúng phiên bản phụ thuộc.
+- **`tsconfig.json`**: Cấu hình TypeScript cho toàn bộ dự án, thiết lập đường dẫn tắt `@/*` trỏ tới `frontend/src/*` và `@shared/*` trỏ tới `shared/*`.
+- **`vercel.json`**: Cấu hình chỉ thị nền tảng đám mây Vercel tự động nhận diện và triển khai thư mục workspace `frontend`.
+- **`.env.example`**: Bảng mẫu các biến môi trường cấu hình (Broker MQTT, JWT Secret, Token Telegram, SMTP Mailer, Gemini API Key).
+- **`.env.local`**: Tệp lưu trữ biến môi trường thực tế khi chạy thử nghiệm trên máy tính cá nhân.
+- **`SortiX_Dashboard.png`**: Ảnh mã QR độ phân giải cao phục vụ nhân viên quét để truy cập nhanh Dashboard trên thiết bị di động.
+- **`README.md`**: Tài liệu hướng dẫn tổng quan toàn diện về hệ thống.
+- **`CHANGELOG.md`**: Nhật ký chi tiết toàn bộ các mốc phát triển, tính năng mới và các bản sửa lỗi qua từng phiên bản.
+- **`AGENTS.md`**: Quy định kỹ thuật, quy tắc an toàn và hướng dẫn bắt buộc dành cho lập trình viên và trợ lý AI khi làm việc trên dự án.
 
 ---
 

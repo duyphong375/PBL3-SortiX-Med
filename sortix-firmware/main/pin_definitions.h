@@ -4,30 +4,30 @@
 
 /**
  * =============================================================================
- * SortiX Hardware Pinout Definitions
- * Target Board: WeAct Studio ESP32-C5-A-N8R8 (ESP32-C5-WROOM-1-N8R8)
- * Standard BOM Reference: danh-sach-linh-kien.md
+ * Định nghĩa sơ đồ chân phần cứng (Pinout) SortiX
+ * Bo mạch mục tiêu: WeAct Studio ESP32-C5-A-N8R8 (ESP32-C5-WROOM-1-N8R8)
+ * Tài liệu tham chiếu BOM linh kiện: danh-sach-linh-kien.md
  * =============================================================================
  *
- * ⚠ FORBIDDEN PINS (DO NOT USE UNDER ANY CIRCUMSTANCE):
- *  - GPIO15 (SPICS1): Hardwired internally to 8 MB Quad SPI PSRAM under shield.
- *  - GPIO13, GPIO14: Native USB (D-, D+) for flashing, JTAG, and USB-CDC console.
- *  - GPIO11, GPIO12: UART0 Debug Console (TX0, RX0 via CH343).
- *  - GPIO26, GPIO27, GPIO28: Strapping pins, Boot Mode, ROM print, RGB/BOOT button.
+ * ⚠ CÁC CHÂN CẤM SỬ DỤNG (TUYỆT ĐỐI KHÔNG DÙNG TRONG MỌI TRƯỜNG HỢP):
+ *  - GPIO15 (SPICS1): Đã nối cứng bên trong với chip 8 MB Quad SPI PSRAM dưới seal kim loại.
+ *  - GPIO13, GPIO14: Cổng USB Native (D-, D+) phục vụ nạp flash firmware, JTAG và USB-CDC console.
+ *  - GPIO11, GPIO12: Cổng UART0 Debug Console (TX0, RX0 qua chip nạp CH343).
+ *  - GPIO26, GPIO27, GPIO28: Các chân Strapping khởi động (Boot Mode), log ROM, nút RGB/BOOT.
  */
 
-// --- Sensors ---
-#define PIN_IR_S1               GPIO_NUM_0   // Left Header Pin 5: Cảm biến vật cản IR S1 (Active Low)
-#define PIN_ENCODER_A           GPIO_NUM_1   // Left Header Pin 6: Encoder Phase A (Xung)
-#define PIN_ENCODER_B           GPIO_NUM_4   // Right Header Pin 8: Encoder Phase B (Chiều)
-#define PIN_LDR_DO              GPIO_NUM_5   // Right Header Pin 9: Cảm biến ánh sáng LDR (DO)
+// --- Cảm biến (Sensors) ---
+#define PIN_IR_S1               GPIO_NUM_0   // Hàng chân trái Pin 5: Cảm biến vật cản hồng ngoại S1 (Active Low)
+#define PIN_ENCODER_A           GPIO_NUM_1   // Hàng chân trái Pin 6: Encoder Phase A (Tín hiệu xung)
+#define PIN_ENCODER_B           GPIO_NUM_4   // Hàng chân phải Pin 8: Encoder Phase B (Tín hiệu chiều quay)
+#define PIN_LDR_DO              GPIO_NUM_5   // Hàng chân phải Pin 9: Cảm biến ánh sáng quang trở LDR (DO)
 
-// --- Actuators & Motor Driver ---
-#define PIN_SERVO_1             GPIO_NUM_6   // Left Header Pin 7: Servo 1 PWM (Gạt 1 - Bin 1)
-#define PIN_MOTOR_IN1           GPIO_NUM_8   // Left Header Pin 9: L298N IN1 (Direction/PWM)
-#define PIN_MOTOR_IN2           GPIO_NUM_9   // Left Header Pin 10: L298N IN2 (Direction/PWM)
-#define PIN_SERVO_2             GPIO_NUM_24  // Right Header Pin 4: Servo 2 PWM (Gạt 2 - Bin 2)
+// --- Cơ cấu chấp hành & Driver động cơ ---
+#define PIN_SERVO_1             GPIO_NUM_6   // Hàng chân trái Pin 7: Xung PWM Servo 1 (Cần gạt 1 - Khay 1)
+#define PIN_MOTOR_IN1           GPIO_NUM_8   // Hàng chân trái Pin 9: L298N IN1 (Chiều quay/PWM)
+#define PIN_MOTOR_IN2           GPIO_NUM_9   // Hàng chân trái Pin 10: L298N IN2 (Chiều quay/PWM)
+#define PIN_SERVO_2             GPIO_NUM_24  // Hàng chân phải Pin 4: Xung PWM Servo 2 (Cần gạt 2 - Khay 2)
 
-// --- User Interface & Indicators ---
-#define PIN_LED_STATUS          GPIO_NUM_10  // Left Header Pin 11: LED trạng thái (Xanh lá)
-#define PIN_BTN_START           GPIO_NUM_23  // Right Header Pin 5: Nút nhấn Start (NO, Pull-up 10k + RC)
+// --- Giao diện người dùng & Đèn báo ---
+#define PIN_LED_STATUS          GPIO_NUM_10  // Hàng chân trái Pin 11: LED trạng thái (Màu xanh lá)
+#define PIN_BTN_START           GPIO_NUM_23  // Hàng chân phải Pin 5: Nút nhấn Start (NO, Pull-up 10k + mạch lọc RC)

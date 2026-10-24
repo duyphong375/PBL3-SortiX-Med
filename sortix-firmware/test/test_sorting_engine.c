@@ -14,12 +14,12 @@ TEST_CASE("Sorting Engine S1 Entry and Vision Matching", "[sorting_engine]")
 {
     sorting_engine_init();
 
-    // S1 Entry event
+    // Sự kiện vật phẩm đi qua S1
     esp_err_t ret = sorting_engine_on_s1_entry(100, 500000);
     TEST_ASSERT_EQUAL(ESP_OK, ret);
     TEST_ASSERT_FALSE(sorting_engine_is_line_empty());
 
-    // Pair with vision result for "brand_a" (configured to Bin 2 by default)
+    // Ghép cặp với kết quả AI thị giác cho "brand_a" (mặc định cấu hình vào Bin 2)
     ret = sorting_engine_on_vision_result("uuid_123", "brand_a", 0.95f);
     TEST_ASSERT_EQUAL(ESP_OK, ret);
 }

@@ -36,13 +36,13 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
 
   if (!isOpen) return null;
 
-  // Tiêu chuẩn độ phức tạp (tối thiểu 4 ký tự)
-  const hasMinLength = newPassword.length >= 4;
+  // Tiêu chuẩn độ phức tạp (tối thiểu 8 ký tự, có chữ hoa, thường, số, ký tự đặc biệt)
+  const hasMinLength = newPassword.length >= 8;
   const hasUppercase = /[A-Z]/.test(newPassword);
   const hasLowercase = /[a-z]/.test(newPassword);
   const hasNumber = /[0-9]/.test(newPassword);
   const hasSpecial = /[^A-Za-z0-9]/.test(newPassword);
-  const isMatched = newPassword && newPassword === confirmPassword;
+  const isMatched = Boolean(newPassword && newPassword === confirmPassword);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,8 +54,8 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
       return;
     }
 
-    if (!hasMinLength) {
-      setErrorMsg("Mật khẩu mới phải có ít nhất 4 ký tự");
+    if (!hasMinLength || !hasUppercase || !hasLowercase || !hasNumber || !hasSpecial) {
+      setErrorMsg("Mật khẩu mới phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt");
       return;
     }
 
@@ -173,7 +173,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
               <input
                 type={showNew ? "text" : "password"}
                 required
-                placeholder="Tối thiểu 4 ký tự"
+                placeholder="Tối thiểu 8 ký tự"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-white dark:bg-[#111319] dark:border-white/[0.08] px-3 py-2 pr-9 text-slate-900 dark:text-white outline-none focus:border-cyan-500"
@@ -221,7 +221,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
             <div className="grid grid-cols-2 gap-1.5 text-[10.5px]">
               <span className={`flex items-center gap-1.5 ${hasMinLength ? "text-emerald-500 font-bold" : "text-slate-400"}`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${hasMinLength ? "bg-emerald-500" : "bg-slate-400"}`} />
-                Tối thiểu 4 ký tự
+                Tối thiểu 8 ký tự
               </span>
               <span className={`flex items-center gap-1.5 ${hasUppercase ? "text-emerald-500 font-bold" : "text-slate-400"}`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${hasUppercase ? "bg-emerald-500" : "bg-slate-400"}`} />

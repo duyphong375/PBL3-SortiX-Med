@@ -8,28 +8,28 @@ extern "C" {
 
 typedef enum {
     LED_MODE_OFF = 0,
-    LED_MODE_IDLE,          // Slow blink (1 Hz): 500ms ON / 500ms OFF
-    LED_MODE_RUNNING,       // Steady ON
-    LED_MODE_JAMMED,        // Fast blink (5 Hz): 100ms ON / 100ms OFF
-    LED_MODE_ERROR          // Fast blink (5 Hz): 100ms ON / 100ms OFF
+    LED_MODE_IDLE,          // Nhấp nháy chậm (1 Hz): 500ms SÁNG / 500ms TẮT (chế độ chờ)
+    LED_MODE_RUNNING,       // Sáng liên tục (hệ thống đang chạy bình thường)
+    LED_MODE_JAMMED,        // Nhấp nháy nhanh (5 Hz): 100ms SÁNG / 100ms TẮT (kẹt cơ cấu phân loại)
+    LED_MODE_ERROR          // Nhấp nháy nhanh (5 Hz): 100ms SÁNG / 100ms TẮT (báo lỗi hệ thống)
 } led_mode_t;
 
 /**
- * @brief Initialize Status LED on GPIO10.
- *        Starts 100ms periodic software timer for non-blocking pattern generation.
- * @return ESP_OK on success.
+ * @brief Khởi tạo LED trạng thái trên chân GPIO10.
+ *        Khởi chạy software timer định kỳ 100ms để tạo hiệu ứng nhấp nháy non-blocking (không chặn CPU).
+ * @return ESP_OK nếu thành công.
  */
 esp_err_t led_indicator_init(void);
 
 /**
- * @brief Set current LED display pattern.
- *        Thread-safe.
- * @param mode Target mode.
+ * @brief Thiết lập chế độ hiển thị hiện tại của LED trạng thái.
+ *        Hàm đảm bảo an toàn đa luồng (Thread-safe).
+ * @param mode Chế độ hiển thị mục tiêu.
  */
 void led_indicator_set_mode(led_mode_t mode);
 
 /**
- * @brief Get current LED display mode.
+ * @brief Lấy chế độ hiển thị hiện tại của LED trạng thái.
  */
 led_mode_t led_indicator_get_mode(void);
 

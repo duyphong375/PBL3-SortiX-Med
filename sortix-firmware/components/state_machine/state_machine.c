@@ -36,7 +36,7 @@ esp_err_t state_machine_init(void)
     }
 
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
-    s_state = SYSTEM_STATE_IDLE; // Always boots into IDLE
+    s_state = SYSTEM_STATE_IDLE; // Luôn khởi động mặc định ở trạng thái an toàn IDLE
     esp_err_t motor_ret = motor_control_stop();
     led_indicator_set_mode(LED_MODE_IDLE);
     xSemaphoreGive(s_state_mutex);
@@ -104,7 +104,7 @@ esp_err_t state_machine_process_event(system_event_t event)
 
         case SYSTEM_EVENT_JAM_DETECTED:
             new_state = SYSTEM_STATE_JAMMED;
-            ret = motor_control_brake(); // Dynamic brake on jam
+            ret = motor_control_brake(); // Kích hoạt hãm động năng khi phát hiện kẹt cơ khí
             {
                 esp_err_t servo_ret = servo_emergency_stop();
                 if (ret == ESP_OK) ret = servo_ret;
@@ -116,7 +116,7 @@ esp_err_t state_machine_process_event(system_event_t event)
 
         case SYSTEM_EVENT_ESTOP:
             new_state = SYSTEM_STATE_ESTOP;
-            ret = motor_control_brake(); // Dynamic brake on emergency stop
+            ret = motor_control_brake(); // Kích hoạt hãm động năng khi dừng khẩn cấp
             {
                 esp_err_t servo_ret = servo_emergency_stop();
                 if (ret == ESP_OK) ret = servo_ret;
@@ -127,12 +127,12 @@ esp_err_t state_machine_process_event(system_event_t event)
             break;
 
         case SYSTEM_EVENT_ESTOP_RELEASE:
-            // Do NOT automatically wipe unresolved items on belt!
-            // Items remain held in queue and require operator physical inspection/clearance before START is accepted.
+            // KHÔNG tự động xóa các vật thể chưa được xử lý trên băng tải!
+            // Các vật thể vẫn được lưu trong hàng đợi và yêu cầu người vận hành kiểm tra dọn sạch trước khi cho phép START lại.
             if (old_state == SYSTEM_STATE_ESTOP || old_state == SYSTEM_STATE_JAMMED || old_state == SYSTEM_STATE_STOPPED) {
                 ret = motor_control_stop();
                 if (ret == ESP_OK) {
-                    new_state = SYSTEM_STATE_IDLE; // Safely transitions to IDLE ONLY, DOES NOT start motor
+                    new_state = SYSTEM_STATE_IDLE; // Chuyển an toàn về IDLE, TUYỆT ĐỐI KHÔNG tự khởi động động cơ
                     led_indicator_set_mode(LED_MODE_IDLE);
                     ESP_LOGI(TAG, "Safety unlocked [%s] -> [IDLE]. System ready for START command.",
                              state_machine_get_state_str(old_state));

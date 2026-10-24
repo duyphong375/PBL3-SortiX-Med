@@ -76,7 +76,7 @@ static void get_iso8601_timestamp(char *buf, size_t max_len)
     struct tm timeinfo;
     gmtime_r(&now, &timeinfo);
 
-    // If time is not synced via SNTP (pre-1971), format relative uptime
+    // Nếu thời gian chưa được đồng bộ qua máy chủ SNTP (trước năm 1971), định dạng theo thời gian uptime tương đối
     if (timeinfo.tm_year < 71) {
         uint32_t uptime_s = (uint32_t)(esp_timer_get_time() / 1000000);
         snprintf(buf, max_len, "1970-01-01T%02lu:%02lu:%02luZ",
@@ -336,7 +336,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
             esp_mqtt_client_subscribe(s_mqtt_client, SORTIX_TOPIC_ESTOP_RELEASE, 1);
             esp_mqtt_client_subscribe(s_mqtt_client, SORTIX_TOPIC_CONFIG_SET, 1);
 
-            // Publish initial status
+            // Phát trạng thái ban đầu của hệ thống lên MQTT
             mqtt_handler_publish_status(state_machine_get_state_str(state_machine_get_state()));
             break;
 
@@ -480,7 +480,7 @@ esp_err_t mqtt_handler_publish_telemetry(void)
 
     system_state_t state = state_machine_get_state();
     bool is_running = (state == SYSTEM_STATE_RUNNING);
-    int speed_val = is_running ? 100 : 0; // Commanded motor drive state; measured speed is separate below.
+    int speed_val = is_running ? 100 : 0; // Trạng thái điều khiển động cơ; tốc độ đo đạc thực tế tách riêng bên dưới.
     float cpu_temp_c = 0.0f;
     if (!safety_monitor_get_cpu_temp(&cpu_temp_c)) return ESP_ERR_INVALID_STATE;
     float measured_speed_mm_s = 0.0f;

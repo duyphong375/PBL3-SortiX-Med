@@ -79,10 +79,10 @@ esp_err_t sorting_engine_init(void)
         s_items[i].state = ITEM_STATE_FREE;
     }
 
-    // Default configuration:
-    // Bin 1: Sharps Waste ("brand_b", "brand_c")
-    // Bin 2: Surgical Instruments ("brand_a")
-    // Bin 3: General Medical Supplies (Default)
+    // Cấu hình phân loại mặc định:
+    // Khay 1: Rác thải sắc nhọn ("brand_b", "brand_c")
+    // Khay 2: Dụng cụ phẫu thuật ("brand_a")
+    // Khay 3: Vật tư y tế thông thường (Khay mặc định)
     s_active_config.config_version = 1;
     s_active_config.bin_rule_count = 2;
     s_active_config.default_bin = 3;
@@ -191,7 +191,7 @@ esp_err_t sorting_engine_on_vision_result(const char *product_id, const char *br
     esp_err_t ret = ESP_ERR_NOT_FOUND;
     xSemaphoreTake(s_sorting_mutex, portMAX_DELAY);
 
-    // Find the oldest item in ITEM_STATE_NEW (FIFO order)
+    // Tìm vật thể cũ nhất đang ở trạng thái ITEM_STATE_NEW (theo thứ tự FIFO - vào trước ra trước)
     tracked_item_t *oldest_new_item = NULL;
     int64_t oldest_time = INT64_MAX;
 
@@ -246,10 +246,10 @@ void sorting_engine_update(void)
     for (int i = 0; i < SORTING_MAX_TRACKED_ITEMS; i++) {
         tracked_item_t *item = &s_items[i];
 
-        // 1. Check Vision Timeout on items waiting in ITEM_STATE_NEW
+        // 1. Kiểm tra hết thời gian chờ nhận diện AI (Vision Timeout) đối với các vật thể ở trạng thái ITEM_STATE_NEW
         if (item->state == ITEM_STATE_NEW) {
             if ((now_us - item->entry_timestamp_us) >= VISION_TIMEOUT_US) {
-                if (fallback_policy == 0) { // PAUSE_AND_HOLD (Safe default)
+                if (fallback_policy == 0) { // PAUSE_AND_HOLD (Dừng băng tải giữ an toàn - mặc định)
                     ESP_LOGE(TAG, "Item #%lu Vision TIMEOUT (%.1fs). Executing PAUSE_AND_HOLD!",
                              item->id, (float)VISION_TIMEOUT_US / 1000000.0f);
                     stop_conveyor_required = true;
@@ -257,24 +257,24 @@ void sorting_engine_update(void)
                     item->actual_bin = 0;
                     strncpy(item->status, "held_timeout", sizeof(item->status));
 
-                    // Report error record exactly once
+                    // Báo cáo bản ghi lỗi duy nhất một lần
                     if (!item->reported_error && s_classification_cb != NULL) {
                         item->reported_error = true;
                         s_classification_cb(item, s_classification_user_ctx);
                     }
-                } else { // DIVERT_TO_DEFAULT
+                } else { // DIVERT_TO_DEFAULT (Đẩy vào khay mặc định)
                     ESP_LOGW(TAG, "Item #%lu Vision TIMEOUT. Routing toward default Bin %d; destination will remain unverified.",
                              item->id, s_active_config.default_bin);
                     item->target_bin = s_active_config.default_bin;
                     item->routed_bin = 0;
-                    item->actual_bin = 0; // Not placed until physically reaching end of line
+                    item->actual_bin = 0; // Chưa xác nhận vị trí cho đến khi thực tế tới cuối băng tải
                     strncpy(item->status, "diverted_default", sizeof(item->status));
                     item->state = ITEM_STATE_IN_TRANSIT;
                 }
             }
         }
 
-        // 2. Track items in transit along the conveyor
+        // 2. Theo dõi vị trí các vật thể đang di chuyển dọc băng tải (dựa theo xung encoder)
         if (item->state == ITEM_STATE_IN_TRANSIT) {
             float dist_mm = encoder_counts_to_mm(current_encoder - item->entry_encoder);
 
@@ -284,13 +284,13 @@ void sorting_engine_update(void)
 
                 if (dist_mm >= (target_dist - SERVO_TRIGGER_WINDOW_MM) && !item->triggered) {
                     if (dist_mm <= (target_dist + SERVO_TRIGGER_WINDOW_MM)) {
-                        // Within trigger window: attempt to fire diverter arm
+                        // Nằm trong cửa sổ kích hoạt: kích hoạt cần gạt servo
                         esp_err_t s_err = servo_trigger(servo_id);
                         if (s_err == ESP_OK) {
                             item->triggered = true;
                             item->routed_bin = item->target_bin;
-                            // The current hardware has no S2/S3 destination sensor.
-                            // A PWM command is not proof that the item entered a bin.
+                            // Phần cứng hiện tại không có cảm biến phản hồi S2/S3 tại khay.
+                            // Xung PWM kích hoạt không phải bằng chứng tuyệt đối vật thể đã rơi vào khay.
                             item->actual_bin = 0;
                             strncpy(item->status, "unverified", sizeof(item->status) - 1);
                             item->state = ITEM_STATE_COMPLETED;
@@ -301,12 +301,12 @@ void sorting_engine_update(void)
                                      item->target_bin, item->id, dist_mm);
                         }
                     } else {
-                        // Past trigger window without being diverted!
+                        // Đã vượt quá cửa sổ kích hoạt mà chưa được gạt!
                         ESP_LOGE(TAG, "Item #%lu missed Servo %d station (dist=%.1f mm > window). Actuation failed!",
-                                 item->id, item->target_bin, dist_mm);
+                                  item->id, item->target_bin, dist_mm);
                         item->servo_failed = true;
 
-                        if (fallback_policy == 0) { // PAUSE_AND_HOLD
+                        if (fallback_policy == 0) { // PAUSE_AND_HOLD (Dừng băng tải giữ an toàn)
                             stop_conveyor_required = true;
                             item->state = ITEM_STATE_TIMEOUT;
                             item->routed_bin = 0;
@@ -316,7 +316,7 @@ void sorting_engine_update(void)
                                 item->reported_error = true;
                                 s_classification_cb(item, s_classification_user_ctx);
                             }
-                        } else { // DIVERT_TO_DEFAULT
+                        } else { // DIVERT_TO_DEFAULT (Chuyển sang khay mặc định)
                             ESP_LOGW(TAG, "Item #%lu routing toward default Bin %d after missed servo; destination remains unverified",
                                      item->id, s_active_config.default_bin);
                             item->target_bin = s_active_config.default_bin;
@@ -326,7 +326,7 @@ void sorting_engine_update(void)
                     }
                 }
             } else {
-                // Target is Bin 3 (Default / End of line)
+                // Khay đích là Khay 3 (Khay mặc định / Cuối băng tải)
                 if (dist_mm >= dist_s1_end) {
                     item->routed_bin = item->target_bin;
                     item->actual_bin = 0;
@@ -340,17 +340,17 @@ void sorting_engine_update(void)
             }
         }
 
-        // 3. Process completed items
+        // 3. Xử lý các vật thể đã hoàn tất phân loại
         if (item->state == ITEM_STATE_COMPLETED) {
             if (s_classification_cb != NULL) {
                 s_classification_cb(item, s_classification_user_ctx);
             }
-            // Free the slot
+            // Giải phóng khe theo dõi
             item->state = ITEM_STATE_FREE;
         }
     }
 
-    // 4. Check if pending config can be applied when line is empty
+    // 4. Kiểm tra xem cấu hình chờ (pending config) có thể áp dụng khi băng tải trống không
     if (s_pending_config.pending_apply) {
         bool line_empty = true;
         for (int i = 0; i < SORTING_MAX_TRACKED_ITEMS; i++) {
@@ -512,7 +512,7 @@ esp_err_t sorting_engine_apply_config_json(const char *json_str, bool *out_appli
     }
 
     if (!s_loading_persisted_config) {
-        // Never persist the MQTT authorization token alongside routing rules.
+        // Tuyệt đối không lưu token xác thực MQTT cùng với các luật phân loại vào bộ nhớ NVS
         cJSON_DeleteItemFromObject(root, "auth_token");
         cJSON_DeleteItemFromObject(root, "token");
         char *persisted_json = cJSON_PrintUnformatted(root);

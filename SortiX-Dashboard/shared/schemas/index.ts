@@ -184,7 +184,10 @@ export const AdminCreateUserSchema = z.object({
     .trim()
     .email("Định dạng email không hợp lệ")
     .max(255),
-  password: strongPassword,
+  password: z
+    .string()
+    .min(4, "Mật khẩu phải có ít nhất 4 ký tự")
+    .max(100, "Mật khẩu không được quá 100 ký tự"),
   role: z.enum(["admin", "user"]).default("user"),
   status: z.enum(["active", "locked"]).default("active"),
 });
@@ -204,7 +207,12 @@ export const AdminUpdateUserSchema = z.object({
     .optional(),
   role: z.enum(["admin", "user"]).optional(),
   status: z.enum(["active", "locked"]).optional(),
-  new_password: strongPassword.optional(),
+  new_password: z
+    .string()
+    .min(4, "Mật khẩu mới phải có ít nhất 4 ký tự")
+    .max(100, "Mật khẩu mới không được quá 100 ký tự")
+    .optional()
+    .or(z.literal("")),
 });
 
 export const ForgotPasswordSchema = z.object({

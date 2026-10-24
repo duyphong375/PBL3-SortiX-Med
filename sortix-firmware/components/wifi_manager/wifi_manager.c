@@ -64,7 +64,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         s_retry_num = 0;
         ESP_LOGI(TAG, "Wi-Fi Connected! IP Address: %s", s_ip_address);
 
-        // Check if connected on 5 GHz channel
+        // Kiểm tra xem có đang kết nối trên kênh tần số 5 GHz (Wi-Fi 6) không
         wifi_ap_record_t ap_info;
         if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
             s_is_5ghz = (ap_info.primary > 14);
@@ -169,7 +169,7 @@ esp_err_t wifi_manager_start_softap(void)
         },
     };
 
-    // Use SOFTAP_SSID if configured; otherwise fallback to unique MAC suffix
+    // Sử dụng SOFTAP_SSID nếu đã cấu hình; ngược lại dùng tên mặc định gắn hậu tố địa chỉ MAC duy nhất
     if (strlen(SOFTAP_SSID) > 0) {
         strncpy((char *)ap_config.ap.ssid, SOFTAP_SSID, sizeof(ap_config.ap.ssid) - 1);
         ap_config.ap.ssid[sizeof(ap_config.ap.ssid) - 1] = '\0';

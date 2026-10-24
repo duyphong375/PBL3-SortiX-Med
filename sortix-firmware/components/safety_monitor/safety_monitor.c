@@ -11,10 +11,10 @@
 
 static const char *TAG = "SAFETY_MONITOR";
 
-#define JAM_STARTUP_GRACE_US        1000000 // 1.0s grace period after motor start
-#define JAM_DETECTION_WINDOW_US     1800000 // 1.8s zero-count window while running -> JAM
-#define TEMP_CHECK_INTERVAL_US      2000000 // Check temperature every 2.0s
-#define TEMP_ALERT_COOLDOWN_US      10000000 // Cooldown 10s between repeated temp alerts
+#define JAM_STARTUP_GRACE_US        1000000 // Thời gian trễ 1.0s sau khi bật động cơ để tránh báo động giả lúc khởi động
+#define JAM_DETECTION_WINDOW_US     1800000 // Khoảng thời gian 1.8s không có xung khi động cơ đang chạy -> Kẹt băng tải (JAM)
+#define TEMP_CHECK_INTERVAL_US      2000000 // Kiểm tra nhiệt độ định kỳ mỗi 2.0s
+#define TEMP_ALERT_COOLDOWN_US      10000000 // Thời gian giãn cách 10s giữa các lần cảnh báo quá nhiệt liên tiếp
 #define CPU_TEMP_ALERT_THRESHOLD    75.0f
 
 static temperature_sensor_handle_t s_temp_sensor = NULL;
@@ -45,7 +45,7 @@ esp_err_t safety_monitor_init(void)
 {
     ESP_LOGI(TAG, "Initializing Safety Monitor (Internal SoC Temperature & Encoder Stall)");
 
-    // Initialize On-Chip SoC Temperature Sensor
+    // Khởi tạo cảm biến nhiệt độ tích hợp trong chip SoC
     temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 80);
     esp_err_t ret = temperature_sensor_install(&temp_sensor_config, &s_temp_sensor);
     if (ret != ESP_OK) {
@@ -118,7 +118,7 @@ void safety_monitor_check(void)
 {
     int64_t now_us = esp_timer_get_time();
 
-    // Sample actual belt motion from the encoder, including the coast/brake period.
+    // Lấy mẫu chuyển động thực tế của băng tải từ encoder, bao gồm cả giai đoạn thả trôi/hãm.
     int64_t speed_count = 0;
     esp_err_t speed_count_ret = encoder_get_count_checked(&speed_count);
     if (speed_count_ret != ESP_OK) {
@@ -152,7 +152,7 @@ void safety_monitor_check(void)
         s_speed_last_count = speed_count;
     }
 
-    // 1. Check SoC internal temperature every 2 seconds
+    // 1. Kiểm tra nhiệt độ bên trong chip SoC định kỳ mỗi 2 giây
     if (s_temp_sensor != NULL && (now_us - s_last_temp_check_us) >= TEMP_CHECK_INTERVAL_US) {
         s_last_temp_check_us = now_us;
         float current_temp = 0.0f;
@@ -186,11 +186,11 @@ void safety_monitor_check(void)
         }
     }
 
-    // 2. Check Encoder Stall / Mechanical Jam
+    // 2. Kiểm tra dừng encoder / kẹt cơ khí băng tải
     bool is_running = motor_control_is_running();
     if (is_running) {
         if (!s_was_running) {
-            // Motor just transitioned to running forward
+            // Động cơ vừa bắt đầu chuyển sang trạng thái chạy thuận
             s_was_running = true;
             s_motor_start_time_us = now_us;
             s_last_encoder_count = encoder_get_count();
@@ -198,22 +198,22 @@ void safety_monitor_check(void)
             return;
         }
 
-        // Check if outside initial startup grace period
+        // Kiểm tra xem đã vượt qua thời gian trễ khởi động ban đầu chưa
         if ((now_us - s_motor_start_time_us) >= JAM_STARTUP_GRACE_US) {
             int64_t current_count = encoder_get_count();
             if (current_count != s_last_encoder_count) {
-                // Pulse count is progressing normally
+                // Số xung encoder đang tăng/giảm bình thường (băng tải đang quay)
                 s_last_encoder_count = current_count;
                 s_last_movement_time_us = now_us;
             } else {
-                // Pulse count has not changed
+                // Số xung encoder không thay đổi (băng tải bị đứng im)
                 int64_t stall_duration_us = now_us - s_last_movement_time_us;
                 if (stall_duration_us >= JAM_DETECTION_WINDOW_US) {
                     float duration_sec = (float)stall_duration_us / 1000000.0f;
                     ESP_LOGE(TAG, "ENCODER STALL DETECTED! Conveyor stationary for %.2fs while motor running!",
                              duration_sec);
 
-                    // Trigger state machine emergency jam
+                    // Kích hoạt máy trạng thái xử lý sự kiện kẹt băng tải khẩn cấp
                     state_machine_process_event(SYSTEM_EVENT_JAM_DETECTED);
                     s_was_running = false;
 

@@ -9,7 +9,7 @@ static const char *TAG = "SENSORS";
 #define SENSOR_PIN_S1           GPIO_NUM_0
 #define SENSOR_PIN_LDR          GPIO_NUM_5
 
-#define S1_DEBOUNCE_MIN_US      80000   // 80 ms lockout to prevent chatter on edge of medical tools
+#define S1_DEBOUNCE_MIN_US      80000   // Khoảng thời gian khóa 80ms ngăn ngừa rung cạnh khi vật thể y tế đi qua
 
 static QueueHandle_t s_event_queue = NULL;
 static volatile int64_t s_last_trigger_us = 0;
@@ -46,7 +46,7 @@ esp_err_t sensors_init(QueueHandle_t event_queue)
     s_event_queue = event_queue;
     ESP_LOGI(TAG, "Initializing Sensors: S1 (GPIO%d), LDR (GPIO%d)", SENSOR_PIN_S1, SENSOR_PIN_LDR);
 
-    // GPIO0 (S1 IR Sensor): Input, Pull-up, Falling Edge Interrupt
+    // Cảm biến hồng ngoại S1 (GPIO0): Đầu vào, Điện trở kéo lên (Pull-up), Ngắt cạnh xuống
     gpio_config_t s1_conf = {
         .pin_bit_mask = (1ULL << SENSOR_PIN_S1),
         .mode = GPIO_MODE_INPUT,
@@ -60,7 +60,7 @@ esp_err_t sensors_init(QueueHandle_t event_queue)
         return ret;
     }
 
-    // GPIO5 (LDR Light Sensor DO): Input, Pull-up
+    // Cảm biến quang trở LDR (GPIO5): Đầu vào số DO, Điện trở kéo lên (Pull-up)
     gpio_config_t ldr_conf = {
         .pin_bit_mask = (1ULL << SENSOR_PIN_LDR),
         .mode = GPIO_MODE_INPUT,
@@ -74,7 +74,7 @@ esp_err_t sensors_init(QueueHandle_t event_queue)
         return ret;
     }
 
-    // Install ISR service (ESP_INTR_FLAG_IRAM)
+    // Đăng ký dịch vụ ngắt GPIO với cờ IRAM
     ret = gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
     if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
         ESP_LOGE(TAG, "Failed to install GPIO ISR service: %s", esp_err_to_name(ret));
@@ -92,7 +92,7 @@ esp_err_t sensors_init(QueueHandle_t event_queue)
 
 bool sensors_is_s1_blocked(void)
 {
-    // Active Low sensor: 0 = object detected, 1 = clear
+    // Cảm biến tích cực mức thấp (Active Low): 0 = có vật thể che, 1 = thông thoáng
     return (gpio_get_level(SENSOR_PIN_S1) == 0);
 }
 

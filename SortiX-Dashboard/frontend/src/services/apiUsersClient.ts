@@ -7,7 +7,7 @@ export interface ApiUsersResponse<T = unknown> {
   message?: string;
 }
 
-const BACKEND_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000").replace(/\/$/, "");
+const BACKEND_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "").replace(/\/$/, "");
 
 function getStoredAuthHeaders(): Record<string, string> {
   if (typeof window === "undefined") return {};
@@ -30,22 +30,21 @@ export const ApiUsersClient = {
   async getAll(): Promise<ApiUsersResponse<SafeUser[]>> {
     const authHeaders = getStoredAuthHeaders();
 
-    // 1. Thử gọi Express Backend nếu có
-    try {
-      const res = await fetchWithTimeout(`${BACKEND_BASE_URL}/api/users`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        signal: AbortSignal.timeout(1500),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        return json;
+    // 1. Thử gọi Express Backend nếu có cấu hình tường minh
+    if (BACKEND_BASE_URL) {
+      try {
+        const res = await fetchWithTimeout(`${BACKEND_BASE_URL}/api/users`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json", ...authHeaders },
+          signal: AbortSignal.timeout(1500),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          return json;
+        }
+      } catch {
+        // Backend offline -> Fallback sang Next.js App Router
       }
-      if (res.status === 403) {
-        return { success: false, message: "403 Forbidden: Yêu cầu quyền Quản trị viên" };
-      }
-    } catch {
-      // Backend offline -> Fallback sang Next.js App Router
     }
 
     // 2. Gọi Next.js App Router nội bộ
@@ -65,26 +64,25 @@ export const ApiUsersClient = {
   async createUser(payload: AdminCreateUserInput): Promise<ApiUsersResponse<SafeUser>> {
     const authHeaders = getStoredAuthHeaders();
 
-    // 1. Thử gọi Express Backend
-    try {
-      const res = await fetchWithTimeout(`${BACKEND_BASE_URL}/api/users`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(1500),
-      });
-      if (res.ok) {
-        return await res.json();
+    // 1. Thử gọi Express Backend nếu có cấu hình tường minh
+    if (BACKEND_BASE_URL) {
+      try {
+        const res = await fetchWithTimeout(`${BACKEND_BASE_URL}/api/users`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(1500),
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+        if (res.status === 400) {
+          const errJson = await res.json();
+          return { success: false, message: errJson.message || "Dữ liệu không hợp lệ" };
+        }
+      } catch {
+        // Backend offline -> fallback Next.js
       }
-      if (res.status === 403) {
-        return { success: false, message: "403 Forbidden: Yêu cầu quyền Quản trị viên" };
-      }
-      if (res.status === 400) {
-        const errJson = await res.json();
-        return { success: false, message: errJson.message || "Dữ liệu không hợp lệ" };
-      }
-    } catch {
-      // Backend offline -> fallback Next.js
     }
 
     // 2. Gọi Next.js App Router nội bộ
@@ -104,26 +102,25 @@ export const ApiUsersClient = {
   async updateUser(id: string, payload: AdminUpdateUserInput): Promise<ApiUsersResponse<SafeUser>> {
     const authHeaders = getStoredAuthHeaders();
 
-    // 1. Thử gọi Express Backend
-    try {
-      const res = await fetchWithTimeout(`${BACKEND_BASE_URL}/api/users/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(1500),
-      });
-      if (res.ok) {
-        return await res.json();
+    // 1. Thử gọi Express Backend nếu có cấu hình tường minh
+    if (BACKEND_BASE_URL) {
+      try {
+        const res = await fetchWithTimeout(`${BACKEND_BASE_URL}/api/users/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...authHeaders },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(1500),
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+        if (res.status === 400 || res.status === 404) {
+          const errJson = await res.json();
+          return { success: false, message: errJson.message };
+        }
+      } catch {
+        // Backend offline -> fallback Next.js
       }
-      if (res.status === 403) {
-        return { success: false, message: "403 Forbidden: Yêu cầu quyền Quản trị viên" };
-      }
-      if (res.status === 400 || res.status === 404) {
-        const errJson = await res.json();
-        return { success: false, message: errJson.message };
-      }
-    } catch {
-      // Backend offline -> fallback Next.js
     }
 
     // 2. Gọi Next.js App Router nội bộ
@@ -143,25 +140,24 @@ export const ApiUsersClient = {
   async deleteUser(id: string): Promise<ApiUsersResponse<{ id: string }>> {
     const authHeaders = getStoredAuthHeaders();
 
-    // 1. Thử gọi Express Backend
-    try {
-      const res = await fetchWithTimeout(`${BACKEND_BASE_URL}/api/users/${id}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        signal: AbortSignal.timeout(1500),
-      });
-      if (res.ok) {
-        return await res.json();
+    // 1. Thử gọi Express Backend nếu có cấu hình tường minh
+    if (BACKEND_BASE_URL) {
+      try {
+        const res = await fetchWithTimeout(`${BACKEND_BASE_URL}/api/users/${id}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json", ...authHeaders },
+          signal: AbortSignal.timeout(1500),
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+        if (res.status === 400 || res.status === 404) {
+          const errJson = await res.json();
+          return { success: false, message: errJson.message };
+        }
+      } catch {
+        // Backend offline -> fallback Next.js
       }
-      if (res.status === 403) {
-        return { success: false, message: "403 Forbidden: Yêu cầu quyền Quản trị viên" };
-      }
-      if (res.status === 400 || res.status === 404) {
-        const errJson = await res.json();
-        return { success: false, message: errJson.message };
-      }
-    } catch {
-      // Backend offline -> fallback Next.js
     }
 
     // 2. Gọi Next.js App Router nội bộ

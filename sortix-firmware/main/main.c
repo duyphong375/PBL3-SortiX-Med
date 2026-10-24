@@ -29,14 +29,14 @@ static const char *TAG = "MAIN_APP";
 
 static QueueHandle_t s_s1_queue = NULL;
 
-// Callback: Physical Start button pressed on GPIO23
+// Hàm Callback: Nút nhấn Start vật lý được nhấn trên GPIO23
 static void on_start_button_pressed(void *user_ctx)
 {
     ESP_LOGI(TAG, "Hardware Start button pressed -> Processing SYSTEM_EVENT_START");
     state_machine_process_event(SYSTEM_EVENT_START);
 }
 
-// Callback: State machine state transition
+// Hàm Callback: Chuyển đổi trạng thái trong máy trạng thái FSM
 static void on_state_changed(system_state_t old_state, system_state_t new_state, void *user_ctx)
 {
     const char *state_str = state_machine_get_state_str(new_state);
@@ -45,7 +45,7 @@ static void on_state_changed(system_state_t old_state, system_state_t new_state,
     mqtt_handler_publish_status(state_str);
 }
 
-// Callback: Sorting engine item classification completed
+// Hàm Callback: Hoàn thành phân loại vật thể trong động cơ phân loại
 static void on_item_classified(const tracked_item_t *item, void *user_ctx)
 {
     ESP_LOGI(TAG, "Publishing classification record: ID #%lu, Product '%s', Brand '%s' -> Bin %d (%s)",
@@ -53,43 +53,43 @@ static void on_item_classified(const tracked_item_t *item, void *user_ctx)
     mqtt_handler_publish_classification(item);
 }
 
-// Callback: Safety monitor mechanical jam detected
+// Hàm Callback: Giám sát an toàn phát hiện kẹt cơ cấu/encoder dừng quay
 static void on_jam_detected(float duration_seconds, void *user_ctx)
 {
     ESP_LOGE(TAG, "Encoder stall jam confirmed (duration: %.2f s) -> Publishing jam alert", duration_seconds);
     mqtt_handler_publish_jam(duration_seconds);
 }
 
-// Callback: Safety monitor SoC over-temperature alert
+// Hàm Callback: Cảnh báo quá nhiệt chip SoC từ giám sát an toàn
 static void on_temp_warning(float current_temp, float threshold_temp, void *user_ctx)
 {
     ESP_LOGW(TAG, "SoC Temperature warning: %.1f °C -> Publishing warning alert", current_temp);
     mqtt_handler_publish_temp_warning(current_temp, threshold_temp);
 }
 
-// Task 1: task_conveyor (Priority 6)
-// Controls L298N motor and monitors encoder stall safety
+// Task 1: task_conveyor (Độ ưu tiên 6)
+// Điều khiển động cơ L298N và giám sát kẹt băng tải an toàn theo xung encoder
 static void task_conveyor(void *pvParameters)
 {
     ESP_LOGI(TAG, "task_conveyor started (Priority %d)", uxTaskPriorityGet(NULL));
     const TickType_t delay_ticks = pdMS_TO_TICKS(20);
 
     while (1) {
-        // Run continuous safety and stall checks
+        // Kiểm tra an toàn và phát hiện kẹt liên tục
         safety_monitor_check();
         vTaskDelay(delay_ticks);
     }
 }
 
-// Task 2: task_sorting (Priority 5)
-// Tracks items on conveyor, matches Vision AI results, actuates servos
+// Task 2: task_sorting (Độ ưu tiên 5)
+// Theo dõi vị trí vật thể trên băng tải, ghép nối kết quả AI và kích hoạt servo gạt
 static void task_sorting(void *pvParameters)
 {
     ESP_LOGI(TAG, "task_sorting started (Priority %d)", uxTaskPriorityGet(NULL));
     s1_event_t s1_evt;
 
     while (1) {
-        // Drain any incoming S1 detection events from ISR queue
+        // Lấy tất cả sự kiện phát hiện vật thể từ cảm biến S1 trong hàng đợi ISR
         while (xQueueReceive(s_s1_queue, &s1_evt, 0) == pdTRUE) {
             sorting_engine_on_s1_entry(s1_evt.encoder_count, s1_evt.timestamp_us);
         }
@@ -99,15 +99,15 @@ static void task_sorting(void *pvParameters)
             sorting_engine_note_tracking_overflow();
         }
 
-        // Run position tracking, servo trigger window checks, and vision timeouts
+        // Cập nhật vị trí di chuyển theo encoder, kiểm tra cửa sổ kích hoạt servo và timeout nhận diện AI
         sorting_engine_update();
 
         vTaskDelay(pdMS_TO_TICKS(15));
     }
 }
 
-// Task 3: task_mqtt (Priority 4)
-// Publishes periodic telemetry and heartbeat to SortiX-Dashboard
+// Task 3: task_mqtt (Độ ưu tiên 4)
+// Phát dữ liệu đo đạc (telemetry) và gói tin nhịp tim (heartbeat) định kỳ lên SortiX-Dashboard
 static void task_mqtt(void *pvParameters)
 {
     ESP_LOGI(TAG, "task_mqtt started (Priority %d)", uxTaskPriorityGet(NULL));
@@ -137,13 +137,13 @@ static void task_mqtt(void *pvParameters)
     }
 }
 
-// Task 4: task_http_tele (Priority 2)
-// Sends HTTP POST telemetry every 5s to backend Node.js server (port 5000)
+// Task 4: task_http_tele (Độ ưu tiên 2)
+// Gửi HTTP POST telemetry định kỳ mỗi 5s tới máy chủ backend Node.js (cổng 5000)
 static void task_http_tele(void *pvParameters)
 {
     ESP_LOGI(TAG, "task_http_tele started (Priority %d)", uxTaskPriorityGet(NULL));
 
-    // Wait until Wi-Fi is connected
+    // Chờ cho đến khi Wi-Fi kết nối thành công
     while (!wifi_manager_is_connected()) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
@@ -156,18 +156,18 @@ static void task_http_tele(void *pvParameters)
     }
 }
 
-// Task 5: task_safety (Priority 5)
-// Supervises system health and watchdog timers
+// Task 5: task_safety (Độ ưu tiên 5)
+// Giám sát sức khỏe hệ thống và tự động bật SoftAP nếu mất mạng kéo dài
 static void task_safety(void *pvParameters)
 {
     ESP_LOGI(TAG, "task_safety started (Priority %d)", uxTaskPriorityGet(NULL));
 
     while (1) {
-        // Check Wi-Fi state; if disconnected for prolonged period and SoftAP not active, start SoftAP
+        // Kiểm tra trạng thái Wi-Fi; nếu mất kết nối kéo dài và SoftAP chưa bật thì khởi động SoftAP
         static int disconnect_counter = 0;
         if (!wifi_manager_is_connected()) {
             disconnect_counter++;
-            if (disconnect_counter == SOFTAP_TRIGGER_TIMEOUT_SEC) { // 10 seconds without connection
+            if (disconnect_counter == SOFTAP_TRIGGER_TIMEOUT_SEC) { // 10 giây không có kết nối Wi-Fi
                 ESP_LOGW(TAG, "Wi-Fi disconnected for >%ds. Starting SoftAP + Captive portal...", SOFTAP_TRIGGER_TIMEOUT_SEC);
                 wifi_manager_start_softap();
                 captive_portal_start();
@@ -196,23 +196,23 @@ void app_main(void)
     ESP_LOGI(TAG, "   Target: %s (%s)", SORTIX_TARGET_CHIP, SORTIX_BOARD_NAME);
     ESP_LOGI(TAG, "=========================================================");
 
-    // 1. Initialize persistent storage (NVS)
+    // 1. Khởi tạo bộ nhớ lưu trữ bất biến (NVS)
     ESP_ERROR_CHECK(nvs_config_init());
 
-    // 2. Initialize Status LED (GPIO10)
+    // 2. Khởi tạo LED trạng thái (GPIO10)
     ESP_ERROR_CHECK(led_indicator_init());
 
-    // 3. Initialize Motor Control (GPIO8 IN1, GPIO9 IN2)
+    // 3. Khởi tạo điều khiển động cơ (GPIO8 IN1, GPIO9 IN2)
     ESP_ERROR_CHECK(motor_control_init());
 
-    // 4. Initialize Non-blocking MG996R Servos (GPIO6 S1, GPIO24 S2)
+    // 4. Khởi tạo Servo MG996R non-blocking (GPIO6 S1, GPIO24 S2)
     ESP_ERROR_CHECK(servo_init());
 
-    // 5. Initialize State Machine (Always boots safely into IDLE)
+    // 5. Khởi tạo máy trạng thái FSM (Luôn khởi động an toàn ở trạng thái IDLE)
     ESP_ERROR_CHECK(state_machine_init());
     state_machine_register_callback(on_state_changed, NULL);
 
-    // 6. Initialize PCNT Rotary Encoder (GPIO1 Phase A, GPIO4 Phase B)
+    // 6. Khởi tạo Encoder quay PCNT (GPIO1 Phase A, GPIO4 Phase B)
     ESP_ERROR_CHECK(encoder_init());
     const sortix_sys_config_t *sys_cfg = nvs_config_get();
     if (sys_cfg != NULL && sys_cfg->counts_per_mm > 0.001f) {
@@ -220,33 +220,33 @@ void app_main(void)
         ESP_LOGI(TAG, "Applied calibrated encoder resolution: %.2f counts/mm", sys_cfg->counts_per_mm);
     }
 
-    // 7. Create FreeRTOS queue for S1 IR sensor events
+    // 7. Tạo hàng đợi FreeRTOS cho sự kiện cảm biến quang S1
     s_s1_queue = xQueueCreate(16, sizeof(s1_event_t));
     if (s_s1_queue == NULL) {
         ESP_LOGE(TAG, "Failed to create S1 event queue!");
         return;
     }
 
-    // 8. Initialize Sensors (S1 IR on GPIO0, LDR DO on GPIO5)
+    // 8. Khởi tạo cảm biến (IR S1 trên GPIO0, LDR DO trên GPIO5)
     ESP_ERROR_CHECK(sensors_init(s_s1_queue));
 
-    // 9. Initialize Start Button (GPIO23 with 20ms debounce)
+    // 9. Khởi tạo nút bấm Start (GPIO23 với lọc nhiễu debounce 20ms)
     ESP_ERROR_CHECK(button_init(on_start_button_pressed, NULL));
 
-    // 10. Initialize Safety Monitor (Encoder stall & SoC temperature sensor)
+    // 10. Khởi tạo giám sát an toàn Safety Monitor (Kẹt encoder & cảm biến nhiệt độ SoC)
     ESP_ERROR_CHECK(safety_monitor_init());
     safety_monitor_set_jam_callback(on_jam_detected, NULL);
     safety_monitor_set_temp_callback(on_temp_warning, NULL);
 
-    // 11. Initialize Sorting Engine (Tracking Ring Buffer & Dynamic routing)
+    // 11. Khởi tạo bộ máy phân loại Sorting Engine (Tracking Ring Buffer & định tuyến động)
     ESP_ERROR_CHECK(sorting_engine_init());
     sorting_engine_set_classification_callback(on_item_classified, NULL);
 
-    // 12. Initialize Wi-Fi Station
+    // 12. Khởi tạo Wi-Fi Station
     ESP_ERROR_CHECK(wifi_manager_init());
     init_sntp();
 
-    // 13. Initialize MQTT Client (SortiX-Dashboard protocol)
+    // 13. Khởi tạo MQTT Client (Giao thức SortiX-Dashboard)
     esp_err_t mqtt_ret = mqtt_handler_init();
     if (mqtt_ret != ESP_OK) {
         ESP_LOGW(TAG, "MQTT is not active (%s); starting setup AP for secure provisioning",
@@ -256,10 +256,10 @@ void app_main(void)
         }
     }
 
-    // 14. Initialize HTTP Telemetry Client (Port 5000 backend)
+    // 14. Khởi tạo HTTP Telemetry Client (Backend cổng 5000)
     ESP_ERROR_CHECK(http_telemetry_init());
 
-    // 15. Create FreeRTOS Tasks
+    // 15. Tạo các tác vụ FreeRTOS
     xTaskCreate(task_conveyor, "task_conveyor", 4096, NULL, 6, NULL);
     xTaskCreate(task_sorting,  "task_sorting",  4096, NULL, 5, NULL);
     xTaskCreate(task_mqtt,     "task_mqtt",     4096, NULL, 4, NULL);

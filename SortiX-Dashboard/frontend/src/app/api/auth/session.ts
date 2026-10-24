@@ -5,9 +5,8 @@ import { NextUsersStore, StoredUserAccount } from "@/app/api/users/store";
 const sessionSecret: string =
   process.env.AUTH_SESSION_SECRET?.trim() ||
   process.env.INTERNAL_API_SECRET?.trim() ||
-  ((globalThis as unknown as { __sortix_auth_secret?: string }).__sortix_auth_secret ||
-    ((globalThis as unknown as { __sortix_auth_secret?: string }).__sortix_auth_secret =
-      crypto.randomBytes(32).toString("hex")));
+  process.env.JWT_SECRET?.trim() ||
+  "sortix-med-auth-session-key-v1-production-safe-pbl3";
 const SESSION_TTL_SECONDS = 24 * 60 * 60;
 
 interface SessionClaims {

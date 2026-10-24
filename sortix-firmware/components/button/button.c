@@ -16,7 +16,7 @@ static volatile bool s_timer_running = false;
 static void button_debounce_timer_cb(void *arg)
 {
     s_timer_running = false;
-    // Check if the pin is still LOW (pressed) after 20ms debounce
+    // Kiểm tra xem chân có vẫn ở mức LOW (đang được nhấn) sau khoảng thời gian debounce 20ms không
     if (gpio_get_level(BUTTON_PIN_START) == 0) {
         ESP_LOGI(TAG, "Start button press verified");
         if (s_on_pressed_cb != NULL) {

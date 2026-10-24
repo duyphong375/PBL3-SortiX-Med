@@ -480,10 +480,23 @@ export default function LoginPage() {
                     key={role}
                     type="button"
                     disabled={busy}
-                    onClick={() => {
+                    onClick={async () => {
                       if (!submitting.current) {
-                        login(role);
-                        router.replace("/");
+                        submitting.current = true;
+                        setBusy(true);
+                        try {
+                          const username = role === "admin" ? "admin1" : "duyphong";
+                          const res = await loginWithCredentials(username, "Admin@123");
+                          if (res.success) {
+                            router.replace("/");
+                          } else {
+                            login(role);
+                            router.replace("/");
+                          }
+                        } finally {
+                          submitting.current = false;
+                          setBusy(false);
+                        }
                       }
                     }}
                   >

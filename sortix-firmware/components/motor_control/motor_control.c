@@ -51,7 +51,7 @@ esp_err_t motor_control_init(void)
         return ret;
     }
 
-    // Default to coast / stop
+    // Mặc định dừng thả trôi (coast / stop)
     ret = gpio_set_level(MOTOR_PIN_IN1, 0);
     if (ret == ESP_OK) ret = gpio_set_level(MOTOR_PIN_IN2, 0);
     if (ret != ESP_OK) return ret;

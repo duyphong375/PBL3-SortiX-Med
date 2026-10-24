@@ -8,7 +8,7 @@
 static const char *TAG = "LED_INDICATOR";
 
 #define LED_PIN_STATUS          GPIO_NUM_10
-#define LED_TIMER_PERIOD_US     100000  // 100 ms
+#define LED_TIMER_PERIOD_US     100000  // Chu kỳ timer 100 ms
 
 static led_mode_t s_current_mode = LED_MODE_OFF;
 static esp_timer_handle_t s_led_timer = NULL;
@@ -31,13 +31,13 @@ static void led_timer_cb(void *arg)
                 break;
 
             case LED_MODE_IDLE:
-                // 1 Hz = 10 ticks (5 on, 5 off)
+                // Tần số 1 Hz = 10 tick (5 tick BẬT, 5 tick TẮT)
                 level = ((s_tick_counter % 10) < 5) ? 1 : 0;
                 break;
 
             case LED_MODE_JAMMED:
             case LED_MODE_ERROR:
-                // 5 Hz = 2 ticks (1 on, 1 off)
+                // Tần số 5 Hz = 2 tick (1 tick BẬT, 1 tick TẮT)
                 level = ((s_tick_counter % 2) == 0) ? 1 : 0;
                 break;
         }

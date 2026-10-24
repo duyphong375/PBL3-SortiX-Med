@@ -4,7 +4,7 @@ const { join } = require("node:path");
 const { test } = require("node:test");
 const ts = require("typescript");
 
-const source = readFileSync(join(__dirname, "../src/lib/history.ts"), "utf8");
+const source = readFileSync(join(__dirname, "../frontend/src/lib/history.ts"), "utf8");
 const { outputText } = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
 });

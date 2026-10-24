@@ -194,24 +194,26 @@ export const ApiAuthClient = {
       }
     }
 
-    // 1. Thử gọi backend Express
-    const backendUrl = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000").replace(/\/$/, "");
-    try {
-      const res = await fetchWithTimeout(`${backendUrl}/api/user/change-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(1500),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        return { success: true, message: data.message || "Đổi mật khẩu thành công" };
+    // 1. Thử gọi backend Express nếu có cấu hình tường minh
+    const backendUrl = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "").replace(/\/$/, "");
+    if (backendUrl) {
+      try {
+        const res = await fetchWithTimeout(`${backendUrl}/api/user/change-password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(1500),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          return { success: true, message: data.message || "Đổi mật khẩu thành công" };
+        }
+        if (!data.success && data.message) {
+          return { success: false, message: data.message };
+        }
+      } catch {
+        // Backend offline -> fallback Next.js route
       }
-      if (!data.success && data.message) {
-        return { success: false, message: data.message };
-      }
-    } catch {
-      // Backend offline -> fallback Next.js route
     }
 
     // 2. Gọi qua Next.js Route

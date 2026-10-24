@@ -7,13 +7,13 @@ extern "C" {
 #endif
 
 /**
- * @brief Start the internal captive portal HTTP web server on port 80.
- * @return ESP_OK on success.
+ * @brief Khởi động máy chủ web HTTP cấu hình mạng nội bộ (Captive Portal) trên cổng 80.
+ * @return ESP_OK nếu thành công.
  */
 esp_err_t captive_portal_start(void);
 
 /**
- * @brief Stop the captive portal HTTP web server.
+ * @brief Dừng máy chủ web HTTP cấu hình Captive Portal.
  */
 void captive_portal_stop(void);
 

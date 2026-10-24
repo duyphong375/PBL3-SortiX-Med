@@ -109,6 +109,15 @@ function getBootstrapUsers(): StoredUserAccount[] {
 }
 
 function resolveStorageFilePath(): string {
+  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  const tmpPath = path.join("/tmp", "users.json");
+
+  if (isServerless) {
+    if (fs.existsSync(tmpPath)) {
+      return tmpPath;
+    }
+  }
+
   const possiblePaths = [
     path.join(process.cwd(), "..", "data", "users.json"),
     path.join(process.cwd(), "data", "users.json"),
@@ -117,8 +126,20 @@ function resolveStorageFilePath(): string {
 
   for (const p of possiblePaths) {
     if (fs.existsSync(p)) {
+      if (isServerless) {
+        try {
+          fs.copyFileSync(p, tmpPath);
+          return tmpPath;
+        } catch {
+          return p;
+        }
+      }
       return p;
     }
+  }
+
+  if (isServerless) {
+    return tmpPath;
   }
 
   for (const p of possiblePaths) {
@@ -259,7 +280,14 @@ function saveUsers(users: StoredUserAccount[]): void {
     fs.writeFileSync(filePath, JSON.stringify(users, null, 2), "utf-8");
     lastLoadedMtimeMs = fs.statSync(filePath).mtimeMs;
   } catch (err) {
-    console.error("[NextUsersStore] Lỗi lưu users.json:", err);
+    console.warn("[NextUsersStore] Không thể lưu vào " + filePath + ", thử lưu vào /tmp/users.json:", err);
+    try {
+      const fallbackPath = path.join("/tmp", "users.json");
+      fs.writeFileSync(fallbackPath, JSON.stringify(users, null, 2), "utf-8");
+      lastLoadedMtimeMs = fs.statSync(fallbackPath).mtimeMs;
+    } catch {
+      // Dữ liệu vẫn được giữ trong bộ nhớ globalAny
+    }
   }
 }
 

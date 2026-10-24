@@ -7,7 +7,7 @@ TEST_CASE("State Machine Boot Safety", "[state_machine]")
     motor_control_init();
     esp_err_t ret = state_machine_init();
     TEST_ASSERT_EQUAL(ESP_OK, ret);
-    // Boot state MUST ALWAYS be IDLE
+    // Trạng thái khởi động LUÔN LUÔN phải là IDLE
     TEST_ASSERT_EQUAL(SYSTEM_STATE_IDLE, state_machine_get_state());
     TEST_ASSERT_EQUAL_STRING("IDLE", state_machine_get_state_str(SYSTEM_STATE_IDLE));
 }
@@ -40,17 +40,17 @@ TEST_CASE("State Machine Jam and E-Stop Safety Logic", "[state_machine]")
     state_machine_process_event(SYSTEM_EVENT_START);
     TEST_ASSERT_EQUAL(SYSTEM_STATE_RUNNING, state_machine_get_state());
 
-    // Trigger Emergency Jam
+    // Kích hoạt sự cố kẹt phôi khẩn cấp (Emergency Jam)
     esp_err_t ret = state_machine_process_event(SYSTEM_EVENT_JAM_DETECTED);
     TEST_ASSERT_EQUAL(ESP_OK, ret);
     TEST_ASSERT_EQUAL(SYSTEM_STATE_JAMMED, state_machine_get_state());
 
-    // START must be rejected while JAMMED
+    // Lệnh START phải bị từ chối khi đang trong trạng thái JAMMED
     ret = state_machine_process_event(SYSTEM_EVENT_START);
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, ret);
     TEST_ASSERT_EQUAL(SYSTEM_STATE_JAMMED, state_machine_get_state());
 
-    // ESTOP_RELEASE must transition to IDLE (NEVER directly to RUNNING)
+    // ESTOP_RELEASE phải chuyển về IDLE (TUYỆT ĐỐI KHÔNG nhảy trực tiếp sang RUNNING)
     ret = state_machine_process_event(SYSTEM_EVENT_ESTOP_RELEASE);
     TEST_ASSERT_EQUAL(ESP_OK, ret);
     TEST_ASSERT_EQUAL(SYSTEM_STATE_IDLE, state_machine_get_state());

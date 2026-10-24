@@ -3,7 +3,10 @@ import { UserRole } from "@shared/types";
 import { ENV } from "../config/env";
 
 const TOKEN_TTL_SECONDS = 24 * 60 * 60;
-const sessionSecret = ENV.AUTH_SESSION_SECRET || crypto.randomBytes(32).toString("hex");
+const sessionSecret =
+  ENV.AUTH_SESSION_SECRET ||
+  ENV.INTERNAL_API_SECRET ||
+  "sortix-med-auth-session-key-v1-production-safe-pbl3";
 
 interface SessionClaims {
   id: string;

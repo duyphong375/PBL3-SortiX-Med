@@ -18,5 +18,5 @@
       "@shared/*": ["./shared/*"]
     }
   },
-  "include": ["frontend/next-env.d.ts", "frontend/src/**/*.ts", "frontend/src/**/*.tsx", "shared/**/*.ts", "src/**/*.ts"]
+  "include": ["frontend/next-env.d.ts", "frontend/src/**/*.ts", "frontend/src/**/*.tsx", "shared/**/*.ts"]
 }

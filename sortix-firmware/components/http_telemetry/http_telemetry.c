@@ -52,12 +52,12 @@ esp_err_t http_telemetry_send_post(void)
 
     system_state_t state = state_machine_get_state();
     bool is_running = (state == SYSTEM_STATE_RUNNING);
-    int speed_val = is_running ? 100 : 0; // Commanded motor drive state; measured speed is separate.
+    int speed_val = is_running ? 100 : 0; // Trạng thái điều khiển động cơ; tốc độ đo đạc thực tế tách riêng.
     float measured_speed_mm_s = 0.0f;
     bool measured_speed_valid = safety_monitor_get_conveyor_speed_mm_s(&measured_speed_mm_s);
 
-    // Construct telemetry JSON payload
-    // STRICT: Do NOT include "optical_sensor" field to avoid conflicting auto-stop logic in backend!
+    // Xây dựng gói dữ liệu telemetry JSON
+    // LƯU Ý: Không thêm trường "optical_sensor" để tránh xung đột với logic tự động dừng của backend!
     cJSON *root = cJSON_CreateObject();
     if (root == NULL) return ESP_ERR_NO_MEM;
     cJSON_AddStringToObject(root, "device_id", SORTIX_DEVICE_ID);
