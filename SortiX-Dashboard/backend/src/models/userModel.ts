@@ -1,10 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { UserAccount, SafeUser, UserRole, UserStatus } from "@shared/types";
-
-// Default Bcrypt Hash for "123456" with 10 salt rounds
-const DEFAULT_HASH = "$2b$10$pPw2AmBT1scTY5wU5cmpb.iLoWJZDwaVaGTxb0iT/diTyE2GKpECO";
 
 const INITIAL_ADMIN_LIST: Omit<UserAccount, "id" | "password_hash" | "created_at" | "updated_at">[] = [
   {
@@ -62,7 +60,44 @@ function resolveStorageFilePath(): string {
   return path.join(process.cwd(), "..", "data", "users.json");
 }
 
+function getStorageAdapter() {
+  const adapter = (globalThis as unknown as { SortiXStorageAdapter?: { read: <T>(col: string, def: T) => T; write: <T>(col: string, data: T) => void } }).SortiXStorageAdapter;
+  if (adapter && typeof adapter.read === "function" && typeof adapter.write === "function") {
+    return adapter;
+  }
+  return null;
+}
+
 function loadUsersFromDisk(): UserAccount[] | null {
+  const adapter = getStorageAdapter();
+  if (adapter) {
+    try {
+      const parsed = adapter.read<UserAccount[]>("users", []);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        let hasFixes = false;
+        for (const u of parsed) {
+          const legacyRecord = u as UserAccount & Record<string, unknown>;
+          if ("plain_password" in legacyRecord) {
+            delete legacyRecord.plain_password;
+            hasFixes = true;
+          }
+          if (u.reset_otp === undefined) {
+            u.reset_otp = null;
+            hasFixes = true;
+          }
+          if (u.reset_otp_expires_at === undefined) {
+            u.reset_otp_expires_at = null;
+            hasFixes = true;
+          }
+        }
+        if (hasFixes) {
+          saveUsersToDisk(parsed);
+        }
+        return parsed;
+      }
+    } catch {}
+  }
+
   const filePath = resolveStorageFilePath();
   try {
     if (fs.existsSync(filePath)) {
@@ -98,6 +133,14 @@ function loadUsersFromDisk(): UserAccount[] | null {
 }
 
 function saveUsersToDisk(users: UserAccount[]): void {
+  const adapter = getStorageAdapter();
+  if (adapter) {
+    try {
+      adapter.write("users", users);
+      return;
+    } catch {}
+  }
+
   const filePath = resolveStorageFilePath();
   try {
     const directory = path.dirname(filePath);
@@ -139,7 +182,13 @@ export const UserModel = {
       return;
     }
 
-    const hash = customPassword ? bcrypt.hashSync(customPassword, 10) : DEFAULT_HASH;
+    const envPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD?.trim();
+    const passwordToUse = customPassword || envPassword;
+    // Tuyệt đối không dùng mật khẩu cố định có thể đoán được như 123456.
+    // Nếu không cấu hình BOOTSTRAP_ADMIN_PASSWORD, tạo chuỗi ngẫu nhiên an toàn.
+    const hash = passwordToUse
+      ? bcrypt.hashSync(passwordToUse, 10)
+      : bcrypt.hashSync(crypto.randomBytes(16).toString("hex"), 10);
     const now = new Date().toISOString();
 
     for (let i = 0; i < INITIAL_ADMIN_LIST.length; i++) {
@@ -313,8 +362,10 @@ export const UserModel = {
     );
     if (!user) return undefined;
 
-    user.reset_otp = otp;
+    const otpHash = crypto.createHash("sha256").update(otp.trim()).digest("hex");
+    user.reset_otp = otpHash;
     user.reset_otp_expires_at = expiresAt;
+    user.reset_otp_attempts = 0;
     user.updated_at = new Date().toISOString();
     saveUsersToDisk(usersStore);
     return user;
@@ -341,17 +392,38 @@ export const UserModel = {
       };
     }
 
-    if (!user.reset_otp || user.reset_otp !== otp.trim()) {
-      return { success: false, message: "Mã OTP không chính xác. Vui lòng kiểm tra lại" };
+    if (!user.reset_otp || !user.reset_otp_expires_at) {
+      return { success: false, message: "Yêu cầu khôi phục không tồn tại hoặc đã bị hủy. Vui lòng tạo yêu cầu mới." };
     }
 
-    if (!user.reset_otp_expires_at || new Date(user.reset_otp_expires_at).getTime() <= Date.now()) {
-      return { success: false, message: "Mã OTP đã hết hạn hiệu lực (quá 5 phút). Vui lòng yêu cầu mã mới" };
+    if (new Date(user.reset_otp_expires_at).getTime() <= Date.now()) {
+      user.reset_otp = null;
+      user.reset_otp_expires_at = null;
+      user.reset_otp_attempts = 0;
+      saveUsersToDisk(usersStore);
+      return { success: false, message: "Mã OTP đã hết hạn hiệu lực (quá 5 phút). Vui lòng yêu cầu mã mới." };
+    }
+
+    if ((user.reset_otp_attempts || 0) >= 5) {
+      user.reset_otp = null;
+      user.reset_otp_expires_at = null;
+      user.reset_otp_attempts = 0;
+      saveUsersToDisk(usersStore);
+      return { success: false, message: "Bạn đã thử sai mã OTP quá 5 lần. Mã OTP đã bị hủy vì lý do an toàn." };
+    }
+
+    const inputHash = crypto.createHash("sha256").update(otp.trim()).digest("hex");
+    if (user.reset_otp !== inputHash) {
+      user.reset_otp_attempts = (user.reset_otp_attempts || 0) + 1;
+      saveUsersToDisk(usersStore);
+      const remaining = 5 - user.reset_otp_attempts;
+      return { success: false, message: `Mã OTP không chính xác. Bạn còn ${remaining} lần thử.` };
     }
 
     user.password_hash = newPasswordHash;
     user.reset_otp = null;
     user.reset_otp_expires_at = null;
+    user.reset_otp_attempts = 0;
     user.updated_at = new Date().toISOString();
     saveUsersToDisk(usersStore);
 

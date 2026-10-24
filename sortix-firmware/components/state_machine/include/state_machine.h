@@ -11,14 +11,16 @@ typedef enum {
     SYSTEM_STATE_IDLE = 0,      // Safe default boot state (Waiting for START)
     SYSTEM_STATE_RUNNING,       // Conveyor active and running
     SYSTEM_STATE_STOPPED,       // Controlled stop by operator or vision timeout
-    SYSTEM_STATE_JAMMED         // Mechanical jam / encoder stall locked
+    SYSTEM_STATE_JAMMED,        // Mechanical jam / encoder stall locked
+    SYSTEM_STATE_ESTOP          // Hardware/Software Emergency Stop locked
 } system_state_t;
 
 typedef enum {
     SYSTEM_EVENT_START = 0,     // Start button pressed or MQTT START command
     SYSTEM_EVENT_STOP,          // MQTT STOP command or Pause-and-hold trigger
     SYSTEM_EVENT_JAM_DETECTED,  // Encoder stall detected while running
-    SYSTEM_EVENT_ESTOP_RELEASE  // MQTT ESTOP_RELEASE (unlocks jam to IDLE, does NOT start motor)
+    SYSTEM_EVENT_ESTOP_RELEASE, // MQTT ESTOP_RELEASE (unlocks jam/estop to IDLE, does NOT start motor)
+    SYSTEM_EVENT_ESTOP          // Emergency stop triggered (hardware or MQTT)
 } system_event_t;
 
 typedef void (*state_change_cb_t)(system_state_t old_state, system_state_t new_state, void *user_ctx);

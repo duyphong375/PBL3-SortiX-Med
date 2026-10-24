@@ -8,11 +8,11 @@ import { UserRoutes } from "./routes/userRoutes";
 import { AuthRoutes } from "./routes/authRoutes";
 import { SafetyRoutes } from "./routes/safetyRoutes";
 import { SSEService, shutdownSSE } from "./services/sseService";
-import { initBackendMQTT, shutdownBackendMQTT } from "./services/mqttService";
+import { initBackendMQTT, shutdownBackendMQTT, publishControlCommand } from "./services/mqttService";
 import { resolveUserFromRequest, checkRolePermission, requireAdmin } from "./middlewares/authMiddleware";
 import { formatErrorResponse } from "./middlewares/errorMiddleware";
 import { ENV } from "./config/env";
-import { HistoryQuerySchema } from "@shared/schemas";
+import { HistoryQuerySchema, SyncActionSchema } from "@shared/schemas";
 import { SyncService } from "./services/syncService";
 import { HistoryModel } from "./models/historyModel";
 import { TelemetryController } from "./controllers/telemetryController";
@@ -100,7 +100,7 @@ const server = http.createServer(async (req, res) => {
     // Telemetry Ingestion via HTTP POST (ESP32 định kỳ 5s/lần đẩy dữ liệu cảm biến)
     if ((pathname === "/api/telemetry" || pathname === "/api/sensors") && method === "POST") {
       const body = await parseJsonBody(req);
-      const result = TelemetryController.handlePostTelemetry(body);
+      const result = TelemetryController.handlePostTelemetry(body, req.headers as Record<string, string | string[] | undefined>);
       sendJson(res, result.status, result.body);
       return;
     }
@@ -142,7 +142,7 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === "/api/auth/forgot-password" && method === "POST") {
       const body = await parseJsonBody(req);
-      const result = AuthRoutes.handleForgotPassword(body);
+      const result = await AuthRoutes.handleForgotPassword(body);
       sendJson(res, result.status, result.body);
       return;
     }
@@ -538,20 +538,66 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // Control Route (Send command to hardware over MQTT via server)
+    if (pathname === "/api/control" && method === "POST") {
+      if (!authUser.isAuthenticated) {
+        sendJson(res, 401, { success: false, message: "401 Unauthorized: Vui lòng đăng nhập để gửi lệnh điều khiển" });
+        return;
+      }
+      const body = (await parseJsonBody(req)) as Record<string, unknown>;
+      const command = typeof body?.command === "string" ? body.command.trim() : "";
+      const value = typeof body?.value === "number" && Number.isFinite(body.value) ? body.value : null;
+
+      if (!command) {
+        sendJson(res, 400, { success: false, message: "Lệnh command không được để trống" });
+        return;
+      }
+
+      if (command === "ESTOP_RELEASE" && authUser.role !== "admin") {
+        sendJson(res, 403, { success: false, message: "Từ chối truy cập: Chỉ Quản trị viên (Admin) mới có quyền mở khóa an toàn" });
+        return;
+      }
+
+      const published = publishControlCommand(command, value);
+      sendJson(res, 200, {
+        success: true,
+        message: `Lệnh '${command}' đã được gửi an toàn tới thiết bị qua server`,
+        command,
+        dispatched: published,
+      });
+      return;
+    }
+
     if (pathname === "/api/sync" && method === "POST") {
       if (!authUser.isAuthenticated) {
         sendJson(res, 401, { success: false, error: "401 Unauthorized: Vui lòng đăng nhập để thực hiện đồng bộ" });
         return;
       }
       const body = await parseJsonBody(req);
-      const { type, state, records, binCounts, brandCounts, item, senderId } = (body as any) || {};
-      if (type === "update_state" && state) {
-        const updated = SyncService.updateState(state, senderId);
+      const validated = SyncActionSchema.safeParse(body);
+      if (!validated.success) {
+        sendJson(res, 400, { success: false, error: "Invalid sync action payload", details: validated.error.format() });
+        return;
+      }
+      const action = validated.data;
+      const { type } = action;
+      const currentState = SyncService.getState();
+
+      if (type === "update_state") {
+        if (currentState.mode === "real" && authUser.role !== "admin") {
+          sendJson(res, 403, { success: false, error: "Chỉ Quản trị viên mới có quyền cập nhật trạng thái hệ thống trong chế độ Thực tế" });
+          return;
+        }
+        const updated = SyncService.updateState(action.state, action.senderId);
         sendJson(res, 200, { success: true, state: updated });
         return;
       }
-      if (type === "sync_records" && Array.isArray(records)) {
-        SyncService.syncRecords(records, binCounts, brandCounts, senderId);
+      if (type === "sync_records") {
+        if (currentState.mode === "real" && authUser.role !== "admin") {
+          sendJson(res, 403, { success: false, error: "Chỉ Quản trị viên mới có quyền đồng bộ ghi đè lịch sử sản xuất thực tế" });
+          return;
+        }
+        SyncService.syncRecords(action.records, action.binCounts, action.brandCounts, action.senderId);
         sendJson(res, 200, { success: true, state: SyncService.getState() });
         return;
       }
@@ -560,12 +606,16 @@ const server = http.createServer(async (req, res) => {
           sendJson(res, 403, { success: false, error: "Truy cập bị từ chối: Thao tác xóa lịch sử yêu cầu quyền Quản trị viên (Admin)" });
           return;
         }
-        SyncService.clearHistory(senderId);
+        SyncService.clearHistory(action.senderId);
         sendJson(res, 200, { success: true, state: SyncService.getState() });
         return;
       }
-      if (type === "spawn_item" && item) {
-        SyncService.spawnItem(item, senderId);
+      if (type === "spawn_item") {
+        if (currentState.mode !== "sim") {
+          sendJson(res, 400, { success: false, error: "Hành động spawn_item chỉ được phép trong chế độ Mô phỏng (Simulation mode)" });
+          return;
+        }
+        SyncService.spawnItem(action.item, action.senderId);
         sendJson(res, 200, { success: true });
         return;
       }

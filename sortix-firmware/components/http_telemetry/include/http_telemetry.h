@@ -14,8 +14,8 @@ esp_err_t http_telemetry_init(void);
 
 /**
  * @brief Send one HTTP POST telemetry payload to the backend server (port 5000).
- *        Payload includes device_id, cpu_temp, conveyor_speed, conveyor_running,
- *        s1_entry, encoder_count.
+ *        Payload includes device_id, valid CPU temperature, commanded motor state,
+ *        encoder speed when fresh, S1 state, encoder count, and unknown S2/S3 state.
  *        DOES NOT include "optical_sensor".
  * @return ESP_OK on success, error code otherwise.
  */

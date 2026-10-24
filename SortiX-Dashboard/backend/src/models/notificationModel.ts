@@ -12,22 +12,35 @@ function resolveStorageFilePath(): string {
   ];
 
   for (const p of possiblePaths) {
-    if (fs.existsSync(p)) {
-      return p;
-    }
+    if (fs.existsSync(p)) return p;
   }
-
   for (const p of possiblePaths) {
     const dir = path.dirname(p);
-    if (fs.existsSync(dir)) {
-      return p;
-    }
+    if (fs.existsSync(dir)) return p;
   }
-
   return path.join(process.cwd(), "data", "notifications.json");
 }
 
+function getStorageAdapter() {
+  const adapter = (globalThis as unknown as { SortiXStorageAdapter?: { read: <T>(col: string, def: T) => T; write: <T>(col: string, data: T) => void } }).SortiXStorageAdapter;
+  if (adapter && typeof adapter.read === "function" && typeof adapter.write === "function") {
+    return adapter;
+  }
+  return null;
+}
+
 function loadFromFile(): void {
+  const adapter = getStorageAdapter();
+  if (adapter) {
+    try {
+      const parsed = adapter.read<NotificationRecord[]>("notifications", []);
+      if (Array.isArray(parsed)) {
+        notificationsStore = parsed;
+        return;
+      }
+    } catch {}
+  }
+
   try {
     const filePath = resolveStorageFilePath();
     if (fs.existsSync(filePath)) {
@@ -47,6 +60,14 @@ function loadFromFile(): void {
 }
 
 function saveToFile(): void {
+  const adapter = getStorageAdapter();
+  if (adapter) {
+    try {
+      adapter.write("notifications", notificationsStore);
+      return;
+    } catch {}
+  }
+
   try {
     const filePath = resolveStorageFilePath();
     const directory = path.dirname(filePath);
@@ -61,12 +82,10 @@ function saveToFile(): void {
     } finally {
       try {
         if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
-      } catch {
-        // Best effort cleanup; the atomic rename already completed if this runs.
-      }
+      } catch {}
     }
   } catch (err) {
-    console.error("[NotificationModel] Lỗi lưu file dữ liệu:", err);
+    console.error("[NotificationModel] Lỗi lưu notifications:", err);
   }
 }
 

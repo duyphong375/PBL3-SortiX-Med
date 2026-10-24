@@ -36,6 +36,7 @@ export interface UseMQTTOptions {
   onDeviceOffline?: (payload: DeviceOfflinePayload) => void;
   onMqttDisconnected?: (payload: MqttDisconnectedPayload) => void;
   onMqttReconnected?: () => void;
+  onEstopAck?: (payload: unknown) => void;
 }
 
 export function useMQTT({
@@ -54,6 +55,7 @@ export function useMQTT({
   onDeviceOffline,
   onMqttDisconnected,
   onMqttReconnected,
+  onEstopAck,
 }: UseMQTTOptions) {
   const [mqttStatus, setMqttStatus] = useState<"connected" | "disconnected" | "error">("disconnected");
   const [pingMs, setPingMs] = useState<number>(24);
@@ -84,6 +86,7 @@ export function useMQTT({
     onDeviceOffline,
     onMqttDisconnected,
     onMqttReconnected,
+    onEstopAck,
   });
   callbacksRef.current = {
     onVisionDetection,
@@ -99,6 +102,7 @@ export function useMQTT({
     onDeviceOffline,
     onMqttDisconnected,
     onMqttReconnected,
+    onEstopAck,
   };
 
   // Coalesce bursty telemetry packets into one React update per frame.
@@ -240,6 +244,12 @@ export function useMQTT({
           if (heartbeat.success) callbacksRef.current.onHeartbeat?.(heartbeat.data);
         }
       }
+
+      // 9. Hardware E-Stop ACK Event (conveyor/safety/estop/ack)
+      const estopAckTopic = DEFAULT_MQTT_TOPICS.ESTOP_ACK || "conveyor/safety/estop/ack";
+      if (topic === estopAckTopic || data.event === "estop_ack") {
+        callbacksRef.current.onEstopAck?.(data);
+      }
     } catch (e) {
       console.warn("Lỗi phân tích JSON MQTT:", e);
     }
@@ -251,7 +261,7 @@ export function useMQTT({
   // Initialize MQTT connection
   useEffect(() => {
     if (!isClient) return;
-    const brokerUrl = process.env.NEXT_PUBLIC_MQTT_BROKER_URL || "wss://broker.emqx.io:8084/mqtt";
+    const brokerUrl = process.env.NEXT_PUBLIC_MQTT_BROKER_URL || "";
     const service = new SorterMQTTService(brokerUrl);
     mqttRef.current = service;
 
@@ -263,6 +273,7 @@ export function useMQTT({
     const telemetryTopic = process.env.NEXT_PUBLIC_MQTT_TOPIC_TELEMETRY || "sorter/sorter_01/telemetry";
     const alertTopic = process.env.NEXT_PUBLIC_MQTT_TOPIC_ALERTS || "sorter/sorter_01/alerts";
     const estopTopic = DEFAULT_MQTT_TOPICS.ESTOP || "conveyor/safety/estop";
+    const estopAckTopic = DEFAULT_MQTT_TOPICS.ESTOP_ACK || "conveyor/safety/estop/ack";
     const jamTopic = DEFAULT_MQTT_TOPICS.JAM || "conveyor/sensor/jam";
     const binStatusTopic = DEFAULT_MQTT_TOPICS.BIN_STATUS || "conveyor/storage/bin_status";
     const tempTopic = DEFAULT_MQTT_TOPICS.TEMP || "conveyor/telemetry/temp";
@@ -309,7 +320,7 @@ export function useMQTT({
     });
 
     setIsSimulatedDisconnect(false);
-    service.connect([statusTopic, visionTopic, classificationTopic, cfgStatusTopic, telemetryTopic, alertTopic, estopTopic, jamTopic, binStatusTopic, tempTopic, heartbeatTopic]);
+    service.connect([statusTopic, visionTopic, classificationTopic, cfgStatusTopic, telemetryTopic, alertTopic, estopTopic, estopAckTopic, jamTopic, binStatusTopic, tempTopic, heartbeatTopic]);
 
     return () => {
       service.disconnect();
@@ -330,29 +341,44 @@ export function useMQTT({
   const publishCommand = useCallback(async (cmd: string, value?: number): Promise<boolean> => {
     if (isSimulationRef.current) return false;
     const command = typeof cmd === "string" ? cmd.trim() : "";
-    if (!command || !mqttRef.current || !mqttRef.current.isConnected()) return false;
+    if (!command) return false;
     if (value !== undefined && !Number.isFinite(value)) return false;
-    const topic = process.env.NEXT_PUBLIC_MQTT_TOPIC_CONTROL || "sorter/sorter_01/control";
-    const auth_token = process.env.NEXT_PUBLIC_MQTT_AUTH_TOKEN || "sortix_sec_control_2026";
-    const payload = {
-      command,
-      value: value !== undefined ? value : null,
-      timestamp: new Date().toISOString(),
-      auth_token,
-    };
-    return mqttRef.current.publish(topic, payload);
+
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("sortix_session_token") : null;
+      const res = await fetch("/api/control", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          command,
+          value: value !== undefined ? value : null,
+        }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
   }, []);
 
   const publishConfig = useCallback(async (config: SorterConfig): Promise<boolean> => {
     if (isSimulationRef.current) return false;
-    if (!mqttRef.current || !mqttRef.current.isConnected()) return false;
-    const topic = process.env.NEXT_PUBLIC_MQTT_TOPIC_CONFIG || "sorter/sorter_01/config";
-    const auth_token = process.env.NEXT_PUBLIC_MQTT_AUTH_TOKEN || "sortix_sec_control_2026";
-    const payload = {
-      ...config,
-      auth_token,
-    };
-    return await mqttRef.current.publish(topic, payload);
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("sortix_session_token") : null;
+      const res = await fetch("/api/config", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(config),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
   }, []);
 
   const publishEmergencyStop = useCallback(async (payload: EmergencyStopPayload): Promise<boolean> => {

@@ -132,7 +132,11 @@ export function RecentActivityList({
                     </td>
                     <td className="px-6 py-3.5">
                       <Badge variant="outline" className="font-semibold text-xs border-cyan-500/30 text-cyan-600 dark:text-cyan-400 bg-cyan-500/5">
-                        Máng {rec.actual_bin}
+                        {(rec.routed_bin ?? 0) > 0
+                          ? `Hướng máng ${rec.routed_bin} (chưa xác minh)`
+                          : rec.actual_bin === 0
+                            ? "Chưa xác minh"
+                            : `Máng ${rec.actual_bin}`}
                       </Badge>
                     </td>
                     <td className="px-6 py-3.5">
@@ -144,7 +148,15 @@ export function RecentActivityList({
                       ) : (
                         <Badge variant="destructive" className="gap-1 text-xs">
                           <AlertTriangle className="h-3.5 w-3.5" />
-                          Lỗi gạt
+                          {rec.status === "diverted_default"
+                            ? "Mặc định (chưa xác minh)"
+                            : rec.status === "held_timeout"
+                              ? "Đã giữ, cần kiểm tra"
+                              : rec.status === "servo_failed"
+                                ? "Lỗi cơ cấu gạt"
+                                : rec.status === "unverified"
+                                  ? "Chưa xác minh"
+                                  : "Cần kiểm tra"}
                         </Badge>
                       )}
                     </td>

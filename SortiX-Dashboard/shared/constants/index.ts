@@ -10,6 +10,7 @@ export const DEFAULT_MQTT_TOPICS = {
   ALERTS: "sorter/sorter_01/alerts",
   ESTOP: "conveyor/safety/estop",
   ESTOP_RELEASE: "conveyor/safety/estop/release",
+  ESTOP_ACK: "conveyor/safety/estop/ack",
   JAM: "conveyor/sensor/jam",
   BIN_STATUS: "conveyor/storage/bin_status",
   TEMP: "conveyor/telemetry/temp",
@@ -20,6 +21,9 @@ export const SYSTEM_SAFETY_STATES = {
   OPERATIONAL: "OPERATIONAL",
   SYSTEM_LOCKED: "SYSTEM_LOCKED",
   HALTED: "HALTED",
+  UNKNOWN: "UNKNOWN",
+  UNAVAILABLE: "UNAVAILABLE",
+  STALE: "STALE",
 } as const;
 
 export const DEFAULT_BINS = [

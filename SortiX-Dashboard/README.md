@@ -34,8 +34,8 @@ SortiX-Dashboard/
 ├─ shared/                        # types, schemas, constants dùng chung giữa Frontend, Backend & Firmware
 ├─ data/                          # JSON runtime store: history, notifications, sync_state, telemetry_logs, users
 ├─ scripts/                       # dev-all.cjs, telegram-poller.cjs, e2e.cjs, free-port.cjs, dev.ps1, test.ps1
-├─ tests/                         # 21 file unit test suites tự động (163/163 unit tests PASS 100%)
-└─ docs/                          # architecture.md, api.md
+├─ tests/                         # 26 file unit test suites tự động (175/175 unit tests PASS 100%)
+├─ docs/                          # architecture.md, api.md
 ```
 
 ### Lệnh chính hiện có
@@ -45,17 +45,17 @@ npm run dev              # Frontend Next.js tại :3000
 npm run dev:backend      # build rồi start backend tại PORT (mặc định :5000)
 npm run dev:all          # Điều phối 3-trong-1 (Frontend :3000 + Backend :5000 + Telegram Bot Poller)
 npm run dev:telegram     # Khởi động riêng tiến trình Telegram Bot Long-Polling Gateway
-npm run build            # build tối ưu hóa frontend Next.js (34/34 routes)
+npm run build            # build tối ưu hóa frontend Next.js (33/33 routes)
 npm run lint             # next lint
 npm run build --workspace=backend
 npx tsc --noEmit --pretty false
-npm test                 # Chạy toàn bộ 21 test suites tự động (163/163 unit tests PASS)
+npm test                 # Chạy toàn bộ 26 test suites tự động (175/175 unit tests PASS 100%)
 npm run test:e2e         # contract desktop/mobile/Capacitor
 npm run cap:sync
 npm run cap:open
 ```
 
-`npm test` hiện chạy toàn bộ **21 file test suites** tự động với **163/163 unit tests PASS 100%** qua lệnh `node --test tests/*.test.cjs`. Bộ kiểm thử bao phủ toàn diện: `history`, `api_schemas`, `users`, `estop_safety`, `jam_detection`, `simulation_mode_guard`, `jam_simulation_audio`, `bin_full`, `temperature_warning`, `device_offline`, `shift_summary`, `bin_sliders_sync`, `mqtt_disconnected`, `temperature_gauge_simulation_vs_real`, `daily_report_sync`, `cross_device_sync`, `http_telemetry_history`, `daily_production_cumulative`, `four_user_requests_upgrade`, `mute_siren_feature`, `new_day_report_tele_email`, `anti_ai_industrial_scada_ui`, `auto_stop_on_all_items_in_trays`, `ghost_item_prevention`, và `telegram_copilot_2way_and_screenfit`.
+`npm test` hiện chạy toàn bộ **26 file test suites** tự động với **175/175 unit tests PASS 100%** qua lệnh `node --test tests/*.test.cjs`. Bộ kiểm thử bao phủ toàn diện: `security_audit_remediation`, `history`, `api_schemas`, `users`, `estop_safety`, `jam_detection`, `simulation_mode_guard`, `jam_simulation_audio`, `bin_full`, `temperature_warning`, `device_offline`, `shift_summary`, `bin_sliders_sync`, `mqtt_disconnected`, `temperature_gauge_simulation_vs_real`, `daily_report_sync`, `cross_device_sync`, `http_telemetry_history`, `daily_production_cumulative`, `four_user_requests_upgrade`, `mute_siren_feature`, `new_day_report_tele_email`, `anti_ai_industrial_scada_ui`, `auto_stop_on_all_items_in_trays`, `ghost_item_prevention`, và `telegram_copilot_2way_and_screenfit`.
 
 Các mục lịch sử bên dưới có thể mô tả trạng thái ở thời điểm phát hành cũ. Khi có khác biệt, phần ghi chú runtime này và source code hiện tại được ưu tiên.
 
@@ -508,8 +508,9 @@ Lưu trữ từng dụng cụ y tế sau khi đi qua cơ cấu phân loại:
 | `product_id` | `VARCHAR(50)` | NOT NULL | Mã định danh dụng cụ (ví dụ: `MED-0042`) |
 | `brand` | `VARCHAR(50)` | NOT NULL | Mã nhận diện nhóm dụng cụ y tế (`med_syringe`, `med_forceps`, `med_scissors`, `med_vial`) |
 | `target_bin` | `INT` | NOT NULL (1, 2, 3) | Khay đích theo cấu hình quy tắc (Khay 1: Sắc nhọn; Khay 2: Tiệt trùng; Khay 3: Vật tư/Mặc định) |
-| `actual_bin` | `INT` | NOT NULL (1, 2, 3) | Khay thực tế mà dụng cụ rơi vào |
-| `status` | `ENUM('success', 'misplaced', 'rejected')` | NOT NULL | Kết quả phân loại (`success` nếu `actual == target`) |
+| `routed_bin` | `INT` | NULL (0, 1, 2, 3) | Hướng mà firmware đã điều khiển; dùng thống kê lượt điều hướng, không xác nhận vật phẩm đã vào khay |
+| `actual_bin` | `INT` | NOT NULL (0, 1, 2, 3) | Hộp đã được cảm biến xác nhận; `0` nghĩa là chưa xác minh vật lý |
+| `status` | `STRING` | NOT NULL | Kết quả như `success`, `unverified`, `diverted_default`, `held_timeout`, `servo_failed` |
 | `confidence` | `FLOAT` | NOT NULL (0.0 - 1.0) | Độ tin cậy nhận diện từ mô hình YOLOv8 |
 | `timestamp` | `TIMESTAMPTZ` | NOT NULL | Thời điểm dụng cụ rơi vào khay |
 
@@ -587,17 +588,17 @@ Các tệp DDL được lưu trữ trong `backend/database/migrations/`:
 
 ---
 
-## 6. Tài Khoản Mặc Định & Phân Quyền (RBAC)
+## 6. Khởi Tạo Tài Khoản Quản Trị & Phân Quyền (RBAC)
 
-Hệ thống được khởi tạo sẵn **4 tài khoản Quản trị viên (Admin)** đại diện cho các thành viên phát triển đề tài PBL3 và tài khoản Người dùng (User):
+Hệ thống hỗ trợ 4 tài khoản Quản trị viên (Admin) và tài khoản Người vận hành (User). Mật khẩu được khởi tạo thông qua biến môi trường bảo mật `BOOTSTRAP_ADMIN_PASSWORD` (tuyệt đối không dùng mật khẩu cố định mặc định):
 
-| Họ và tên | Username / Email | Mật khẩu mặc định | Vai trò | Quyền hạn |
+| Họ và tên | Username / Email | Thiết lập mật khẩu | Vai trò | Quyền hạn |
 | :--- | :--- | :--- | :--- | :--- |
-| **Nguyễn Tá Duy Phong** | `admin1` / `admin1@gmail.com` | `123456` | **Quản trị viên (Admin)** | Toàn quyền cấu hình máy, xóa dữ liệu, dừng khẩn cấp, mở khóa an toàn, chuyển đổi Mô phỏng/Thực tế, quản lý thành viên |
-| **Nguyễn Nhật Minh** | `admin2` / `admin2@gmail.com` | `123456` | **Quản trị viên (Admin)** | Toàn quyền cấu hình máy, xóa dữ liệu, dừng khẩn cấp, mở khóa an toàn, chuyển đổi Mô phỏng/Thực tế, quản lý thành viên |
-| **Trần Đăng Lợi** | `admin3` / `admin3@gmail.com` | `123456` | **Quản trị viên (Admin)** | Toàn quyền cấu hình máy, xóa dữ liệu, dừng khẩn cấp, mở khóa an toàn, chuyển đổi Mô phỏng/Thực tế, quản lý thành viên |
-| **Nguyễn Đình Anh Tuấn** | `admin4` / `admin4@gmail.com` | `123456` | **Quản trị viên (Admin)** | Toàn quyền cấu hình máy, xóa dữ liệu, dừng khẩn cấp, mở khóa an toàn, chuyển đổi Mô phỏng/Thực tế, quản lý thành viên |
-| **Tài khoản Vận hành** | `duyphong` / `duyphong@gmail.com` | `123456` | **Người vận hành (User)** | Giám sát dashboard, xem băng tải, xem thống kê & lịch sử (chỉ vận hành ở chế độ Thực tế, bị khóa nút Mô phỏng) |
+| **Nguyễn Tá Duy Phong** | `admin1` / `admin1@gmail.com` | Cấu hình qua `BOOTSTRAP_ADMIN_PASSWORD` | **Quản trị viên (Admin)** | Toàn quyền cấu hình máy, xóa dữ liệu, dừng khẩn cấp, mở khóa an toàn, chuyển đổi Mô phỏng/Thực tế, quản lý thành viên |
+| **Nguyễn Nhật Minh** | `admin2` / `admin2@gmail.com` | Cấu hình qua `BOOTSTRAP_ADMIN_PASSWORD` | **Quản trị viên (Admin)** | Toàn quyền cấu hình máy, xóa dữ liệu, dừng khẩn cấp, mở khóa an toàn, chuyển đổi Mô phỏng/Thực tế, quản lý thành viên |
+| **Trần Đăng Lợi** | `admin3` / `admin3@gmail.com` | Cấu hình qua `BOOTSTRAP_ADMIN_PASSWORD` | **Quản trị viên (Admin)** | Toàn quyền cấu hình máy, xóa dữ liệu, dừng khẩn cấp, mở khóa an toàn, chuyển đổi Mô phỏng/Thực tế, quản lý thành viên |
+| **Nguyễn Đình Anh Tuấn** | `admin4` / `admin4@gmail.com` | Cấu hình qua `BOOTSTRAP_ADMIN_PASSWORD` | **Quản trị viên (Admin)** | Toàn quyền cấu hình máy, xóa dữ liệu, dừng khẩn cấp, mở khóa an toàn, chuyển đổi Mô phỏng/Thực tế, quản lý thành viên |
+| **Tài khoản Vận hành** | `duyphong` / `duyphong@gmail.com` | Khởi tạo bởi Admin / Đổi qua hồ sơ | **Người vận hành (User)** | Giám sát dashboard, xem băng tải, xem thống kê & lịch sử (chỉ vận hành ở chế độ Thực tế, bị khóa nút Mô phỏng) |
 
 > [!IMPORTANT]
 > **Cơ chế bảo vệ an toàn cao cấp:**
@@ -813,7 +814,7 @@ Xem chi tiết tại [`.env.example`](.env.example):
 
 | Biến môi trường | Mục đích | Ví dụ |
 | :--- | :--- | :--- |
-| `NEXT_PUBLIC_MQTT_BROKER_URL` | WebSocket URL kết nối MQTT Broker | `wss://broker.emqx.io:8084/mqtt` |
+| `NEXT_PUBLIC_MQTT_BROKER_URL` | WSS URL của MQTT broker riêng | Chưa cấu hình |
 | `NEXT_PUBLIC_DEFAULT_DEVICE_ID` | Mã định danh thiết bị máy phân loại | `sorter_01` |
 | `NEXT_PUBLIC_MQTT_TOPIC_TELEMETRY` | Topic nhận telemetry cảm biến | `sorter/01/telemetry` |
 | `NEXT_PUBLIC_MQTT_TOPIC_VISION` | Topic nhận kết quả nhận diện camera | `sorter/01/vision` |

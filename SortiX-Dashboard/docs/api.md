@@ -462,8 +462,9 @@ Xác thực mã OTP 6 chữ số và thiết lập mật khẩu mới.
         "product_id": "MED-0042",
         "brand": "med_syringe",
         "target_bin": 1,
-        "actual_bin": 1,
-        "status": "success",
+        "routed_bin": 1,
+        "actual_bin": 0,
+        "status": "unverified",
         "confidence": 0.96,
         "timestamp": "2026-09-18T12:48:32.000Z"
       }
@@ -477,6 +478,8 @@ Xác thực mã OTP 6 chữ số và thiết lập mật khẩu mới.
   }
 }
 ```
+
+`routed_bin` là hướng điều khiển để thống kê lượt phân loại. `actual_bin: 0` cùng trạng thái `unverified` nghĩa là chưa có cảm biến xác nhận vật phẩm đã vào khay.
 
 ### 4.2. Thêm Bản Ghi Phân Loại
 - **Method**: `POST`
@@ -683,7 +686,7 @@ Xác thực mã OTP 6 chữ số và thiết lập mật khẩu mới.
 ```json
 {
   "status": "disconnected",
-  "broker_url": "wss://broker.emqx.io:8084/mqtt",
+"broker_url": "wss://<your-private-broker>:8084/mqtt",
   "duration": 5.1,
   "attempt": 1
 }

@@ -34,11 +34,25 @@ export async function POST(request: Request) {
     const action = SyncActionSchema.parse(await request.json());
     const { type } = action;
 
+    const currentState = SyncService.getState();
+
     if (type === "update_state") {
+        if (currentState.mode === "real" && user.role !== "admin") {
+          return NextResponse.json(
+            { success: false, error: "Chỉ Quản trị viên mới có quyền cập nhật trạng thái hệ thống trong chế độ Thực tế" },
+            { status: 403 }
+          );
+        }
         const state = SyncService.updateState(action.state, action.senderId);
         return NextResponse.json({ success: true, state });
     }
     if (type === "sync_records") {
+        if (currentState.mode === "real" && user.role !== "admin") {
+          return NextResponse.json(
+            { success: false, error: "Chỉ Quản trị viên mới có quyền đồng bộ ghi đè lịch sử sản xuất thực tế" },
+            { status: 403 }
+          );
+        }
         SyncService.syncRecords(action.records, action.binCounts, action.brandCounts, action.senderId);
         return NextResponse.json({ success: true, state: SyncService.getState() });
     }
@@ -53,6 +67,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: true, state: SyncService.getState() });
     }
     if (type === "spawn_item") {
+        if (currentState.mode !== "sim") {
+          return NextResponse.json(
+            { success: false, error: "Hành động spawn_item chỉ được phép trong chế độ Mô phỏng (Simulation mode)" },
+            { status: 400 }
+          );
+        }
         SyncService.spawnItem(action.item, action.senderId);
         return NextResponse.json({ success: true });
     }

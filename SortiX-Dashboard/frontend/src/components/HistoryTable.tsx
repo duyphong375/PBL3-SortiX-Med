@@ -98,7 +98,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
         r.brand_name.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchBin =
-        selectedBin === "all" || r.actual_bin.toString() === selectedBin;
+        selectedBin === "all" || (r.routed_bin ?? r.actual_bin).toString() === selectedBin;
 
       const matchDate =
         selectedDateFilter === "all" ||
@@ -139,9 +139,10 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
       let bin2 = 0;
       let bin3 = 0;
       for (const item of items) {
-        if (item.actual_bin === 1) bin1++;
-        else if (item.actual_bin === 2) bin2++;
-        else bin3++;
+        const routedBin = item.routed_bin ?? item.actual_bin;
+        if (routedBin === 1) bin1++;
+        else if (routedBin === 2) bin2++;
+        else if (routedBin === 3) bin3++;
       }
 
       return {
@@ -316,9 +317,9 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
               className="rounded-xl border border-slate-200 bg-slate-50/90 px-2.5 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-cyan-500 dark:border-white/[0.07] dark:bg-[#111319] dark:text-slate-200"
             >
               <option value="all">Tất cả khay (1, 2, 3)</option>
-              <option value="1">Khay 1 (Thùng sắc nhọn / Gạt 1)</option>
-              <option value="2">Khay 2 (Hấp Autoclave / Gạt 2)</option>
-              <option value="3">Khay 3 (Vật tư & Ống nghiệm)</option>
+              <option value="1">Hướng tới Khay 1</option>
+              <option value="2">Hướng tới Khay 2</option>
+              <option value="3">Hướng tới Khay 3</option>
             </select>
           </div>
 
@@ -439,7 +440,8 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
                         <th className="px-4 py-2.5">Thương hiệu AI</th>
                         <th className="px-4 py-2.5">Độ tin cậy</th>
                         <th className="px-4 py-2.5">Khay đích</th>
-                        <th className="px-4 py-2.5">Khay thực tế</th>
+                        <th className="px-4 py-2.5">Hướng firmware</th>
+                        <th className="px-4 py-2.5">Khay xác minh</th>
                         <th className="px-4 py-2.5">Trạng thái</th>
                         <th className="px-4 py-2.5 text-right">Thời gian</th>
                       </tr>
@@ -495,9 +497,14 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
                             <td className="whitespace-nowrap px-4 py-2.5 text-slate-700 dark:text-slate-300 font-medium">
                               Khay {item.target_bin}
                             </td>
+                            <td className="whitespace-nowrap px-4 py-2.5 text-cyan-700 dark:text-cyan-300 font-medium">
+                              {(item.routed_bin ?? item.actual_bin) > 0
+                                ? `Hướng Khay ${item.routed_bin ?? item.actual_bin}`
+                                : "Chưa điều hướng"}
+                            </td>
                             <td className="whitespace-nowrap px-4 py-2.5">
                               <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 border border-slate-200 dark:bg-white/[0.08] dark:text-slate-300 dark:border-white/[0.05]">
-                                Khay {item.actual_bin}
+                                {item.actual_bin === 0 ? "Chưa xác minh" : `Khay ${item.actual_bin}`}
                               </span>
                             </td>
                             <td className="whitespace-nowrap px-4 py-2.5">
@@ -507,7 +514,16 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
-                                  <CornerDownRight className="h-3.5 w-3.5" /> Mặc Định (K3)
+                                  <CornerDownRight className="h-3.5 w-3.5" />
+                                  {item.status === "diverted_default"
+                                    ? "Mặc định (chưa xác minh)"
+                                    : item.status === "held_timeout"
+                                      ? "Đã giữ, cần kiểm tra"
+                                      : item.status === "servo_failed"
+                                        ? "Lỗi cơ cấu gạt"
+                                        : item.status === "unverified"
+                                          ? "Chưa xác minh"
+                                          : "Cần kiểm tra"}
                                 </span>
                               )}
                             </td>

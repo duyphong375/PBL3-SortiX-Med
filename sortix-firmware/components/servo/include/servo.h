@@ -42,6 +42,9 @@ esp_err_t servo_trigger(servo_id_t id);
  */
 void servo_reset_all(void);
 
+/** Disable PWM commands to all servos immediately for a latched safety stop. */
+esp_err_t servo_emergency_stop(void);
+
 /**
  * @brief Check if a servo is currently actively diverting (non-IDLE).
  */

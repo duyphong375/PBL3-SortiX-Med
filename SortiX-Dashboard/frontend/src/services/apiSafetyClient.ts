@@ -9,16 +9,25 @@ export const ApiSafetyClient = {
     try {
       const res = await fetchWithTimeout(endpoint("/api/safety/status"));
       if (res.ok) {
-        const json = await res.json();
+        const json = (await res.json()) as SafetyStatusResponse;
+        if (json && json.status === "OPERATIONAL" && json.updated_at) {
+          const ageMs = Date.now() - new Date(json.updated_at).getTime();
+          if (ageMs > 30000) {
+            return {
+              ...json,
+              status: "STALE",
+            };
+          }
+        }
         return json;
       }
     } catch {
-      // Fallback
+      // Network failure / timeout
     }
 
     return {
-      success: true,
-      status: "OPERATIONAL",
+      success: false,
+      status: "UNAVAILABLE",
       is_locked: false,
       unprocessed_count: 0,
     };

@@ -1,9 +1,11 @@
 import { TelemetryModel, TelemetryRecord } from "../models/telemetryModel";
 import { SafetyService } from "../services/safetyService";
 import { SSEService } from "../services/sseService";
+import { TelemetryIngestionSchema } from "@shared/schemas";
+import { SyncService } from "../services/syncService";
 
 export const TelemetryController = {
-  handlePostTelemetry(body: unknown) {
+  handlePostTelemetry(body: unknown, headers?: Record<string, string | string[] | undefined>) {
     if (!body || typeof body !== "object") {
       return {
         status: 400,
@@ -14,77 +16,138 @@ export const TelemetryController = {
       };
     }
 
-    const payload = body as Record<string, unknown>;
-
-    // Trích xuất nhiệt độ linh hoạt (hỗ trợ nhiều tên trường thông dụng)
-    const rawTemp =
-      payload.temperature ??
-      payload.current_temp ??
-      payload.temp ??
-      payload.cpu_temp;
-    const temperature =
-      typeof rawTemp === "number"
-        ? rawTemp
-        : rawTemp !== undefined
-        ? Number(rawTemp)
-        : 42.5;
-
-    // Trích xuất cảm biến quang (hỗ trợ optical_sensor, sensor_optical, optical_sensor_02, s1, s2, s3)
-    const rawOptical =
-      payload.optical_sensor ??
-      payload.sensor_optical ??
-      payload.optical_sensor_02 ??
-      payload.s2 ??
-      payload.s1 ??
-      "CLEAR";
-    const optical_sensor =
-      rawOptical === 1 || rawOptical === "1" || rawOptical === true || rawOptical === "BLOCKED"
-        ? "BLOCKED"
-        : rawOptical === 0 || rawOptical === "0" || rawOptical === false || rawOptical === "CLEAR"
-        ? "CLEAR"
-        : String(rawOptical);
-
-    // Trích xuất tốc độ băng tải / động cơ
-    const rawSpeed =
-      payload.conveyor_speed ??
-      payload.motor_speed ??
-      payload.speed;
-
-    // QUY TẮC CỐT LÕI (BE): CÒN VẬT THÌ CHẠY, HẾT VẬT DỪNG NGAY
-    // Backend tự động quyết định dựa trên sự có mặt của vật mẫu:
-    // - Có vật đặt ở cảm biến quang (BLOCKED / 1) -> is_running = true (băng tải chạy)
-    // - Không có vật (CLEAR / 0) -> is_running = false (băng tải tự động dừng chờ phôi)
-    const hasObjectOnSensor = optical_sensor === "BLOCKED";
-    const hasExplicitOptical = payload.optical_sensor !== undefined || payload.sensor_optical !== undefined;
-
-    let is_running = false;
-    if (hasExplicitOptical) {
-      is_running = hasObjectOnSensor;
-    } else {
-      is_running =
-        payload.is_running !== undefined
-          ? Boolean(payload.is_running)
-          : payload.conveyor_running !== undefined
-          ? Boolean(payload.conveyor_running)
-          : false;
+    // Check payload size
+    try {
+      const payloadStr = JSON.stringify(body);
+      if (payloadStr.length > 32768) {
+        return {
+          status: 413,
+          body: {
+            success: false,
+            message: "Payload telemetry vượt quá kích thước cho phép (tối đa 32KB).",
+          },
+        };
+      }
+    } catch {
+      return {
+        status: 400,
+        body: { success: false, message: "Payload JSON không thể tuần tự hóa." },
+      };
     }
 
+    // 1. Validate payload schema using shared Zod schema
+    const parseResult = TelemetryIngestionSchema.safeParse(body);
+    if (!parseResult.success) {
+      const errorMsg = parseResult.error.issues.map((i) => i.message).join(", ");
+      return {
+        status: 400,
+        body: {
+          success: false,
+          message: `Dữ liệu telemetry không hợp lệ: ${errorMsg}`,
+        },
+      };
+    }
+
+    const validData = parseResult.data;
+
+    // 2. Validate device authentication / mode
+    const syncState = SyncService.getState();
+    const isSimMode = syncState.mode === "sim";
+
+    if (!isSimMode) {
+      const expectedToken = process.env.DEVICE_TOKEN || process.env.SORTIX_DEVICE_TOKEN;
+      if (!expectedToken) {
+        return {
+          status: 500,
+          body: {
+            success: false,
+            message: "Lỗi cấu hình bảo mật máy chủ: DEVICE_TOKEN chưa được thiết lập.",
+          },
+        };
+      }
+
+      const rawHeaderToken = headers?.["x-device-token"] || headers?.["authorization"];
+      const headerToken = Array.isArray(rawHeaderToken) ? rawHeaderToken[0] : rawHeaderToken;
+      const cleanHeaderToken = headerToken ? headerToken.replace(/^Bearer\s+/i, "").trim() : undefined;
+
+      if (!cleanHeaderToken || cleanHeaderToken !== expectedToken) {
+        return {
+          status: 401,
+          body: {
+            success: false,
+            message: "Từ chối truy cập: Yêu cầu Header 'X-Device-Token' hoặc 'Authorization' hợp lệ của thiết bị phần cứng.",
+          },
+        };
+      }
+    }
+
+    // 3. Extract and strictly validate temperature (Reject missing / NaN / Infinity)
+    const rawTemp =
+      validData.temperature ??
+      validData.cpu_temp ??
+      validData.current_temp ??
+      validData.temp;
+
+    if (rawTemp === undefined || !Number.isFinite(rawTemp) || Number.isNaN(rawTemp)) {
+      return {
+        status: 400,
+        body: {
+          success: false,
+          message: "Dữ liệu nhiệt độ bị thiếu hoặc không phải số thực hữu hạn. Không chấp nhận giá trị mặc định giả lập.",
+        },
+      };
+    }
+    const temperature = rawTemp;
+
+    // 4. Optical sensor extraction
+    const rawOptical =
+      validData.optical_sensor ??
+      validData.sensor_optical ??
+      validData.optical_sensor_02 ??
+      validData.s2 ??
+      validData.s1 ??
+      (validData.s1_entry !== undefined ? (validData.s1_entry ? "BLOCKED" : "CLEAR") : "CLEAR");
+
+    const optical_sensor =
+      (rawOptical as unknown) === "1" || rawOptical === 1 || rawOptical === true || rawOptical === "BLOCKED"
+        ? "BLOCKED"
+        : "CLEAR";
+
+    // 5. Conveyor speed extraction
+    const rawSpeed =
+      validData.conveyor_speed ??
+      validData.motor_speed ??
+      validData.speed;
+
+    const hasObjectOnSensor = optical_sensor === "BLOCKED";
+    const hasExplicitOptical =
+      validData.optical_sensor !== undefined ||
+      validData.sensor_optical !== undefined ||
+      validData.s1_entry !== undefined;
+
+    // Prefer the device's motor state. S1 only reports whether an item blocks
+    // the sensor; a clear sensor does not mean the conveyor has stopped.
+    const is_running =
+      validData.conveyor_running !== undefined
+        ? Boolean(validData.conveyor_running)
+        : validData.is_running !== undefined
+          ? Boolean(validData.is_running)
+          : hasExplicitOptical
+            ? hasObjectOnSensor
+            : false;
+
     const conveyor_speed = is_running
-      ? typeof rawSpeed === "number"
+      ? typeof rawSpeed === "number" && Number.isFinite(rawSpeed)
         ? rawSpeed
-        : rawSpeed !== undefined
-        ? Number(rawSpeed)
         : 50
       : 0;
 
-    // Trạng thái nút E-Stop
-    const estop_pressed = Boolean(payload.estop_pressed);
+    const estop_pressed = Boolean(validData.estop_pressed);
+    const device_id = validData.device_id || "ESP32_MAIN_CONTROLLER";
+    const unit = validData.unit || "°C";
+    const timestamp = validData.timestamp || new Date().toISOString();
 
-    const device_id = String(payload.device_id || "ESP32_MAIN_CONTROLLER");
-    const unit = String(payload.unit || "°C");
-    const timestamp = payload.timestamp ? String(payload.timestamp) : new Date().toISOString();
-
-    // Lưu vào database TelemetryModel (Atomic Write)
+    // 6. Persist to TelemetryModel
     const record = TelemetryModel.addRecord({
       device_id,
       temperature,
@@ -95,10 +158,10 @@ export const TelemetryController = {
       unit,
       timestamp,
       protocol: "HTTP_POST",
-      raw: payload,
+      raw: validData,
     });
 
-    // Đồng bộ cập nhật trạng thái an toàn trong SafetyService
+    // 7. Synchronize SafetyService state
     SafetyService.updateTelemetry({
       device_id,
       current_temp: temperature,
@@ -117,19 +180,15 @@ export const TelemetryController = {
       updated_at: new Date().toISOString(),
     });
 
-    // Phát sóng SSE thời gian thực tới toàn bộ Client Dashboard
+    // 8. Broadcast via SSE
     SSEService.broadcast("telemetry", record);
     SSEService.broadcast("status", SafetyService.getStatus());
-
-    // In log ra Terminal máy chủ để người dùng quan sát thấy ngay
-    const timeVnStr = new Date().toLocaleTimeString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour12: false });
-    console.log(`[HTTP POST 5s] 🟢 ${timeVnStr} | ${device_id} | Nhiệt độ: ${temperature.toFixed(1)}°C | Quang: ${optical_sensor}`);
 
     return {
       status: 200,
       body: {
         success: true,
-        message: "Dữ liệu cảm biến đã được lưu trữ thành công qua HTTP POST (chu kỳ 5s/lần)",
+        message: "Dữ liệu cảm biến đã được xác thực và lưu trữ thành công qua HTTP POST",
         protocol: "HTTP_POST",
         record,
         total_logs: TelemetryModel.getCount(),

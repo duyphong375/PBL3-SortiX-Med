@@ -254,7 +254,7 @@ export const SafetyController = {
   },
 
   recoverMqttConnectedAlert(body?: unknown) {
-    let brokerUrl = "wss://broker.emqx.io:8084/mqtt";
+    let brokerUrl = "not configured";
     if (body !== undefined) {
       if (typeof body !== "object" || body === null || Array.isArray(body)) {
         return { status: 400, body: { success: false, message: "Dữ liệu MQTT recovery không hợp lệ" } };

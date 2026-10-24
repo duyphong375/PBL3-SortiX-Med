@@ -7,20 +7,20 @@ menu "SortiX Firmware Configuration"
             Unique ID of this sorter device on MQTT and Dashboard.
 
     config SORTIX_WIFI_SSID
-        string "Default WiFi SSID"
-        default "SortiX-Lab"
+        string "Default WiFi SSID (leave empty to provision through setup AP)"
+        default ""
 
     config SORTIX_WIFI_PASSWORD
-        string "Default WiFi Password"
-        default "sortix1234"
+        string "Default WiFi Password (leave empty for an open WiFi network)"
+        default ""
 
     config SORTIX_MQTT_BROKER_URI
-        string "MQTT Broker URI"
-        default "mqtt://192.168.1.100:1883"
+        string "MQTTS/WSS Broker URI"
+        default ""
 
     config SORTIX_HTTP_TELEMETRY_URL
-        string "Backend HTTP Telemetry URL"
-        default "http://192.168.1.100:5000/api/telemetry"
+        string "HTTPS Telemetry URL"
+        default ""
 
     choice SORTIX_FALLBACK_POLICY_CHOICE
         prompt "Fallback policy on Vision AI timeout / MQTT disconnect"

@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { randomInt } from "node:crypto";
+import nodemailer from "nodemailer";
 import { UserModel, toSafeUser } from "../models/userModel";
 import {
   UpdateProfileSchema,
@@ -13,6 +14,27 @@ import {
 } from "@shared/schemas";
 import { SafeUser } from "@shared/types";
 import { createAuthToken } from "./authToken";
+
+const otpRequestRateLimit = new Map<string, { count: number; firstRequestTime: number }>();
+
+function checkOtpRateLimit(key: string): boolean {
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000; // 15 phút
+  const maxRequests = 3;
+
+  const record = otpRequestRateLimit.get(key);
+  if (!record || now - record.firstRequestTime > windowMs) {
+    otpRequestRateLimit.set(key, { count: 1, firstRequestTime: now });
+    return true;
+  }
+
+  if (record.count >= maxRequests) {
+    return false;
+  }
+
+  record.count++;
+  return true;
+}
 
 export interface ServiceResult<T> {
   success: boolean;
@@ -171,6 +193,10 @@ export const UserService = {
       return { success: false, message: "Tài khoản hoặc mật khẩu không chính xác" };
     }
 
+    if (input.password === "123456") {
+      return { success: false, message: "Mật khẩu mặc định '123456' đã bị vô hiệu hóa vì lý do bảo mật. Vui lòng sử dụng mật khẩu mạnh được cấp hoặc đổi mật khẩu." };
+    }
+
     // Mật khẩu chỉ được xác minh bằng Bcrypt hash đã lưu.
     const isMatch = await bcrypt.compare(input.password, user.password_hash);
     if (!isMatch) {
@@ -281,7 +307,7 @@ export const UserService = {
     return { success: true, data: { id: targetId }, message: result.message };
   },
 
-  forgotPassword(rawInput: unknown): ServiceResult<{ demo_otp?: string; expires_at: string; username: string; email: string }> {
+  async forgotPassword(rawInput: unknown): Promise<ServiceResult<{ demo_otp?: string; expires_at?: string; username?: string; email?: string }>> {
     const parseResult = ForgotPasswordSchema.safeParse(rawInput);
     if (!parseResult.success) {
       const errorMsg = parseResult.error.issues.map((i) => i.message).join(", ");
@@ -289,17 +315,32 @@ export const UserService = {
     }
 
     const { identifier } = parseResult.data;
+    const rateLimitKey = identifier.trim().toLowerCase();
+    if (!checkOtpRateLimit(rateLimitKey)) {
+      return {
+        success: false,
+        message: "Bạn đã yêu cầu quá nhiều mã OTP trong thời gian ngắn. Vui lòng chờ 15 phút trước khi thử lại.",
+      };
+    }
+
     const user = UserModel.findByIdentifier(identifier);
-    if (!user) {
-      return { success: false, message: "Không tìm thấy tài khoản với tên đăng nhập hoặc email này" };
-    }
+    const isProduction = process.env.NODE_ENV === "production";
+    const allowDemoOtp = !isProduction && process.env.ENABLE_DEMO_OTP === "true";
 
-    if (user.status === "locked") {
-      return { success: false, message: "Tài khoản hiện đang bị khóa. Vui lòng liên hệ quản trị viên." };
-    }
-
-    // BẢO MẬT: Tài khoản Quản trị viên (Admin) chỉ được phép đổi mật khẩu khi đã đăng nhập bên trong hệ thống
-    if (user.role === "admin") {
+    // BẢO MẬT: Tránh tiết lộ tài khoản có tồn tại hay không trong môi trường production
+    if (!user || user.status === "locked" || user.role === "admin") {
+      if (isProduction) {
+        return {
+          success: true,
+          message: "Nếu thông tin khớp với tài khoản hợp lệ trong hệ thống, mã OTP đã được gửi đến email đăng ký.",
+        };
+      }
+      if (!user) {
+        return { success: false, message: "Không tìm thấy tài khoản với tên đăng nhập hoặc email này" };
+      }
+      if (user.status === "locked") {
+        return { success: false, message: "Tài khoản hiện đang bị khóa. Vui lòng liên hệ quản trị viên." };
+      }
       return {
         success: false,
         message: "Vì lý do an toàn bảo mật, tài khoản Quản trị viên (Admin) chỉ có thể đổi mật khẩu sau khi đã đăng nhập vào hệ thống.",
@@ -309,10 +350,46 @@ export const UserService = {
     const otp = randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
+    // Lưu mã OTP (được băm) vào store
     UserModel.setResetOtp(user.username, otp, expiresAt);
 
+    const hasSmtp = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+
+    if (hasSmtp) {
+      try {
+        const port = parseInt(process.env.SMTP_PORT || "587", 10);
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST,
+          port,
+          secure: process.env.SMTP_SECURE === "true" || port === 465,
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+          connectionTimeout: 10000,
+        });
+
+        await transporter.sendMail({
+          from: process.env.SMTP_FROM || `"SortiX Security" <${process.env.SMTP_USER}>`,
+          to: user.email,
+          subject: "SortiX - Mã xác thực đặt lại mật khẩu (OTP)",
+          text: `Xin chào ${user.full_name},\n\nMã xác thực OTP của bạn là: ${otp}\nMã này có hiệu lực trong vòng 5 phút.\nNếu bạn không yêu cầu mã này, vui lòng bỏ qua email.\n\nTrân trọng,\nĐội ngũ kỹ thuật SortiX.`,
+        });
+      } catch (err) {
+        console.error("[UserService] Lỗi khi gửi email OTP:", err);
+        return {
+          success: false,
+          message: "Không thể gửi email OTP đến hộp thư của bạn. Vui lòng thử lại sau.",
+        };
+      }
+    } else if (isProduction) {
+      return {
+        success: false,
+        message: "Dịch vụ máy chủ thư tín (SMTP) chưa được cấu hình trên môi trường sản xuất.",
+      };
+    }
+
     const maskedEmail = user.email.replace(/^(.)(.*)(.@.*)$/, (_, first, middle, last) => `${first}${"*".repeat(Math.max(1, middle.length))}${last}`);
-    const allowDemoOtp = process.env.NODE_ENV !== "production" && process.env.ENABLE_DEMO_OTP === "true";
 
     const responseData: { demo_otp?: string; expires_at: string; username: string; email: string } = {
       expires_at: expiresAt,

@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "esp_err.h"
 
 #ifdef __cplusplus
@@ -12,6 +13,9 @@ typedef struct {
     char wifi_ssid[33];
     char wifi_pass[65];
     char mqtt_broker_uri[128];
+    char mqtt_user[64];
+    char mqtt_pass[64];
+    char control_secret[64];
     char http_telemetry_url[128];
     char device_id[32];
     uint32_t active_config_version;
@@ -40,11 +44,22 @@ const sortix_sys_config_t *nvs_config_get(void);
  * @return ESP_OK on success.
  */
 esp_err_t nvs_config_save(const sortix_sys_config_t *cfg);
+esp_err_t nvs_config_save_portal_config(const sortix_sys_config_t *cfg, const char *device_token);
 
 /**
  * @brief Reset configuration in NVS to factory defaults.
  */
 esp_err_t nvs_config_factory_reset(void);
+
+/** Get the separately stored API token used only for HTTPS telemetry. */
+const char *nvs_config_get_device_token(void);
+
+/** Persist the separate backend DEVICE_TOKEN without changing the system blob layout. */
+esp_err_t nvs_config_save_device_token(const char *token);
+
+/** Persist/load the validated sorter configuration JSON across reboots. */
+esp_err_t nvs_config_save_sorter_config(const char *json);
+esp_err_t nvs_config_load_sorter_config(char *buffer, size_t buffer_size);
 
 #ifdef __cplusplus
 }

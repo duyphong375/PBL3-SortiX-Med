@@ -46,8 +46,10 @@ function AnalyticsPageContent() {
   const {
     records,
     binCounts,
+    routedBinCounts,
     brandCounts,
     throughputHistory,
+    isSimulation,
     isRunning,
     conveyorSpeed,
     sorterConfig,
@@ -392,14 +394,28 @@ function AnalyticsPageContent() {
             </div>
           </div>
 
+          <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-3 text-center">
+            {[1, 2, 3].map((bin) => (
+              <div key={bin}>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400">Hướng tới Khay {bin}</div>
+                <div className="font-mono text-lg font-bold text-cyan-700 dark:text-cyan-300">
+                  {routedBinCounts[`bin${bin}` as "bin1" | "bin2" | "bin3"]}
+                </div>
+                <div className="text-[9px] text-slate-400">
+                  {isSimulation ? "lượt mô phỏng" : "lượt, chưa xác minh vào khay"}
+                </div>
+              </div>
+            ))}
+          </div>
+
           {/* Footer tóm tắt tỷ trọng khay */}
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
             <span>Khay 1 (Đỏ) • Khay 2 (Xanh)</span>
             <span className="font-mono text-cyan-600 dark:text-cyan-400 font-bold">
               {(() => {
-                const b1 = binCounts.bin1 || 0;
-                const b2 = binCounts.bin2 || 0;
-                if (b1 === 0 && b2 === 0) return "-- Cân bằng";
+                const b1 = routedBinCounts.bin1 || 0;
+                const b2 = routedBinCounts.bin2 || 0;
+                if (b1 === 0 && b2 === 0) return "Chưa có lượt";
                 const balance = ((Math.min(b1, b2) / Math.max(b1, b2)) * 100).toFixed(0);
                 return `${balance}% Cân bằng`;
               })()}

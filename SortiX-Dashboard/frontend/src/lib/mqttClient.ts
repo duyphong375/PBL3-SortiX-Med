@@ -33,7 +33,7 @@ export class SorterMQTTService {
     this.brokerUrl =
       brokerUrl ||
       process.env.NEXT_PUBLIC_MQTT_BROKER_URL ||
-      "wss://broker.emqx.io:8084/mqtt";
+      "";
     this.clientId =
       clientId ||
       (process.env.NEXT_PUBLIC_MQTT_CLIENT_ID || "pbl3_dash_") +
@@ -58,6 +58,10 @@ export class SorterMQTTService {
 
   public connect(topicsToSubscribe: string[] = []): MqttClient | null {
     if (typeof window === "undefined") return null;
+    if (!this.brokerUrl.startsWith("wss://")) {
+      this.callbacks.onError?.(new Error("NEXT_PUBLIC_MQTT_BROKER_URL must point to a WSS broker"));
+      return null;
+    }
 
     for (const topic of topicsToSubscribe) {
       if (typeof topic === "string" && topic.trim()) this.subscribedTopics.add(topic.trim());

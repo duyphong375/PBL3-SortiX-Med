@@ -1,9 +1,13 @@
 #include "state_machine.h"
 #include "motor_control.h"
+#include "servo.h"
 #include "led_indicator.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+
+extern bool sorting_engine_has_unresolved_items(void);
+extern esp_err_t sorting_engine_clear_unresolved(void);
 
 static const char *TAG = "STATE_MACHINE";
 
@@ -19,6 +23,7 @@ const char *state_machine_get_state_str(system_state_t state)
         case SYSTEM_STATE_RUNNING:  return "RUNNING";
         case SYSTEM_STATE_STOPPED:  return "STOPPED";
         case SYSTEM_STATE_JAMMED:   return "JAMMED";
+        case SYSTEM_STATE_ESTOP:    return "ESTOPPED";
         default:                    return "UNKNOWN";
     }
 }
@@ -32,9 +37,10 @@ esp_err_t state_machine_init(void)
 
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
     s_state = SYSTEM_STATE_IDLE; // Always boots into IDLE
-    motor_control_stop();
+    esp_err_t motor_ret = motor_control_stop();
     led_indicator_set_mode(LED_MODE_IDLE);
     xSemaphoreGive(s_state_mutex);
+    if (motor_ret != ESP_OK) return motor_ret;
 
     ESP_LOGI(TAG, "State Machine initialized in safe state: IDLE");
     return ESP_OK;
@@ -53,46 +59,87 @@ esp_err_t state_machine_process_event(system_event_t event)
 
     switch (event) {
         case SYSTEM_EVENT_START:
-            if (old_state == SYSTEM_STATE_IDLE || old_state == SYSTEM_STATE_STOPPED) {
-                new_state = SYSTEM_STATE_RUNNING;
-                motor_control_forward();
-                led_indicator_set_mode(LED_MODE_RUNNING);
-                ESP_LOGI(TAG, "Transition [%s] -> [RUNNING]: Motor started",
-                         state_machine_get_state_str(old_state));
+            if (old_state == SYSTEM_STATE_ESTOP) {
+                ESP_LOGW(TAG, "START rejected: System is in EMERGENCY STOP! Admin unlock required.");
+                ret = ESP_ERR_INVALID_STATE;
             } else if (old_state == SYSTEM_STATE_JAMMED) {
                 ESP_LOGW(TAG, "START rejected: System is JAMMED! Release/clear jam first.");
                 ret = ESP_ERR_INVALID_STATE;
+            } else if (sorting_engine_has_unresolved_items()) {
+                ESP_LOGW(TAG, "START rejected: Unresolved held/timeout items on conveyor! Clear belt before restarting.");
+                ret = ESP_ERR_INVALID_STATE;
+            } else if (old_state == SYSTEM_STATE_IDLE || old_state == SYSTEM_STATE_STOPPED) {
+                ret = motor_control_forward();
+                if (ret == ESP_OK) {
+                    new_state = SYSTEM_STATE_RUNNING;
+                    led_indicator_set_mode(LED_MODE_RUNNING);
+                    ESP_LOGI(TAG, "Transition [%s] -> [RUNNING]: Motor started",
+                             state_machine_get_state_str(old_state));
+                }
             } else {
                 ESP_LOGD(TAG, "START ignored: Already RUNNING");
             }
             break;
 
         case SYSTEM_EVENT_STOP:
-            if (old_state == SYSTEM_STATE_RUNNING) {
-                new_state = SYSTEM_STATE_STOPPED;
-                motor_control_stop();
-                led_indicator_set_mode(LED_MODE_IDLE);
-                ESP_LOGI(TAG, "Transition [RUNNING] -> [STOPPED]: Motor stopped");
+            if (old_state == SYSTEM_STATE_ESTOP || old_state == SYSTEM_STATE_JAMMED) {
+                ESP_LOGW(TAG, "STOP does not release the latched emergency state");
+                ret = ESP_ERR_INVALID_STATE;
             } else {
+                ret = motor_control_stop();
+                if (ret == ESP_OK) {
+                    esp_err_t servo_ret = servo_emergency_stop();
+                    if (old_state == SYSTEM_STATE_RUNNING) {
+                        new_state = SYSTEM_STATE_STOPPED;
+                        ESP_LOGI(TAG, "Transition [RUNNING] -> [STOPPED]: Motor stopped");
+                    }
+                    led_indicator_set_mode(LED_MODE_IDLE);
+                    if (servo_ret != ESP_OK) ret = servo_ret;
+                }
+            }
+            if (old_state != SYSTEM_STATE_RUNNING && ret == ESP_OK) {
                 ESP_LOGD(TAG, "STOP ignored: Not currently RUNNING");
             }
             break;
 
         case SYSTEM_EVENT_JAM_DETECTED:
             new_state = SYSTEM_STATE_JAMMED;
-            motor_control_brake(); // Dynamic brake on jam
+            ret = motor_control_brake(); // Dynamic brake on jam
+            {
+                esp_err_t servo_ret = servo_emergency_stop();
+                if (ret == ESP_OK) ret = servo_ret;
+            }
             led_indicator_set_mode(LED_MODE_JAMMED);
-            ESP_LOGE(TAG, "EMERGENCY JAM! Transition [%s] -> [JAMMED]: Motor dynamically braked!",
+            ESP_LOGE(TAG, "EMERGENCY JAM! Transition [%s] -> [JAMMED]: motor brake and servo stop commands issued",
+                     state_machine_get_state_str(old_state));
+            break;
+
+        case SYSTEM_EVENT_ESTOP:
+            new_state = SYSTEM_STATE_ESTOP;
+            ret = motor_control_brake(); // Dynamic brake on emergency stop
+            {
+                esp_err_t servo_ret = servo_emergency_stop();
+                if (ret == ESP_OK) ret = servo_ret;
+            }
+            led_indicator_set_mode(LED_MODE_JAMMED);
+            ESP_LOGE(TAG, "EMERGENCY STOP! Transition [%s] -> [ESTOPPED]: motor brake and servo signal disable commands issued",
                      state_machine_get_state_str(old_state));
             break;
 
         case SYSTEM_EVENT_ESTOP_RELEASE:
-            if (old_state == SYSTEM_STATE_JAMMED || old_state == SYSTEM_STATE_STOPPED) {
-                new_state = SYSTEM_STATE_IDLE; // Safely transitions to IDLE ONLY, DOES NOT start motor
-                motor_control_stop();
-                led_indicator_set_mode(LED_MODE_IDLE);
-                ESP_LOGI(TAG, "Safety unlocked [%s] -> [IDLE]. System ready for START command.",
-                         state_machine_get_state_str(old_state));
+            // Do NOT automatically wipe unresolved items on belt!
+            // Items remain held in queue and require operator physical inspection/clearance before START is accepted.
+            if (old_state == SYSTEM_STATE_ESTOP || old_state == SYSTEM_STATE_JAMMED || old_state == SYSTEM_STATE_STOPPED) {
+                ret = motor_control_stop();
+                if (ret == ESP_OK) {
+                    new_state = SYSTEM_STATE_IDLE; // Safely transitions to IDLE ONLY, DOES NOT start motor
+                    led_indicator_set_mode(LED_MODE_IDLE);
+                    ESP_LOGI(TAG, "Safety unlocked [%s] -> [IDLE]. System ready for START command.",
+                             state_machine_get_state_str(old_state));
+                } else {
+                    ESP_LOGE(TAG, "Safety release rejected because motor stop pins could not be set: %s",
+                             esp_err_to_name(ret));
+                }
             } else {
                 ESP_LOGI(TAG, "ESTOP_RELEASE received in state %s. Maintaining IDLE safe state.",
                          state_machine_get_state_str(old_state));
@@ -118,7 +165,11 @@ esp_err_t state_machine_process_event(system_event_t event)
 
 system_state_t state_machine_get_state(void)
 {
-    return s_state;
+    if (s_state_mutex == NULL) return s_state;
+    xSemaphoreTake(s_state_mutex, portMAX_DELAY);
+    system_state_t state = s_state;
+    xSemaphoreGive(s_state_mutex);
+    return state;
 }
 
 void state_machine_register_callback(state_change_cb_t cb, void *user_ctx)

@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "esp_err.h"
+#include "esp_attr.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,11 +17,17 @@ extern "C" {
 esp_err_t encoder_init(void);
 
 /**
- * @brief Get cumulative 64-bit encoder counts.
+ * @brief Get the encoder count reported by the configured PCNT unit.
  *        Thread-safe and ISR-safe.
- * @return Signed 64-bit pulse count.
+ * @return Signed pulse count, widened to int64_t for position calculations.
  */
 int64_t encoder_get_count(void);
+
+/** Read count while preserving PCNT errors for safety-sensitive callers. */
+esp_err_t encoder_get_count_checked(int64_t *count);
+
+/** Fast count snapshot for IRAM GPIO handlers only. */
+int64_t IRAM_ATTR encoder_get_count_isr(void);
 
 /**
  * @brief Reset encoder count to zero.

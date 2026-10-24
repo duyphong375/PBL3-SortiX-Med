@@ -1,7 +1,8 @@
 import mqtt, { MqttClient } from "mqtt";
 import { DEFAULT_MQTT_TOPICS } from "@shared/constants";
-import { EmergencyStopPayloadSchema, JamDetectedPayloadSchema, BinFullPayloadSchema, TemperatureWarningPayloadSchema, HeartbeatPayloadSchema, MqttDisconnectedPayloadSchema } from "@shared/schemas";
+import { EmergencyStopPayloadSchema, EmergencyStopAckPayloadSchema, JamDetectedPayloadSchema, BinFullPayloadSchema, TemperatureWarningPayloadSchema, HeartbeatPayloadSchema, MqttDisconnectedPayloadSchema } from "@shared/schemas";
 import { SafetyService } from "./safetyService";
+import { SSEService } from "./sseService";
 import { ENV } from "../config/env";
 
 let client: MqttClient | null = null;
@@ -19,10 +20,16 @@ export function initBackendMQTT() {
   shuttingDown = false;
   const brokerUrl = ENV.MQTT_BROKER_URL;
   const estopTopic = DEFAULT_MQTT_TOPICS.ESTOP || "conveyor/safety/estop";
+  const estopAckTopic = DEFAULT_MQTT_TOPICS.ESTOP_ACK || "conveyor/safety/estop/ack";
   const jamTopic = DEFAULT_MQTT_TOPICS.JAM || "conveyor/sensor/jam";
   const binStatusTopic = DEFAULT_MQTT_TOPICS.BIN_STATUS || "conveyor/storage/bin_status";
   const tempTopic = DEFAULT_MQTT_TOPICS.TEMP || "conveyor/telemetry/temp";
   const heartbeatTopic = DEFAULT_MQTT_TOPICS.HEARTBEAT || "conveyor/heartbeat";
+
+  if (!brokerUrl.startsWith("mqtts://") && !brokerUrl.startsWith("wss://")) {
+    console.error("[Backend MQTT] MQTT disabled: configure MQTT_BROKER_URL with TLS (mqtts:// or wss://).");
+    return;
+  }
 
   try {
     console.log(`[Backend MQTT] Đang kết nối tới broker: ${brokerUrl}...`);
@@ -50,13 +57,13 @@ export function initBackendMQTT() {
         reconnectAttemptCount = 0;
         SafetyService.recoverMqttConnected(brokerUrl);
       }
-      console.log(`[Backend MQTT] Đã kết nối thành công! Đang lắng nghe topics: ${estopTopic}, ${jamTopic}, ${binStatusTopic}, ${tempTopic}, ${heartbeatTopic}`);
+      console.log(`[Backend MQTT] Đã kết nối thành công! Đang lắng nghe topics: ${estopTopic}, ${estopAckTopic}, ${jamTopic}, ${binStatusTopic}, ${tempTopic}, ${heartbeatTopic}`);
 
-      client?.subscribe([estopTopic, jamTopic, binStatusTopic, tempTopic, heartbeatTopic], (err) => {
+      client?.subscribe([estopTopic, estopAckTopic, jamTopic, binStatusTopic, tempTopic, heartbeatTopic], (err) => {
         if (err) {
           console.error(`[Backend MQTT] Lỗi subscribe topics an toàn & telemetry:`, err);
         } else {
-          console.log(`[Backend MQTT] Đã subscribe thành công các topics: ${estopTopic}, ${jamTopic}, ${binStatusTopic}, ${tempTopic}, ${heartbeatTopic}`);
+          console.log(`[Backend MQTT] Đã subscribe thành công các topics: ${estopTopic}, ${estopAckTopic}, ${jamTopic}, ${binStatusTopic}, ${tempTopic}, ${heartbeatTopic}`);
         }
       });
     });
@@ -135,6 +142,23 @@ export function initBackendMQTT() {
         } catch (err) {
           console.error(`[Backend MQTT] Lỗi giải mã heartbeat trên ${topic}:`, err);
         }
+      } else if (topic === estopAckTopic) {
+        try {
+          const raw = JSON.parse(message.toString());
+          const validated = EmergencyStopAckPayloadSchema.safeParse(raw);
+          if (validated.success) {
+            console.log(`[Backend MQTT] 🟢 Nhận ACK Dừng Khẩn Cấp hợp lệ từ phần cứng qua topic ${topic}:`, validated.data);
+            SSEService.broadcast("estop_ack", {
+              event: "estop_ack",
+              payload: validated.data,
+              timestamp: new Date().toISOString(),
+            });
+          } else {
+            console.warn(`[Backend MQTT] Bỏ qua ACK Dừng Khẩn Cấp không hợp lệ trên ${topic}:`, validated.error.format());
+          }
+        } catch (err) {
+          console.error(`[Backend MQTT] Lỗi giải mã estop_ack trên ${topic}:`, err);
+        }
       }
     });
 
@@ -199,10 +223,16 @@ export function initBackendMQTT() {
     // Cài đặt hook khi Admin mở khóa hệ thống -> gửi thông điệp release qua MQTT
     SafetyService.setOnUnlockPublishHook(() => {
       if (client && isConnected) {
+        const controlSecret = ENV.SORTIX_CONTROL_SECRET;
+        if (controlSecret.length < 16) {
+          console.error("[Backend MQTT] Từ chối ESTOP_RELEASE: SORTIX_CONTROL_SECRET chưa cấu hình đủ 16 ký tự.");
+          return;
+        }
         const releasePayload = JSON.stringify({
           command: "ESTOP_RELEASE",
           timestamp: new Date().toISOString(),
           released_by: "admin",
+          auth_token: controlSecret,
         });
         client.publish(DEFAULT_MQTT_TOPICS.ESTOP_RELEASE, releasePayload);
         client.publish(DEFAULT_MQTT_TOPICS.CONTROL, releasePayload);
@@ -227,6 +257,26 @@ export function shutdownBackendMQTT(): void {
   isDeviceOffline = false;
   try { client?.end(true); } catch { /* already closed */ }
   client = null;
+}
+
+export function publishControlCommand(command: string, value?: number | null): boolean {
+  if (client && isConnected) {
+    const controlSecret = ENV.SORTIX_CONTROL_SECRET;
+    if (controlSecret.length < 16) {
+      console.error("[Backend MQTT] Từ chối lệnh điều khiển: SORTIX_CONTROL_SECRET chưa cấu hình đủ 16 ký tự.");
+      return false;
+    }
+    const payload = JSON.stringify({
+      command,
+      value: value !== undefined ? value : null,
+      timestamp: new Date().toISOString(),
+      auth_token: controlSecret,
+    });
+    const topic = DEFAULT_MQTT_TOPICS.CONTROL || "sorter/sorter_01/control";
+    client.publish(topic, payload);
+    return true;
+  }
+  return false;
 }
 
 export function publishEstopSimulation(payload: unknown) {

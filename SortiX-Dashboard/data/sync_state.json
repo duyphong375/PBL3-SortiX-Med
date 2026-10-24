@@ -1,9 +1,9 @@
 {
-  "mode": "real",
-  "isRunning": false,
+  "mode": "sim",
+  "isRunning": true,
   "speed": 50,
   "binCounts": {
-    "bin1": 0,
+    "bin1": 9,
     "bin2": 0,
     "bin3": 0
   },
@@ -13,10 +13,11 @@
     "bin3": 50
   },
   "brandCounts": {
-    "med_syringe": 0,
-    "med_forceps": 0,
-    "med_scissors": 0,
-    "med_vial": 0
+    "brand_c": 0,
+    "brand_a": 0,
+    "brand_b": 0,
+    "brand_d": 0,
+    "med_syringe": 9
   },
   "config": {
     "schema_version": 1,
@@ -42,5 +43,5 @@
     "apply_mode": "when_line_empty",
     "timestamp": "2026-09-29T00:00:00.000Z"
   },
-  "updatedAt": "2026-09-29T00:00:00.000Z"
+  "updatedAt": "2026-10-24T01:56:08.194Z"
 }

@@ -164,6 +164,7 @@ export interface DashboardState {
   alerts: AlertEvent[];
   setAlerts: React.Dispatch<React.SetStateAction<AlertEvent[]>>;
   binCounts: { bin1: number; bin2: number; bin3: number };
+  routedBinCounts: { bin1: number; bin2: number; bin3: number };
   setBinCounts: (
     action: React.SetStateAction<{ bin1: number; bin2: number; bin3: number }>
   ) => void;
@@ -230,8 +231,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   const [isSystemLocked, setIsSystemLocked] = useState(false);
   const [estopIncident, setEstopIncident] = useState<EmergencyStopPayload | null>(null);
   const [estopConfirmModalOpen, setEstopConfirmModalOpen] = useState(false);
+  const [hardwareEstopAcked, setHardwareEstopAcked] = useState(false);
   const isSystemLockedRef = useRef(isSystemLocked);
-  isSystemLockedRef.current = isSystemLocked;
   const lastUnlockedTimeRef = useRef(0);
 
   // Jam Detection State
@@ -535,6 +536,10 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     isClient: sorterData.isClient && !isLoginPage && isAuthenticated,
     isSimulation: user?.role === "user" ? false : sorterData.isSimulation,
     onVisionDetection: sorterData.handleRealHardwareDetection,
+    onClassification: (record) => {
+      if (isLoginPageRef.current || !isAuthenticatedRef.current) return;
+      sorterData.handleHardwareClassification(record);
+    },
     onTelemetryPayload: (payload: any) => {
       if (isLoginPageRef.current || !isAuthenticatedRef.current) return;
       setLastTelemetryTime(new Date().toLocaleTimeString("vi-VN", { hour12: false }));
@@ -649,6 +654,16 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       };
       sorterData.setAlerts((prev) => [alertItem, ...prev.filter((a) => a.event_id !== alertItem.event_id)].slice(0, 100));
     },
+    onEstopAck: (ackPayload?: unknown) => {
+      if (ackPayload && typeof ackPayload === "object") {
+        const p = ackPayload as Record<string, unknown>;
+        if (p.event === "estop_ack" && (p.hardware_state === "ESTOP_LOCKED" || p.hardware_state === "LOCKED") && p.actuators_stopped !== false) {
+          setHardwareEstopAcked(true);
+          return;
+        }
+      }
+      setHardwareEstopAcked(false);
+    },
   });
   publishCommandRef.current = mqtt.publishCommand;
 
@@ -662,6 +677,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       if (isLoginPageRef.current || !isAuthenticatedRef.current) {
         return;
       }
+      setHardwareEstopAcked(false);
       // 1. Nếu vừa mới mở khóa trong vòng 5s và nhận sự kiện từ mqtt/sse -> Bỏ qua để tránh kẹt loop echo
       if (source !== "user_action" && Date.now() - lastUnlockedTimeRef.current < 5000) {
         console.log("[E-Stop] Đang trong thời gian ân hạn 5s sau mở khóa, bỏ qua tín hiệu dừng lặp lại từ", source);
@@ -748,6 +764,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         lastUnlockedTimeRef.current = Date.now();
         setIsSystemLocked(false);
         setEstopIncident(null);
+        setHardwareEstopAcked(false);
         setTelemetry((prev) => ({ ...prev, estop_pressed: false }));
 
         // Đánh dấu đã giải quyết (resolved) cho toàn bộ sự cố emergency_stop trong danh sách cảnh báo
@@ -755,7 +772,6 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           prev.map((a) => (a.event_type === "emergency_stop" ? { ...a, resolved: true } : a))
         );
 
-        mqtt.publishCommand("ESTOP_RELEASE");
         toast.success("Hệ thống đã được mở khóa an toàn thành công!");
         return true;
       } else {
@@ -763,7 +779,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         return false;
       }
     },
-    [toast, setTelemetry, mqtt, sorterData]
+    [toast, setTelemetry, sorterData]
   );
 
   // Xử lý xác nhận kích hoạt Dừng Khẩn Cấp từ Modal cảnh báo liên tục
@@ -1440,6 +1456,10 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           prev.map((a) => (a.event_type === "emergency_stop" ? { ...a, resolved: true } : a))
         );
         toastRef.current.info("Hệ thống đã được mở khóa an toàn bởi Quản trị viên.");
+      });
+
+      eventSource.addEventListener("estop_ack", () => {
+        setHardwareEstopAcked(true);
       });
 
       eventSource.addEventListener("status", (e) => {
@@ -2171,6 +2191,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     alerts: sorterData.alerts,
     setAlerts: sorterData.setAlerts,
     binCounts: sorterData.binCounts,
+    routedBinCounts: sorterData.routedBinCounts,
     setBinCounts: sorterData.setBinCounts,
     brandCounts: sorterData.brandCounts,
     setBrandCounts: sorterData.setBrandCounts,
@@ -2267,6 +2288,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           <EmergencyStopBanner
             isLocked={isSystemLocked}
             incident={estopIncident}
+            isHardwareAcked={hardwareEstopAcked}
             onOpenUnlockDialog={() => handleUnlockSystem()}
           />
 

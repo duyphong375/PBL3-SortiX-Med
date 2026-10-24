@@ -4,6 +4,7 @@
 
 TEST_CASE("State Machine Boot Safety", "[state_machine]")
 {
+    motor_control_init();
     esp_err_t ret = state_machine_init();
     TEST_ASSERT_EQUAL(ESP_OK, ret);
     // Boot state MUST ALWAYS be IDLE
@@ -13,6 +14,7 @@ TEST_CASE("State Machine Boot Safety", "[state_machine]")
 
 TEST_CASE("State Machine Normal Transitions", "[state_machine]")
 {
+    motor_control_init();
     state_machine_init();
 
     // IDLE -> RUNNING
@@ -33,6 +35,7 @@ TEST_CASE("State Machine Normal Transitions", "[state_machine]")
 
 TEST_CASE("State Machine Jam and E-Stop Safety Logic", "[state_machine]")
 {
+    motor_control_init();
     state_machine_init();
     state_machine_process_event(SYSTEM_EVENT_START);
     TEST_ASSERT_EQUAL(SYSTEM_STATE_RUNNING, state_machine_get_state());

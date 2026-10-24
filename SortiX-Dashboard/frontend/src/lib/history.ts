@@ -36,7 +36,8 @@ function isRecord(value: unknown): value is ClassificationRecord {
     && typeof item.product_id === "string" && typeof item.brand_id === "string"
     && typeof item.brand_name === "string" && Number.isFinite(item.confidence)
     && Number.isFinite(item.target_bin) && Number.isFinite(item.actual_bin)
-    && ["success", "diverted_default", "rejected", "jammed"].includes(item.status ?? "")
+    && (item.routed_bin === undefined || (Number.isInteger(item.routed_bin) && item.routed_bin >= 0 && item.routed_bin <= 3))
+    && ["success", "diverted_default", "rejected", "jammed", "unverified", "held_timeout", "servo_failed"].includes(item.status ?? "")
     && typeof item.timestamp === "string";
 }
 
@@ -94,7 +95,7 @@ function countRecordsByBin(records: ClassificationRecord[]): BinCounts {
   records.forEach((record) => {
     if (record.actual_bin === 1) counts.bin1++;
     else if (record.actual_bin === 2) counts.bin2++;
-    else counts.bin3++;
+    else if (record.actual_bin === 3) counts.bin3++;
   });
   counts.bin1 = Math.min(counts.bin1, 50);
   counts.bin2 = Math.min(counts.bin2, 50);

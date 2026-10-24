@@ -111,8 +111,10 @@ export default function SettingsDevicesPage() {
   const [selectedCategory, setSelectedCategory] = useState<GpioCategory>("all");
 
   // Mask MQTT Broker URL for security (protect credentials & domain)
-  const rawBrokerUrl = process.env.NEXT_PUBLIC_MQTT_BROKER_URL || "wss://broker.emqx.io:8084/mqtt";
-  const maskedBrokerUrl = rawBrokerUrl.replace(/(wss?:\/\/)([^/@:]+@)?([^/:]+)/, "$1***.emqx.io");
+  const rawBrokerUrl = process.env.NEXT_PUBLIC_MQTT_BROKER_URL || "Chưa cấu hình";
+  const maskedBrokerUrl = rawBrokerUrl === "Chưa cấu hình"
+    ? rawBrokerUrl
+    : rawBrokerUrl.replace(/(wss?:\/\/)([^/@:]+@)?([^/:]+)/, "$1***");
 
   // Detailed GPIO Pinout Matrix - Chuẩn hóa WeAct Studio ESP32-C5-A-N8R8
   const gpioList: GpioPinSpec[] = useMemo(() => [

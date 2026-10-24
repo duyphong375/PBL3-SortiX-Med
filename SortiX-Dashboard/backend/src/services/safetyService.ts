@@ -51,6 +51,7 @@ export const SafetyService = {
       active_incident: activeIncident,
       last_notification: lastNotification,
       unprocessed_count: unprocessedCount,
+      updated_at: new Date().toISOString(),
     };
   },
 
@@ -366,7 +367,7 @@ export const SafetyService = {
     payload = { ...payload, timestamp: eventTime(payload.timestamp) };
     const attempt = payload.reconnect_attempt || 1;
     const duration = payload.disconnected_duration_seconds || 5;
-    const brokerUrl = payload.broker_url || "wss://broker.emqx.io:8084/mqtt";
+    const brokerUrl = payload.broker_url || "not configured";
     const description = `[MẤT KẾT NỐI MẠNG] Mất liên lạc với MQTT Broker! Đang thử kết nối lại lần thứ ${attempt} (Reconnecting...)`;
 
     const record = NotificationModel.add({
@@ -401,7 +402,7 @@ export const SafetyService = {
     message: string;
     notification: NotificationRecord;
   } {
-    const broker = brokerUrl || "wss://broker.emqx.io:8084/mqtt";
+    const broker = brokerUrl || "not configured";
     const description = `[ĐÃ PHỤC HỒI] Kết nối MQTT Broker thành công`;
 
     const record = NotificationModel.add({

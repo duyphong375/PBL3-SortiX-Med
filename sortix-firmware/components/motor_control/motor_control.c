@@ -12,6 +12,21 @@ static const char *TAG = "MOTOR_CTRL";
 static SemaphoreHandle_t s_motor_mutex = NULL;
 static motor_direction_t s_current_dir = MOTOR_DIR_COAST;
 
+static esp_err_t set_motor_pins(motor_direction_t direction, int in1, int in2)
+{
+    if (s_motor_mutex == NULL) return ESP_ERR_INVALID_STATE;
+    xSemaphoreTake(s_motor_mutex, portMAX_DELAY);
+    esp_err_t ret1 = gpio_set_level(MOTOR_PIN_IN1, in1);
+    esp_err_t ret2 = gpio_set_level(MOTOR_PIN_IN2, in2);
+    esp_err_t ret = (ret1 != ESP_OK) ? ret1 : ret2;
+    if (ret == ESP_OK) s_current_dir = direction;
+    xSemaphoreGive(s_motor_mutex);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set motor GPIO state %d: %s", direction, esp_err_to_name(ret));
+    }
+    return ret;
+}
+
 esp_err_t motor_control_init(void)
 {
     if (s_motor_mutex == NULL) {
@@ -37,8 +52,9 @@ esp_err_t motor_control_init(void)
     }
 
     // Default to coast / stop
-    gpio_set_level(MOTOR_PIN_IN1, 0);
-    gpio_set_level(MOTOR_PIN_IN2, 0);
+    ret = gpio_set_level(MOTOR_PIN_IN1, 0);
+    if (ret == ESP_OK) ret = gpio_set_level(MOTOR_PIN_IN2, 0);
+    if (ret != ESP_OK) return ret;
     s_current_dir = MOTOR_DIR_COAST;
 
     ESP_LOGI(TAG, "Motor control initialized (IN1: GPIO%d, IN2: GPIO%d)", MOTOR_PIN_IN1, MOTOR_PIN_IN2);
@@ -47,58 +63,46 @@ esp_err_t motor_control_init(void)
 
 esp_err_t motor_control_forward(void)
 {
-    if (s_motor_mutex == NULL) return ESP_ERR_INVALID_STATE;
-    xSemaphoreTake(s_motor_mutex, portMAX_DELAY);
-    gpio_set_level(MOTOR_PIN_IN1, 1);
-    gpio_set_level(MOTOR_PIN_IN2, 0);
-    s_current_dir = MOTOR_DIR_FORWARD;
-    xSemaphoreGive(s_motor_mutex);
+    esp_err_t ret = set_motor_pins(MOTOR_DIR_FORWARD, 1, 0);
+    if (ret != ESP_OK) return ret;
     ESP_LOGD(TAG, "Motor set to FORWARD");
-    return ESP_OK;
+    return ret;
 }
 
 esp_err_t motor_control_reverse(void)
 {
-    if (s_motor_mutex == NULL) return ESP_ERR_INVALID_STATE;
-    xSemaphoreTake(s_motor_mutex, portMAX_DELAY);
-    gpio_set_level(MOTOR_PIN_IN1, 0);
-    gpio_set_level(MOTOR_PIN_IN2, 1);
-    s_current_dir = MOTOR_DIR_REVERSE;
-    xSemaphoreGive(s_motor_mutex);
+    esp_err_t ret = set_motor_pins(MOTOR_DIR_REVERSE, 0, 1);
+    if (ret != ESP_OK) return ret;
     ESP_LOGD(TAG, "Motor set to REVERSE");
-    return ESP_OK;
+    return ret;
 }
 
 esp_err_t motor_control_brake(void)
 {
-    if (s_motor_mutex == NULL) return ESP_ERR_INVALID_STATE;
-    xSemaphoreTake(s_motor_mutex, portMAX_DELAY);
-    gpio_set_level(MOTOR_PIN_IN1, 1);
-    gpio_set_level(MOTOR_PIN_IN2, 1);
-    s_current_dir = MOTOR_DIR_BRAKE;
-    xSemaphoreGive(s_motor_mutex);
+    esp_err_t ret = set_motor_pins(MOTOR_DIR_BRAKE, 1, 1);
+    if (ret != ESP_OK) return ret;
     ESP_LOGD(TAG, "Motor set to BRAKE");
-    return ESP_OK;
+    return ret;
 }
 
 esp_err_t motor_control_stop(void)
 {
-    if (s_motor_mutex == NULL) return ESP_ERR_INVALID_STATE;
-    xSemaphoreTake(s_motor_mutex, portMAX_DELAY);
-    gpio_set_level(MOTOR_PIN_IN1, 0);
-    gpio_set_level(MOTOR_PIN_IN2, 0);
-    s_current_dir = MOTOR_DIR_COAST;
-    xSemaphoreGive(s_motor_mutex);
+    esp_err_t ret = set_motor_pins(MOTOR_DIR_COAST, 0, 0);
+    if (ret != ESP_OK) return ret;
     ESP_LOGD(TAG, "Motor set to COAST/STOP");
-    return ESP_OK;
+    return ret;
 }
 
 bool motor_control_is_running(void)
 {
-    return (s_current_dir == MOTOR_DIR_FORWARD);
+    return motor_control_get_direction() == MOTOR_DIR_FORWARD;
 }
 
 motor_direction_t motor_control_get_direction(void)
 {
-    return s_current_dir;
+    if (s_motor_mutex == NULL) return MOTOR_DIR_COAST;
+    xSemaphoreTake(s_motor_mutex, portMAX_DELAY);
+    motor_direction_t direction = s_current_dir;
+    xSemaphoreGive(s_motor_mutex);
+    return direction;
 }

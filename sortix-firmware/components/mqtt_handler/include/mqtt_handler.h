@@ -63,6 +63,11 @@ esp_err_t mqtt_handler_publish_temp_warning(float current_temp, float threshold_
  */
 esp_err_t mqtt_handler_publish_config_status(bool applied, uint32_t version, const char *error_reason);
 
+/**
+ * @brief Schedule an emergency-stop acknowledgment after checking motor state and measured speed.
+ */
+esp_err_t mqtt_handler_publish_estop_ack(esp_err_t command_result);
+
 #ifdef __cplusplus
 }
 #endif

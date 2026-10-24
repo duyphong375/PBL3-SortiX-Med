@@ -10,12 +10,14 @@ interface EmergencyStopBannerProps {
   isLocked: boolean;
   incident?: EmergencyStopPayload | null;
   onOpenUnlockDialog?: () => void;
+  isHardwareAcked?: boolean;
 }
 
 export const EmergencyStopBanner: React.FC<EmergencyStopBannerProps> = ({
   isLocked,
   incident,
   onOpenUnlockDialog,
+  isHardwareAcked = false,
 }) => {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -64,6 +66,15 @@ export const EmergencyStopBanner: React.FC<EmergencyStopBannerProps> = ({
               <span className="inline-flex items-center gap-1 rounded-md bg-black/30 px-2 py-0.5 text-[11px] font-black uppercase tracking-wider text-yellow-300 border border-yellow-300/40">
                 <ShieldAlert className="h-3.5 w-3.5" /> Hệ thống đã khóa
               </span>
+              {isHardwareAcked ? (
+                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-950/80 px-2 py-0.5 text-[11px] font-bold text-emerald-300 border border-emerald-400/40">
+                  ✓ Đã dừng phần cứng (ACK từ ESP32)
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-md bg-amber-950/80 px-2 py-0.5 text-[11px] font-bold text-amber-300 border border-amber-400/40 animate-pulse">
+                  ⏳ Đang chờ xác nhận phần cứng...
+                </span>
+              )}
               <span className="text-xs font-mono opacity-90">
                 {timeStr} • {incident?.mode === "simulation" ? "Mô phỏng" : "Thực tế"}
               </span>

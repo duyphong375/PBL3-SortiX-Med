@@ -23,6 +23,7 @@ export default function DashboardPage() {
     mqttStatus,
     records,
     binCounts,
+    routedBinCounts,
     visualItems,
     isRunning,
     conveyorSpeed,
@@ -226,6 +227,7 @@ export default function DashboardPage() {
             isSimulation={isSimulation}
             isRunning={isRunning}
             binCounts={binCounts}
+            routedBinCounts={routedBinCounts}
             bin1Brands={bin1Brands}
             bin2Brands={bin2Brands}
             bin3Brands={bin3Brands}

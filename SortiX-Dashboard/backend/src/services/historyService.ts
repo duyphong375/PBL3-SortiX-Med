@@ -29,7 +29,9 @@ export function queryClassificationHistory(params: HistoryFilterParams = {}): {
   }
 
   if (bin) {
-    filtered = filtered.filter((r) => r.actual_bin === bin || r.target_bin === bin);
+    filtered = filtered.filter((r) =>
+      r.routed_bin === bin || r.actual_bin === bin || r.target_bin === bin
+    );
   }
 
   if (status) {

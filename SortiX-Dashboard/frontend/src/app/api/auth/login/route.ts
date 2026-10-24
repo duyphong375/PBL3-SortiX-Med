@@ -2,10 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { LoginSchema } from "@shared/schemas";
 import { NextUsersStore, toSafeUser } from "@/app/api/users/store";
-import { MOCK_USERS } from "@/lib/permissions";
 import { createSessionToken } from "../session";
-
-const DEMO_PASSWORD_HASH = "$2b$10$pPw2AmBT1scTY5wU5cmpb.iLoWJZDwaVaGTxb0iT/diTyE2GKpECO";
 
 export async function POST(request: Request) {
   try {
@@ -33,6 +30,16 @@ export async function POST(request: Request) {
         );
       }
 
+      if (password === "123456") {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Mật khẩu mặc định '123456' đã bị vô hiệu hóa vì lý do bảo mật. Vui lòng sử dụng mật khẩu mạnh được cấp hoặc đổi mật khẩu.",
+          },
+          { status: 403 }
+        );
+      }
+
       const isMatch = NextUsersStore.verifyPassword(user, password);
       if (!isMatch) {
         return NextResponse.json(
@@ -54,42 +61,6 @@ export async function POST(request: Request) {
           token,
         },
       });
-    }
-
-    // 2. Fallback sang MOCK_USERS nếu chưa có trong store
-    const fallbackUser = MOCK_USERS.find(
-      (u) =>
-        u.email.toLowerCase() === trimmed ||
-        u.username?.toLowerCase() === trimmed ||
-        u.displayName.toLowerCase() === trimmed
-    );
-
-    if (fallbackUser) {
-      const isMatch = await bcrypt.compare(password, DEMO_PASSWORD_HASH);
-
-      if (isMatch) {
-        const token = createSessionToken({
-          id: fallbackUser.id || "admin-001",
-          role: fallbackUser.role,
-          username: fallbackUser.username || fallbackUser.displayName,
-        });
-
-        return NextResponse.json({
-          success: true,
-          message: "Đăng nhập thành công",
-          data: {
-            user: {
-              id: fallbackUser.id || "admin-001",
-              username: fallbackUser.username || fallbackUser.displayName,
-              full_name: fallbackUser.displayName,
-              email: fallbackUser.email,
-              role: fallbackUser.role,
-              status: "active",
-            },
-            token,
-          },
-        });
-      }
     }
 
     return NextResponse.json(

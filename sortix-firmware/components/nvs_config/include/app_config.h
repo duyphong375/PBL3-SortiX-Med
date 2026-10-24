@@ -27,6 +27,7 @@
 // Inbound (Subscriptions)
 #define SORTIX_TOPIC_VISION                 "sorter/sorter_01/vision"
 #define SORTIX_TOPIC_CONTROL                "sorter/sorter_01/control"
+#define SORTIX_TOPIC_ESTOP                  "conveyor/safety/estop"
 #define SORTIX_TOPIC_ESTOP_RELEASE          "conveyor/safety/estop/release"
 #define SORTIX_TOPIC_CONFIG_SET             "sorter/sorter_01/config/set"
 
@@ -38,25 +39,22 @@
 #define SORTIX_TOPIC_HEARTBEAT              "conveyor/heartbeat"
 #define SORTIX_TOPIC_JAM                    "conveyor/sensor/jam"
 #define SORTIX_TOPIC_TEMP_WARN              "conveyor/telemetry/temp"
+#define SORTIX_TOPIC_ESTOP_ACK              "conveyor/safety/estop/ack"
 
-// Shared Secret for Control Command Authentication (START, STOP, ESTOP_RELEASE, CONFIG_SET)
-// Commands from MQTT without a matching auth_token will be strictly rejected.
+// Shared secret is provisioned through the setup portal and must match
+// SORTIX_CONTROL_SECRET on the Dashboard/backend. Keep this empty in firmware.
 #define SORTIX_CONTROL_SECRET               "sortix_sec_control_2026"
 
-// =============================================================================
-// Security Notice Regarding Hardcoded Default Credentials:
-// WARNING: The following Wi-Fi SSID, Wi-Fi password, SoftAP password and MQTT Broker
-// URI are development defaults for initial laboratory setup. In production, these
-// MUST be provisioned dynamically via NVS, captive portal, or encrypted provisioning.
-// Never expose a device using default passwords to a public network or public MQTT broker!
-// =============================================================================
-#define DEFAULT_WIFI_SSID                   "SortiX-Lab"
-#define DEFAULT_WIFI_PASS                   "sortix1234"
-#define DEFAULT_MQTT_BROKER_URI             "mqtt://192.168.1.100:1883"
-#define DEFAULT_HTTP_TELEMETRY_URL          "http://192.168.1.100:5000/api/telemetry"
+// Credentials and service endpoints are provisioned per installation.
+// Empty defaults force first-boot setup instead of shipping shared secrets.
+#define DEFAULT_WIFI_SSID                   "KTKH 207 B1 2.4G"          // SSid của wifi
+#define DEFAULT_WIFI_PASS                   "duyphongnguyen"          // Mật khẩu wifi
+#define DEFAULT_MQTT_BROKER_URI             "mqtts://broker.emqx.io:8883"                // URI MQTT
+#define DEFAULT_HTTP_TELEMETRY_URL          "http://192.168.1.100:5000/api/telemetry"    // URL HTTP Telemetry
 
-#define SOFTAP_SSID                         "SortiX-Setup-AP"
-#define SOFTAP_PASS                         "sortix1234"
+// wifi_manager generates a unique SSID and random password when these are empty.
+#define SOFTAP_SSID                         "phongchimto"
+#define SOFTAP_PASS                         "12345678"
 
 // =============================================================================
 // Mechanical & Calibration Hypotheses (MUST BE CALIBRATED ON REAL HARDWARE)
@@ -81,5 +79,6 @@
 #define TELEMETRY_PUBLISH_INTERVAL_MS       1500        // MQTT Telemetry publish interval (1-2s)
 #define HEARTBEAT_INTERVAL_MS               2000        // Heartbeat publish interval (2s)
 #define HTTP_TELEMETRY_INTERVAL_MS          5000        // Native HTTP POST telemetry interval (5s)
+#define SOFTAP_TRIGGER_TIMEOUT_SEC          10          // Mất kết nối Wi-Fi >10s tự động bật SoftAP + Captive Portal
 
 #define MAX_TRACKED_ITEMS                   15          // Maximum items in tracking FIFO ring buffer

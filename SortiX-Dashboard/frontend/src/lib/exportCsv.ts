@@ -33,6 +33,7 @@ export function exportClassificationToCSV(
     "Mã Nhãn",
     "Độ Tin Cậy (%)",
     "Khay Chỉ Định",
+    "Hướng Firmware",
     "Khay Thực Tế",
     "Trạng Thái",
     "Thời Gian Ghi Nhận",
@@ -40,9 +41,12 @@ export function exportClassificationToCSV(
 
   const statusMap: Record<string, string> = {
     success: "Phân loại thành công",
-    diverted_default: "Chuyển khay 3 (Mặc định)",
+    diverted_default: "Hướng mặc định, chưa xác minh vào khay",
     rejected: "Từ chối / Nhãn lạ",
     jammed: "Sự cố kẹt phôi",
+    unverified: "Đã điều hướng, chưa xác minh vào khay",
+    held_timeout: "Đã giữ do hết thời gian chờ",
+    servo_failed: "Lỗi cơ cấu gạt",
   };
 
   const rows = records.map((r, idx) => {
@@ -61,7 +65,8 @@ export function exportClassificationToCSV(
       `"${r.brand_id}"`,
       r.confidence ? (r.confidence * 100).toFixed(1) : "0.0",
       r.target_bin,
-      r.actual_bin,
+      (r.routed_bin ?? r.actual_bin) > 0 ? (r.routed_bin ?? r.actual_bin) : "Chưa điều hướng",
+      r.actual_bin === 0 ? "Chưa xác minh" : r.actual_bin,
       `"${statusMap[r.status] || r.status}"`,
       `"${r.timestamp}"`,
     ];

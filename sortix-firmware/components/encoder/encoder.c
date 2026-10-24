@@ -16,16 +16,23 @@ static pcnt_unit_handle_t s_pcnt_unit = NULL;
 static pcnt_channel_handle_t s_pcnt_chan_a = NULL;
 static pcnt_channel_handle_t s_pcnt_chan_b = NULL;
 
-static portMUX_TYPE s_encoder_spinlock = portMUX_INITIALIZER_UNLOCKED;
-static volatile int64_t s_accumulator = 0;
 static float s_counts_per_mm = 31.5f;
+
+#define PCNT_CHECK(call) do { \
+    ret = (call); \
+    if (ret != ESP_OK) { \
+        ESP_LOGE(TAG, "PCNT setup failed at %s: %s", #call, esp_err_to_name(ret)); \
+        return ret; \
+    } \
+} while (0)
 
 static bool IRAM_ATTR pcnt_on_reach(pcnt_unit_handle_t unit, const pcnt_watch_event_data_t *edata, void *user_ctx)
 {
-    portENTER_CRITICAL_ISR(&s_encoder_spinlock);
-    s_accumulator += edata->watch_point_value;
-    pcnt_unit_clear_count(unit);
-    portEXIT_CRITICAL_ISR(&s_encoder_spinlock);
+    // With accum_count enabled, the PCNT driver accounts for the limit value
+    // and clears the hardware counter itself. Do not clear it again here.
+    (void)unit;
+    (void)edata;
+    (void)user_ctx;
     return false;
 }
 
@@ -68,56 +75,64 @@ esp_err_t encoder_init(void)
     }
 
     // Set edge and level actions for full quadrature x4
-    pcnt_channel_set_edge_action(s_pcnt_chan_a, PCNT_CHANNEL_EDGE_ACTION_DECREASE, PCNT_CHANNEL_EDGE_ACTION_INCREASE);
-    pcnt_channel_set_level_action(s_pcnt_chan_a, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE);
+    PCNT_CHECK(pcnt_channel_set_edge_action(s_pcnt_chan_a, PCNT_CHANNEL_EDGE_ACTION_DECREASE, PCNT_CHANNEL_EDGE_ACTION_INCREASE));
+    PCNT_CHECK(pcnt_channel_set_level_action(s_pcnt_chan_a, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
 
-    pcnt_channel_set_edge_action(s_pcnt_chan_b, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_DECREASE);
-    pcnt_channel_set_level_action(s_pcnt_chan_b, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE);
+    PCNT_CHECK(pcnt_channel_set_edge_action(s_pcnt_chan_b, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_DECREASE));
+    PCNT_CHECK(pcnt_channel_set_level_action(s_pcnt_chan_b, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
 
     // Glitch filter (1000ns)
     pcnt_glitch_filter_config_t filter_config = {
         .max_glitch_ns = 1000,
     };
-    pcnt_unit_set_glitch_filter(s_pcnt_unit, &filter_config);
+    PCNT_CHECK(pcnt_unit_set_glitch_filter(s_pcnt_unit, &filter_config));
 
     // Watchpoints for high and low limit overflow
-    pcnt_unit_add_watch_point(s_pcnt_unit, PCNT_HIGH_LIMIT);
-    pcnt_unit_add_watch_point(s_pcnt_unit, PCNT_LOW_LIMIT);
+    PCNT_CHECK(pcnt_unit_add_watch_point(s_pcnt_unit, PCNT_HIGH_LIMIT));
+    PCNT_CHECK(pcnt_unit_add_watch_point(s_pcnt_unit, PCNT_LOW_LIMIT));
 
     pcnt_event_callbacks_t cbs = {
         .on_reach = pcnt_on_reach,
     };
-    pcnt_unit_register_event_callbacks(s_pcnt_unit, &cbs, NULL);
+    PCNT_CHECK(pcnt_unit_register_event_callbacks(s_pcnt_unit, &cbs, NULL));
 
-    pcnt_unit_enable(s_pcnt_unit);
-    pcnt_unit_clear_count(s_pcnt_unit);
-    pcnt_unit_start(s_pcnt_unit);
+    PCNT_CHECK(pcnt_unit_enable(s_pcnt_unit));
+    PCNT_CHECK(pcnt_unit_clear_count(s_pcnt_unit));
+    PCNT_CHECK(pcnt_unit_start(s_pcnt_unit));
 
-    s_accumulator = 0;
     ESP_LOGI(TAG, "Encoder PCNT started successfully");
     return ESP_OK;
 }
 
+#undef PCNT_CHECK
+
 int64_t encoder_get_count(void)
+{
+    int64_t count = 0;
+    (void)encoder_get_count_checked(&count);
+    return count;
+}
+
+esp_err_t encoder_get_count_checked(int64_t *count)
+{
+    if (count == NULL || s_pcnt_unit == NULL) return ESP_ERR_INVALID_STATE;
+    int current_val = 0;
+    esp_err_t ret = pcnt_unit_get_count(s_pcnt_unit, &current_val);
+    if (ret == ESP_OK) *count = current_val;
+    return ret;
+}
+
+int64_t IRAM_ATTR encoder_get_count_isr(void)
 {
     if (s_pcnt_unit == NULL) return 0;
     int current_val = 0;
-    pcnt_unit_get_count(s_pcnt_unit, &current_val);
-
-    portENTER_CRITICAL(&s_encoder_spinlock);
-    int64_t total = s_accumulator + current_val;
-    portEXIT_CRITICAL(&s_encoder_spinlock);
-
-    return total;
+    return pcnt_unit_get_count(s_pcnt_unit, &current_val) == ESP_OK ? current_val : 0;
 }
 
 void encoder_reset_count(void)
 {
     if (s_pcnt_unit == NULL) return;
-    portENTER_CRITICAL(&s_encoder_spinlock);
-    s_accumulator = 0;
     pcnt_unit_clear_count(s_pcnt_unit);
-    portEXIT_CRITICAL(&s_encoder_spinlock);
     ESP_LOGI(TAG, "Encoder count reset to 0");
 }
 

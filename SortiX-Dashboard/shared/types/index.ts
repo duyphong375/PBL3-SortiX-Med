@@ -116,19 +116,20 @@ export interface TelemetryData {
   wifi_rssi: number; // dBm
   wifi_band: "2.4 GHz" | "5.0 GHz (Wi-Fi 6)";
   conveyor_running: boolean;
-  conveyor_speed: number; // 0 - 100 (%)
+  conveyor_speed: number; // 0 - 100% motor drive command
+  conveyor_speed_mm_s?: number; // Encoder measured belt speed
   s1_entry: boolean; // GPIO0 - Cảm biến vật cản hồng ngoại LM393 (Active Low)
   ldr_active?: boolean; // GPIO5 - Cảm biến quang trở ánh sáng buồng quét LM393
   arm1_active: boolean; // GPIO6 - Servo 1 (MG996R Khay 1)
   arm2_active: boolean; // GPIO24 - Servo 2 (MG996R Khay 2)
   start_btn_pressed?: boolean; // GPIO23 - Nút nhấn Khởi Động Start (PBS-110)
-  estop_pressed: boolean; // Tiếp điểm NC ngắt nguồn lực 12V
+  estop_pressed: boolean; // Firmware E-stop latch state; no separate physical contact feedback
   encoder_count: number; // GPIO1 (Phase A) & GPIO4 (Phase B) - Xung Encoder JGB37-520
   active_config_version: number;
   last_heartbeat: string;
   // Cờ tương thích ngược (deprecated - không dùng cho logic vật lý)
-  s2_sorter1?: boolean;
-  s3_sorter2?: boolean;
+  s2_sorter1?: boolean | null; // null when no destination sensor is installed
+  s3_sorter2?: boolean | null; // null when no destination sensor is installed
 }
 
 export interface VisionDetection {
@@ -146,8 +147,9 @@ export interface ClassificationRecord {
   brand_name: string;
   confidence: number;
   target_bin: number;
+  routed_bin?: number;
   actual_bin: number;
-  status: "success" | "diverted_default" | "rejected" | "jammed";
+  status: "success" | "diverted_default" | "rejected" | "jammed" | "unverified" | "held_timeout" | "servo_failed";
   timestamp: string;
 }
 
@@ -202,11 +204,13 @@ export interface UserAccount {
   last_login_at?: string | null;
   reset_otp?: string | null;
   reset_otp_expires_at?: string | null;
+  reset_otp_attempts?: number | null;
   created_at: string;
   updated_at: string;
+  must_change_password?: boolean;
 }
 
-export type SafeUser = Omit<UserAccount, "password_hash" | "reset_otp" | "reset_otp_expires_at">;
+export type SafeUser = Omit<UserAccount, "password_hash" | "reset_otp" | "reset_otp_expires_at" | "reset_otp_attempts">;
 
 export interface UpdateProfileInput {
   username?: string;
@@ -276,7 +280,7 @@ export interface AdminUpdateUserInput {
 }
 
 // Emergency Stop (E-Stop) & Safety Domain Types
-export type SystemSafetyStatus = "OPERATIONAL" | "SYSTEM_LOCKED" | "HALTED";
+export type SystemSafetyStatus = "OPERATIONAL" | "SYSTEM_LOCKED" | "HALTED" | "UNKNOWN" | "UNAVAILABLE" | "STALE";
 
 export interface EmergencyStopPayload {
   event: "emergency_stop";
@@ -284,6 +288,15 @@ export interface EmergencyStopPayload {
   triggered_by: string;
   timestamp: string;
   mode: "realtime" | "simulation";
+}
+
+export interface EmergencyStopAckPayload {
+  event: "estop_ack";
+  device_id: string;
+  hardware_state: string;
+  actuators_stopped: boolean;
+  measured_speed?: number;
+  timestamp: string;
 }
 
 export type NotificationStatus = "unprocessed" | "acknowledged" | "resolved";
@@ -309,6 +322,7 @@ export interface SafetyStatusResponse {
   active_incident?: EmergencyStopPayload | null;
   last_notification?: NotificationRecord | null;
   unprocessed_count: number;
+  updated_at?: string;
 }
 
 export interface UnlockSystemInput {

@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -30,10 +31,13 @@ typedef struct {
     int64_t entry_encoder;
     int64_t entry_timestamp_us;
     int target_bin;             // 1, 2, or 3
-    int actual_bin;             // 1, 2, or 3
+    int routed_bin;             // 0 = no route completed; 1, 2, or 3 = firmware route decision/actuation
+    int actual_bin;             // 0 = physical destination unverified; 1, 2, or 3 only with feedback
     tracked_item_state_t state;
-    char status[32];            // "success", "diverted_default", "rejected", "jammed"
+    char status[32];            // Includes "unverified" when actuator command has no destination feedback
     bool triggered;
+    bool reported_error;        // Flag to prevent duplicate error callbacks
+    bool servo_failed;          // Flag indicating servo actuation failed
 } tracked_item_t;
 
 // Structure for dynamic bin configuration
@@ -66,6 +70,9 @@ esp_err_t sorting_engine_init(void);
  * @return ESP_OK on success, ESP_ERR_NO_MEM if queue is full.
  */
 esp_err_t sorting_engine_on_s1_entry(int64_t encoder_count, int64_t timestamp_us);
+
+/** Latch a tracking loss, stop the conveyor, and require operator clearance. */
+void sorting_engine_note_tracking_overflow(void);
 
 /**
  * @brief Process an incoming Vision AI YOLOv8 result from MQTT.
@@ -104,6 +111,17 @@ void sorting_engine_set_classification_callback(classification_cb_t cb, void *us
  * @brief Check if the conveyor belt is currently empty (0 items being tracked).
  */
 bool sorting_engine_is_line_empty(void);
+
+/**
+ * @brief Check if there are unresolved held/timeout items on the conveyor belt.
+ */
+bool sorting_engine_has_unresolved_items(void);
+
+/**
+ * @brief Safely clear and free all unresolved timeout/held items after operator verification.
+ * @return ESP_OK on success.
+ */
+esp_err_t sorting_engine_clear_unresolved(void);
 
 /**
  * @brief Get currently active config version number.

@@ -23,3 +23,17 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 CONFIG_ESP_TASK_WDT_TIMEOUT_S=30
 CONFIG_LOG_DEFAULT_LEVEL_INFO=y
 CONFIG_COMPILER_OPTIMIZATION_DEFAULT=y
+
+# Credentials and service endpoints must be provisioned per device/site.
+CONFIG_SORTIX_WIFI_SSID=""
+CONFIG_SORTIX_WIFI_PASSWORD=""
+CONFIG_SORTIX_MQTT_BROKER_URI=""
+CONFIG_SORTIX_HTTP_TELEMETRY_URL=""
+
+# Verify HTTPS/MQTTS peers against ESP-IDF's trusted root bundle.
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
+
+# Keep peripheral access used by the IRAM GPIO callback executable while the
+# flash cache is disabled.
+CONFIG_PCNT_CTRL_FUNC_IN_IRAM=y
+CONFIG_PCNT_ISR_IRAM_SAFE=y

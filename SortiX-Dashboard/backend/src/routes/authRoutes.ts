@@ -17,8 +17,8 @@ export const AuthRoutes = {
     };
   },
 
-  handleForgotPassword(body: unknown) {
-    const result = UserService.forgotPassword(body);
+  async handleForgotPassword(body: unknown) {
+    const result = await UserService.forgotPassword(body);
     return {
       status: result.success ? 200 : 400,
       body: result,

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { UserAccount, SafeUser } from "@shared/types";
 import { MOCK_USERS, AuthUser } from "@/lib/permissions";
@@ -19,84 +20,93 @@ export function toSafeUser(user: StoredUserAccount): SafeUser {
     last_login_at: user.last_login_at,
     created_at: user.created_at,
     updated_at: user.updated_at,
+    must_change_password: user.must_change_password,
   };
 }
 
-const INITIAL_USERS: StoredUserAccount[] = [
-  {
-    id: "admin-001",
-    username: "admin1",
-    full_name: "Nguyễn Tá Duy Phong",
-    email: "admin1@gmail.com",
-    password_hash: "$2b$10$pPw2AmBT1scTY5wU5cmpb.iLoWJZDwaVaGTxb0iT/diTyE2GKpECO",
-    role: "admin",
-    status: "active",
-    is_online: true,
-    last_login_at: new Date().toISOString(),
-    created_at: "2026-01-10T08:00:00.000Z",
-    updated_at: "2026-01-10T08:00:00.000Z",
-  },
-  {
-    id: "admin-002",
-    username: "admin2",
-    full_name: "Nguyễn Nhật Minh",
-    email: "admin2@gmail.com",
-    password_hash: "$2b$10$pPw2AmBT1scTY5wU5cmpb.iLoWJZDwaVaGTxb0iT/diTyE2GKpECO",
-    role: "admin",
-    status: "active",
-    is_online: false,
-    created_at: "2026-01-12T09:30:00.000Z",
-    updated_at: "2026-01-12T09:30:00.000Z",
-  },
-  {
-    id: "admin-003",
-    username: "admin3",
-    full_name: "Trần Đăng Lợi",
-    email: "admin3@gmail.com",
-    password_hash: "$2b$10$pPw2AmBT1scTY5wU5cmpb.iLoWJZDwaVaGTxb0iT/diTyE2GKpECO",
-    role: "admin",
-    status: "active",
-    is_online: false,
-    created_at: "2026-01-15T10:15:00.000Z",
-    updated_at: "2026-01-15T10:15:00.000Z",
-  },
-  {
-    id: "admin-004",
-    username: "admin4",
-    full_name: "Nguyễn Đình Anh Tuấn",
-    email: "admin4@gmail.com",
-    password_hash: "$2b$10$pPw2AmBT1scTY5wU5cmpb.iLoWJZDwaVaGTxb0iT/diTyE2GKpECO",
-    role: "admin",
-    status: "active",
-    is_online: false,
-    created_at: "2026-01-20T14:20:00.000Z",
-    updated_at: "2026-01-20T14:20:00.000Z",
-  },
-  {
-    id: "admin-legacy",
-    username: "admin",
-    full_name: "Quản trị viên hệ thống (Legacy)",
-    email: "admin@pbl3.local",
-    password_hash: "$2b$10$pPw2AmBT1scTY5wU5cmpb.iLoWJZDwaVaGTxb0iT/diTyE2GKpECO",
-    role: "admin",
-    status: "active",
-    is_online: false,
-    created_at: "2026-01-01T00:00:00.000Z",
-    updated_at: "2026-01-01T00:00:00.000Z",
-  },
-  {
-    id: "usr-demo-001",
-    username: "operator",
-    full_name: "Kỹ thuật viên vận hành",
-    email: "operator@pbl3.local",
-    password_hash: "$2b$10$pPw2AmBT1scTY5wU5cmpb.iLoWJZDwaVaGTxb0iT/diTyE2GKpECO",
-    role: "user",
-    status: "active",
-    is_online: false,
-    created_at: "2026-02-01T08:00:00.000Z",
-    updated_at: "2026-02-01T08:00:00.000Z",
-  },
-];
+function getBootstrapUsers(): StoredUserAccount[] {
+  const envPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD?.trim();
+  const hash = envPassword
+    ? bcrypt.hashSync(envPassword, 10)
+    : bcrypt.hashSync(crypto.randomBytes(16).toString("hex"), 10);
+  const now = new Date().toISOString();
+
+  return [
+    {
+      id: "admin-001",
+      username: "admin1",
+      full_name: "Nguyễn Tá Duy Phong",
+      email: "admin1@gmail.com",
+      password_hash: hash,
+      role: "admin",
+      status: "active",
+      is_online: true,
+      last_login_at: now,
+      created_at: "2026-01-10T08:00:00.000Z",
+      updated_at: "2026-01-10T08:00:00.000Z",
+    },
+    {
+      id: "admin-002",
+      username: "admin2",
+      full_name: "Nguyễn Nhật Minh",
+      email: "admin2@gmail.com",
+      password_hash: hash,
+      role: "admin",
+      status: "active",
+      is_online: false,
+      created_at: "2026-01-12T09:30:00.000Z",
+      updated_at: "2026-01-12T09:30:00.000Z",
+    },
+    {
+      id: "admin-003",
+      username: "admin3",
+      full_name: "Trần Đăng Lợi",
+      email: "admin3@gmail.com",
+      password_hash: hash,
+      role: "admin",
+      status: "active",
+      is_online: false,
+      created_at: "2026-01-15T10:15:00.000Z",
+      updated_at: "2026-01-15T10:15:00.000Z",
+    },
+    {
+      id: "admin-004",
+      username: "admin4",
+      full_name: "Nguyễn Đình Anh Tuấn",
+      email: "admin4@gmail.com",
+      password_hash: hash,
+      role: "admin",
+      status: "active",
+      is_online: false,
+      created_at: "2026-01-20T14:20:00.000Z",
+      updated_at: "2026-01-20T14:20:00.000Z",
+    },
+    {
+      id: "admin-legacy",
+      username: "admin",
+      full_name: "Quản trị viên hệ thống (Legacy)",
+      email: "admin@pbl3.local",
+      password_hash: hash,
+      role: "admin",
+      status: "active",
+      is_online: false,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "usr-demo-001",
+      username: "operator",
+      full_name: "Kỹ thuật viên vận hành",
+      email: "operator@pbl3.local",
+      password_hash: hash,
+      role: "user",
+      status: "active",
+      is_online: false,
+      created_at: "2026-02-01T08:00:00.000Z",
+      updated_at: "2026-02-01T08:00:00.000Z",
+    },
+  ];
+}
 
 function resolveStorageFilePath(): string {
   const possiblePaths = [
@@ -230,7 +240,7 @@ function loadUsers(): StoredUserAccount[] {
     console.error("[NextUsersStore] Không thể đọc users.json:", err);
   }
 
-  globalAny[globalUsersKey] = [...INITIAL_USERS];
+  globalAny[globalUsersKey] = getBootstrapUsers();
   saveUsers(globalAny[globalUsersKey]!);
   syncToPermissions(globalAny[globalUsersKey]!);
   return globalAny[globalUsersKey]!;
@@ -409,8 +419,10 @@ export const NextUsersStore = {
     if (index === -1) return undefined;
 
     const user = { ...users[index] };
-    user.reset_otp = otp;
+    const otpHash = crypto.createHash("sha256").update(otp.trim()).digest("hex");
+    user.reset_otp = otpHash;
     user.reset_otp_expires_at = expiresAt;
+    user.reset_otp_attempts = 0;
     user.updated_at = new Date().toISOString();
     users[index] = user;
     saveUsers(users);
@@ -441,14 +453,36 @@ export const NextUsersStore = {
       };
     }
 
-    // Kiểm tra mã OTP
-    if (!user.reset_otp || user.reset_otp !== otp.trim()) {
-      return { success: false, message: "Mã OTP không chính xác. Vui lòng kiểm tra lại" };
+    if (!user.reset_otp || !user.reset_otp_expires_at) {
+      return { success: false, message: "Yêu cầu khôi phục không tồn tại hoặc đã bị hủy. Vui lòng tạo yêu cầu mới." };
     }
 
     // Kiểm tra hạn sử dụng OTP (5 phút)
-    if (!user.reset_otp_expires_at || new Date(user.reset_otp_expires_at).getTime() <= Date.now()) {
-      return { success: false, message: "Mã OTP đã hết hạn hiệu lực (quá 5 phút). Vui lòng yêu cầu mã mới" };
+    if (new Date(user.reset_otp_expires_at).getTime() <= Date.now()) {
+      user.reset_otp = null;
+      user.reset_otp_expires_at = null;
+      user.reset_otp_attempts = 0;
+      users[index] = user;
+      saveUsers(users);
+      return { success: false, message: "Mã OTP đã hết hạn hiệu lực (quá 5 phút). Vui lòng yêu cầu mã mới." };
+    }
+
+    if ((user.reset_otp_attempts || 0) >= 5) {
+      user.reset_otp = null;
+      user.reset_otp_expires_at = null;
+      user.reset_otp_attempts = 0;
+      users[index] = user;
+      saveUsers(users);
+      return { success: false, message: "Bạn đã thử sai mã OTP quá 5 lần. Mã OTP đã bị hủy vì lý do an toàn." };
+    }
+
+    const inputHash = crypto.createHash("sha256").update(otp.trim()).digest("hex");
+    if (user.reset_otp !== inputHash) {
+      user.reset_otp_attempts = (user.reset_otp_attempts || 0) + 1;
+      users[index] = user;
+      saveUsers(users);
+      const remaining = 5 - user.reset_otp_attempts;
+      return { success: false, message: `Mã OTP không chính xác. Bạn còn ${remaining} lần thử.` };
     }
 
     // Băm mật khẩu mới bằng Bcrypt
@@ -456,6 +490,7 @@ export const NextUsersStore = {
     // Xóa OTP sau khi đổi mật khẩu thành công (chống tái sử dụng)
     user.reset_otp = null;
     user.reset_otp_expires_at = null;
+    user.reset_otp_attempts = 0;
     user.updated_at = new Date().toISOString();
 
     users[index] = user;

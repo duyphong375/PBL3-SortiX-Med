@@ -13,6 +13,8 @@ static const char *TAG = "SENSORS";
 
 static QueueHandle_t s_event_queue = NULL;
 static volatile int64_t s_last_trigger_us = 0;
+static volatile bool s_s1_queue_overflow = false;
+static portMUX_TYPE s_s1_overflow_mux = portMUX_INITIALIZER_UNLOCKED;
 
 static void IRAM_ATTR s1_gpio_isr_handler(void *arg)
 {
@@ -21,13 +23,17 @@ static void IRAM_ATTR s1_gpio_isr_handler(void *arg)
         s_last_trigger_us = now_us;
 
         s1_event_t evt = {
-            .encoder_count = encoder_get_count(),
+            .encoder_count = encoder_get_count_isr(),
             .timestamp_us = now_us,
         };
 
         if (s_event_queue != NULL) {
             BaseType_t high_task_wakeup = pdFALSE;
-            xQueueSendFromISR(s_event_queue, &evt, &high_task_wakeup);
+            if (xQueueSendFromISR(s_event_queue, &evt, &high_task_wakeup) != pdTRUE) {
+                portENTER_CRITICAL_ISR(&s_s1_overflow_mux);
+                s_s1_queue_overflow = true;
+                portEXIT_CRITICAL_ISR(&s_s1_overflow_mux);
+            }
             if (high_task_wakeup == pdTRUE) {
                 portYIELD_FROM_ISR(high_task_wakeup);
             }
@@ -69,7 +75,11 @@ esp_err_t sensors_init(QueueHandle_t event_queue)
     }
 
     // Install ISR service (ESP_INTR_FLAG_IRAM)
-    gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
+    ret = gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+        ESP_LOGE(TAG, "Failed to install GPIO ISR service: %s", esp_err_to_name(ret));
+        return ret;
+    }
     ret = gpio_isr_handler_add(SENSOR_PIN_S1, s1_gpio_isr_handler, NULL);
     if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
         ESP_LOGE(TAG, "Failed to add S1 ISR handler: %s", esp_err_to_name(ret));
@@ -89,4 +99,13 @@ bool sensors_is_s1_blocked(void)
 int sensors_get_ldr_level(void)
 {
     return gpio_get_level(SENSOR_PIN_LDR);
+}
+
+bool sensors_take_s1_queue_overflow(void)
+{
+    portENTER_CRITICAL(&s_s1_overflow_mux);
+    bool overflowed = s_s1_queue_overflow;
+    s_s1_queue_overflow = false;
+    portEXIT_CRITICAL(&s_s1_overflow_mux);
+    return overflowed;
 }

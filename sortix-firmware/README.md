@@ -141,16 +141,16 @@ sortix-firmware/
    - Nhận ngắt từ S1 (GPIO0) kèm giá trị xung encoder và timestamp vi giây.
    - Ghép cặp kết quả Vision AI từ MQTT (`sorter/sorter_01/vision`) theo thứ tự FIFO.
    - Điều khiển Servo 1 (GPIO6) và Servo 2 (GPIO24) qua FSM Non-blocking (`IDLE -> OPENING -> HOLDING -> CLOSING -> IDLE`).
-   - Áp dụng chính sách an toàn `PAUSE_AND_HOLD` (dừng băng tải khi mất kết nối hoặc quá hạn nhận diện) hoặc `DIVERT_TO_DEFAULT` (cho trôi về Bin 3).
+   - Áp dụng `PAUSE_AND_HOLD` hoặc `DIVERT_TO_DEFAULT`; bản ghi có `routed_bin` để thống kê hướng firmware đã điều khiển, còn `actual_bin: 0` và trạng thái `unverified` nếu chưa có cảm biến xác nhận phôi vào khay.
 3. **`task_mqtt` (Priority 4):**
    - Quản lý kết nối MQTT Client với cơ chế tự động kết nối lại (exponential backoff: 3s, 5s, 10s, 30s).
    - Publish định kỳ Telemetry (1.5s), Heartbeat (2.0s), trạng thái hệ thống, kết quả phân loại, cảnh báo kẹt và cảnh báo nhiệt SoC.
 4. **`task_http_tele` (Priority 2):**
-   - Gửi HTTP POST định kỳ 5s lên backend Node.js (`http://<DASHBOARD_IP>:5000/api/telemetry`).
+   - Gửi HTTPS POST định kỳ 5s lên backend Node.js khi đã provision endpoint và Device API Token (`https://<DASHBOARD_HOST>/api/telemetry`).
    - Tuyệt đối không gửi trường `optical_sensor` để tránh xung đột với logic tự động dừng của backend.
 5. **`task_safety` (Priority 5):**
    - Đọc cảm biến nhiệt độ nội chip SoC ESP32-C5 qua `driver/temperature_sensor.h` (chu kỳ 2s). Cảnh báo lên MQTT khi nhiệt độ chip vượt 75°C.
-   - Tự động bật SoftAP + Captive Portal nếu mất kết nối Wi-Fi kéo dài.
+   - Tự động bật SoftAP + Captive Portal khi không có cấu hình MQTT hợp lệ lúc khởi động hoặc Wi-Fi mất kết nối kéo dài.
 
 ---
 
@@ -167,15 +167,21 @@ cd d:\PBL3_NHOM5\sortix-firmware
 idf.py set-target esp32c5
 ```
 
-### 5.3 Tùy biến thông số cấu hình (Menuconfig)
-```powershell
-idf.py menuconfig
-```
-Tại menu **SortiX Firmware Configuration**, có thể điều chỉnh:
-- Wi-Fi SSID / Password mặc định.
-- Địa chỉ MQTT Broker URI (mặc định: `mqtt://192.168.1.100:1883`).
-- Endpoint HTTP Telemetry Backend (mặc định: `http://192.168.1.100:5000/api/telemetry`).
-- Chính sách an toàn khi mất Vision (`PAUSE_AND_HOLD` hoặc `DIVERT_TO_DEFAULT`).
+### 5.3 Provisioning cấu hình thiết bị
+Cấu hình Wi-Fi, MQTT và token được provision qua Captive Portal; firmware không chứa SSID/password Wi-Fi, MQTT URI, Control Secret hoặc API token mặc định. Khi chưa có cấu hình MQTT hợp lệ, thiết bị bật SoftAP với SSID `SortiX-Setup-<đuôi MAC>` và mật khẩu ngẫu nhiên 16 ký tự. Lấy mật khẩu từ console serial cục bộ, kết nối SoftAP rồi mở `http://192.168.4.1`.
+
+Điền các trường sau:
+- Wi-Fi Station SSID và password. Đánh dấu tùy chọn mạng không mật khẩu nếu dùng Wi-Fi mở.
+- MQTT URI có TLS: `mqtts://<broker>:8883` hoặc `wss://<broker>:443`. Firmware từ chối `mqtt://` và `ws://`; broker công khai không có ACL vẫn không phù hợp cho triển khai thật.
+- MQTT username/password của broker nếu broker yêu cầu.
+- `Control Secret` dài 16–63 ký tự, phải khớp `SORTIX_CONTROL_SECRET` của Dashboard/backend. Lệnh `START`, `STOP`, `ESTOP`, mở khóa và cấu hình sorter đều phải mang token này. Producer Vision bên ngoài cũng phải gửi `auth_token` (hoặc `token`) khớp với secret.
+- Nếu bật telemetry HTTP, dùng URL `https://...` và một `Device API Token` riêng, khớp `DEVICE_TOKEN` hoặc `SORTIX_DEVICE_TOKEN` ở backend. Firmware gửi token trong header `X-Device-Token`; để trống URL để tắt luồng HTTP telemetry.
+
+Không dùng Control Secret làm Device API Token. Mật khẩu SoftAP được ghi một lần vào serial để kỹ thuật viên tại chỗ có thể cấu hình thiết bị; không chia sẻ log serial.
+
+Thông số hiệu chuẩn có thể cập nhật trong cấu hình/NVS:
+- Chính sách an toàn khi quá hạn nhận diện Vision AI (`PAUSE_AND_HOLD` dừng băng tải an toàn hoặc `DIVERT_TO_DEFAULT`).
+- Khoảng cách hiệu chuẩn trạm phân loại lưu trong NVS (`dist_s1_servo1_mm`, `dist_s1_servo2_mm`, `dist_s1_end_mm`) và `counts_per_mm`.
 
 ### 5.4 Biên dịch (Build)
 ```powershell
@@ -190,8 +196,23 @@ idf.py -p COM_PORT flash monitor
 
 ---
 
-## 6. Quy Tắc An Toàn Nguồn & E-Stop
+## 6. Giao Thức E-Stop & Mở Khóa An Toàn
 
-1. **E-Stop Cơ Khí:** Nút E-Stop ngắt trực tiếp nguồn 12V trước tiếp điểm K1 và module XL4015 nuôi ESP32. Khi nhấn E-Stop, ESP32 mất nguồn hoàn toàn.
-2. **Khởi động An Toàn:** Khi có điện trở lại, hệ thống **LUÔN LUÔN** khởi động vào trạng thái `IDLE`. Băng tải không bao giờ tự ý quay khi chưa có lệnh START từ nút vật lý (GPIO23) hoặc Dashboard.
-3. **Lệnh ESTOP_RELEASE:** Lệnh nhả E-Stop từ Dashboard chỉ có tác dụng mở khóa an toàn phần mềm, đưa hệ thống về `IDLE`, **TUYỆT ĐỐI KHÔNG ĐƯỢC** tự khởi động động cơ.
+1. **E-Stop Vật Lý (Hard-wired Emergency Stop):**
+   - Firmware hiện không đọc tiếp điểm E-Stop vật lý trên GPIO và không thể xác minh mạch cắt nguồn độc lập đã được lắp.
+   - Cần thiết kế mạch E-Stop phần cứng ngắt nguồn động cơ độc lập với MCU, mạng và phần mềm; **không dùng lệnh MQTT hoặc firmware thay cho mạch này**.
+   - Hệ thống không tuyên bố đạt chứng nhận an toàn công nghiệp (như SIL hoặc PL) khi chưa được đánh giá và kiểm định phần cứng chuyên dụng.
+
+2. **Giao Thức E-Stop Phần Mềm & ACK Phần Cứng:**
+   - Firmware chỉ chấp nhận E-Stop MQTT có `auth_token` hợp lệ; lệnh từ topic điều khiển dùng cùng cơ chế xác thực.
+   - Khi nhận E-Stop, firmware chốt `SYSTEM_STATE_ESTOP`, yêu cầu phanh động cơ và đưa duty điều khiển servo về 0. ACK chỉ báo `ESTOP_LOCKED`/`actuators_stopped: true` khi GPIO phanh được đặt thành công, servo signal được tắt và encoder đo tốc độ không quá 0.5 mm/s trong ít nhất 3 mẫu liên tiếp. Nếu không đủ điều kiện, ACK báo trạng thái chưa xác nhận và Dashboard không đánh dấu đã dừng phần cứng.
+   - `measured_speed` là tốc độ băng tải đo từ encoder, không phải giá trị giả định. Không có phản hồi vị trí servo hoặc công tắc xác nhận máng nên ACK này không thay thế mạch E-Stop độc lập và không xác nhận vị trí cơ khí của servo.
+
+3. **Luồng Mở Khóa An Toàn (ESTOP_RELEASE):**
+   - Chỉ tài khoản Quản trị viên (Admin) được phép kích hoạt mở khóa từ Dashboard, bắt buộc phải nhập ghi chú hiện trường.
+   - Dashboard gửi lệnh `ESTOP_RELEASE` kèm trường xác thực `auth_token` tới firmware.
+   - Firmware xác minh `auth_token` khớp với `control_secret` lưu trong NVS trước khi xử lý.
+   - Khi mở khóa thành công, firmware chỉ chuyển về `SYSTEM_STATE_IDLE` nếu GPIO dừng động cơ được đặt thành công; hệ thống **không tự khởi động lại động cơ**.
+   - Nếu còn vật phẩm chưa được xử lý trên băng tải (`sorting_engine_has_unresolved_items()`), hệ thống chặn lệnh START cho đến khi người vận hành xác nhận giải phóng vật thể an toàn.
+
+4. **Báo cáo đích phân loại:** Firmware hiện chỉ có cảm biến đầu vào S1, không có cảm biến xác nhận vật phẩm đã vào Bin 1/2/3. `routed_bin` ghi nhận hướng điều khiển mà firmware đã phát lệnh/điều phối để Dashboard thống kê lượt phân loại; trường này không xác nhận vật phẩm đã rơi vào hộp. `actual_bin: 0` cùng trạng thái `unverified` giữ nguyên ý nghĩa chưa xác minh vật lý. Muốn có số liệu máng thực tế cần lắp và tích hợp cảm biến phản hồi cho từng máng.

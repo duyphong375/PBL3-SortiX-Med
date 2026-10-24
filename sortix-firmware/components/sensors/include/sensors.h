@@ -35,6 +35,9 @@ bool sensors_is_s1_blocked(void);
  */
 int sensors_get_ldr_level(void);
 
+/** Return and clear the flag raised when the S1 ISR queue was full. */
+bool sensors_take_s1_queue_overflow(void);
+
 #ifdef __cplusplus
 }
 #endif

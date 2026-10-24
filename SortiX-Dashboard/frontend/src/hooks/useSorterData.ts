@@ -384,7 +384,8 @@ export function useSorterData({ configRef, onSpawnRealVisualItem, onPublishComma
     industrialAudio.playSortSuccess();
   }, []);
 
-  // Only confirmed MQTT classifications may update real counts/history.
+  // Persist MQTT classification outcomes; only verified physical bin feedback
+  // may update real occupancy and bin-full counts.
   const handleHardwareClassification = useCallback((record: ClassificationRecord) => {
     if (isSimulationRef.current) return;
     if (realRecordsRef.current.some((existing) => existing.id === record.id ||
@@ -394,7 +395,10 @@ export function useSorterData({ configRef, onSpawnRealVisualItem, onPublishComma
     setRealRecords(nextRecords);
     saveClassificationRecord(record, false);
     recentSortTimesRealRef.current.push(Date.now());
-    if (record.status === "success" || record.status === "diverted_default") {
+    // routed_bin is a command/route metric; only verified actual_bin feedback
+    // may change occupancy and bin-full calculations.
+    if ((record.status === "success" || record.status === "diverted_default")
+      && (record.actual_bin === 1 || record.actual_bin === 2 || record.actual_bin === 3)) {
       const key = `bin${record.actual_bin}` as keyof BinCounts;
       const nextCounts = { ...realBinCountsRef.current, [key]: realBinCountsRef.current[key] + 1 };
       realBinCountsRef.current = nextCounts;
@@ -529,6 +533,16 @@ export function useSorterData({ configRef, onSpawnRealVisualItem, onPublishComma
   // Active data views based on current mode
   const records = isSimulation ? simRecords : realRecords;
   const binCounts = isSimulation ? simBinCounts : realBinCounts;
+  const routedBinCounts = useMemo(() => {
+    const counts: BinCounts = { bin1: 0, bin2: 0, bin3: 0 };
+    for (const record of records) {
+      const bin = record.routed_bin ?? record.actual_bin;
+      if (bin === 1) counts.bin1++;
+      else if (bin === 2) counts.bin2++;
+      else if (bin === 3) counts.bin3++;
+    }
+    return counts;
+  }, [records]);
   const binCapacities = isSimulation ? simBinCapacities : realBinCapacities;
   const brandCounts = isSimulation ? simBrandCounts : realBrandCounts;
   const throughputHistory = isSimulation ? simThroughput : realThroughput;
@@ -705,6 +719,7 @@ export function useSorterData({ configRef, onSpawnRealVisualItem, onPublishComma
     records,
     setRecords,
     binCounts,
+    routedBinCounts,
     setBinCounts,
     binCapacities,
     setBinCapacities,

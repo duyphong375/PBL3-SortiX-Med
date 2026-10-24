@@ -42,37 +42,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const parsed: unknown = JSON.parse(stored);
         if (isValidStoredUser(parsed)) {
           setUser(parsed);
-          // Tự động cấp token phiên và đồng bộ thông tin mới nhất từ máy chủ
-          fetch("/api/auth/token", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              id: parsed.id,
-              username: parsed.username,
-              role: parsed.role,
-            }),
-          })
-            .then((res) => res.json())
-            .then((data) => {
-              if (data.success) {
-                const token = data.token || parsed.sessionToken;
-                const freshName = data.user?.full_name || parsed.displayName;
-                const freshEmail = data.user?.email || parsed.email;
-                const enriched: AuthUser = {
-                  ...parsed,
-                  sessionToken: token,
-                  displayName: freshName,
-                  email: freshEmail,
-                };
-                setUser(enriched);
-                try {
-                  localStorage.setItem(STORAGE_KEY, JSON.stringify(enriched));
-                } catch {
-                  // ignore
-                }
-              }
+          // Tự động làm mới phiên và đồng bộ thông tin mới nhất nếu có sessionToken
+          if (parsed.sessionToken) {
+            fetch("/api/auth/token", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${parsed.sessionToken}`,
+              },
             })
-            .catch(() => {});
+              .then((res) => {
+                if (res.status === 401 || res.status === 403) {
+                  // Phiên không còn hợp lệ, tài khoản bị khóa hoặc token hết hạn
+                  localStorage.removeItem(STORAGE_KEY);
+                  setUser(null);
+                  return null;
+                }
+                return res.json();
+              })
+              .then((data) => {
+                if (data && data.success) {
+                  const token = data.token || parsed.sessionToken;
+                  const freshName = data.user?.full_name || parsed.displayName;
+                  const freshEmail = data.user?.email || parsed.email;
+                  const enriched: AuthUser = {
+                    ...parsed,
+                    sessionToken: token,
+                    displayName: freshName,
+                    email: freshEmail,
+                  };
+                  setUser(enriched);
+                  try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(enriched));
+                  } catch {
+                    // ignore
+                  }
+                }
+              })
+              .catch(() => {});
+          }
         } else {
           localStorage.removeItem(STORAGE_KEY);
         }
@@ -151,37 +159,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
     } catch {
       // In-memory session remains usable
-    }
-
-    // Luôn đảm bảo có sessionToken hợp lệ
-    if (!authUser.sessionToken) {
-      fetch("/api/auth/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: authUser.id,
-          username: authUser.username,
-          role: authUser.role,
-        }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success && data.token) {
-            const enriched: AuthUser = {
-              ...authUser,
-              sessionToken: data.token,
-              displayName: data.user?.full_name || authUser.displayName,
-              email: data.user?.email || authUser.email,
-            };
-            setUser(enriched);
-            try {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(enriched));
-            } catch {
-              // ignore
-            }
-          }
-        })
-        .catch(() => {});
     }
   }, []);
 

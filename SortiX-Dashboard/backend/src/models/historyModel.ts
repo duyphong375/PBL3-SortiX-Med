@@ -24,7 +24,30 @@ function resolveStorageFilePath(filename: string): string {
 
 const STORAGE_FILE = resolveStorageFilePath("history.json");
 
+function getStorageAdapter() {
+  const adapter = (globalThis as unknown as { SortiXStorageAdapter?: { read: <T>(col: string, def: T) => T; write: <T>(col: string, data: T) => void } }).SortiXStorageAdapter;
+  if (adapter && typeof adapter.read === "function" && typeof adapter.write === "function") {
+    return adapter;
+  }
+  return null;
+}
+
 function loadHistoryFromFile(): ClassificationRecord[] {
+  const adapter = getStorageAdapter();
+  if (adapter) {
+    try {
+      const parsed = adapter.read<unknown[]>("history", []);
+      if (Array.isArray(parsed)) {
+        const validRecords: ClassificationRecord[] = [];
+        for (const record of parsed) {
+          const result = ClassificationRecordSchema.safeParse(record);
+          if (result.success) validRecords.push(result.data as ClassificationRecord);
+        }
+        return validRecords.slice(0, MAX_SERVER_RECORDS);
+      }
+    } catch {}
+  }
+
   try {
     if (fs.existsSync(STORAGE_FILE)) {
       const raw = fs.readFileSync(STORAGE_FILE, "utf-8");
@@ -45,6 +68,14 @@ function loadHistoryFromFile(): ClassificationRecord[] {
 }
 
 function saveHistoryToFile(records: ClassificationRecord[]): void {
+  const adapter = getStorageAdapter();
+  if (adapter) {
+    try {
+      adapter.write("history", records);
+      return;
+    } catch {}
+  }
+
   try {
     const dir = path.dirname(STORAGE_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });

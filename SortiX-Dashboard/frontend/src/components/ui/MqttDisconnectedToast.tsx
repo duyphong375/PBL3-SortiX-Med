@@ -50,7 +50,7 @@ export const MqttDisconnectedToast: React.FC<MqttDisconnectedToastProps> = ({
   if (!isOpen && !showRestored) return null;
 
   const attempt = incident?.reconnect_attempt || reconnectAttempt || 1;
-  const brokerUrl = incident?.broker_url || "wss://broker.emqx.io:8084/mqtt";
+  const brokerUrl = incident?.broker_url || "MQTT broker chưa cấu hình";
   const durationSec = incident?.disconnected_duration_seconds || 5;
 
   // Tính toán vị trí xếp tầng (stacking offset)

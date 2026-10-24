@@ -37,7 +37,8 @@ function isRecord(value: unknown): value is ClassificationRecord {
     && typeof item.product_id === "string" && typeof item.brand_id === "string"
     && typeof item.brand_name === "string" && Number.isFinite(item.confidence)
     && Number.isFinite(item.target_bin) && Number.isFinite(item.actual_bin)
-    && ["success", "diverted_default", "rejected", "jammed"].includes(item.status ?? "")
+    && (item.routed_bin === undefined || (Number.isInteger(item.routed_bin) && item.routed_bin >= 0 && item.routed_bin <= 3))
+    && ["success", "diverted_default", "rejected", "jammed", "unverified", "held_timeout", "servo_failed"].includes(item.status ?? "")
     && typeof item.timestamp === "string";
 }
 

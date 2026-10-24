@@ -15,6 +15,7 @@ export const TelemetrySchema = z.object({
   wifi_band: z.enum(["2.4 GHz", "5.0 GHz (Wi-Fi 6)"]).default("2.4 GHz").catch("2.4 GHz"),
   conveyor_running: z.boolean().default(false),
   conveyor_speed: finiteNumber.min(0).max(100).default(60),
+  conveyor_speed_mm_s: finiteNumber.nonnegative().optional(),
   s1_entry: z.boolean().default(false),
   ldr_active: z.boolean().optional().default(false),
   arm1_active: z.boolean().default(false),
@@ -24,8 +25,8 @@ export const TelemetrySchema = z.object({
   encoder_count: finiteNumber.nonnegative().default(0),
   active_config_version: finiteNumber.int().nonnegative().default(1),
   last_heartbeat: nonEmptyString.max(128).default(() => new Date().toISOString()),
-  s2_sorter1: z.boolean().optional().default(false),
-  s3_sorter2: z.boolean().optional().default(false),
+  s2_sorter1: z.boolean().nullable().optional(),
+  s3_sorter2: z.boolean().nullable().optional(),
 }).passthrough();
 
 export const VisionDetectionSchema = z.object({
@@ -60,8 +61,11 @@ export const ClassificationRecordSchema = z.object({
   brand_name: nonEmptyString.max(128),
   confidence: finiteNumber.min(0).max(1),
   target_bin: finiteNumber.int().min(1).max(3),
-  actual_bin: finiteNumber.int().min(1).max(3),
-  status: z.enum(["success", "diverted_default", "rejected", "jammed"]),
+  // 0 means no route has completed; 1-3 records the commanded/routed destination.
+  routed_bin: finiteNumber.int().min(0).max(3).optional(),
+  // 0 means firmware could not verify the physical destination with sensors.
+  actual_bin: finiteNumber.int().min(0).max(3),
+  status: z.enum(["success", "diverted_default", "rejected", "jammed", "unverified", "held_timeout", "servo_failed"]),
   timestamp: nonEmptyString.max(128),
 }).passthrough();
 
@@ -70,7 +74,7 @@ export const HistoryQuerySchema = z.object({
   offset: z.coerce.number().int().nonnegative().default(0),
   brand: z.string().optional(),
   bin: z.coerce.number().int().min(1).max(3).optional(),
-  status: z.enum(["success", "diverted_default", "rejected", "jammed"]).optional(),
+  status: z.enum(["success", "diverted_default", "rejected", "jammed", "unverified", "held_timeout", "servo_failed"]).optional(),
   date: z.string().optional(),
 });
 
@@ -102,14 +106,20 @@ export const UpdateProfileSchema = z.object({
   message: "Cần ít nhất một trường dữ liệu (username, full_name hoặc email) để cập nhật",
 });
 
+export const strongPassword = z
+  .string()
+  .min(8, "Mật khẩu phải có ít nhất 8 ký tự")
+  .max(100, "Mật khẩu không được quá 100 ký tự")
+  .regex(/[A-Z]/, "Mật khẩu phải chứa ít nhất 1 chữ hoa")
+  .regex(/[a-z]/, "Mật khẩu phải chứa ít nhất 1 chữ thường")
+  .regex(/[0-9]/, "Mật khẩu phải chứa ít nhất 1 chữ số")
+  .regex(/[^A-Za-z0-9]/, "Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt");
+
 export const ChangePasswordSchema = z.object({
   current_password: z
     .string()
     .min(1, "Mật khẩu hiện tại không được để trống"),
-  new_password: z
-    .string()
-    .min(4, "Mật khẩu mới phải có ít nhất 4 ký tự")
-    .max(100, "Mật khẩu mới không được quá 100 ký tự"),
+  new_password: strongPassword,
   confirm_password: z
     .string()
     .min(1, "Vui lòng xác nhận mật khẩu mới"),
@@ -138,10 +148,7 @@ export const RegisterSchema = z.object({
     .trim()
     .email("Định dạng email không hợp lệ")
     .max(255),
-  password: z
-    .string()
-    .min(4, "Mật khẩu phải có ít nhất 4 ký tự")
-    .max(100, "Mật khẩu không được quá 100 ký tự"),
+  password: strongPassword,
   confirm_password: z
     .string()
     .min(1, "Vui lòng nhập lại mật khẩu"),
@@ -177,10 +184,7 @@ export const AdminCreateUserSchema = z.object({
     .trim()
     .email("Định dạng email không hợp lệ")
     .max(255),
-  password: z
-    .string()
-    .min(4, "Mật khẩu phải có ít nhất 4 ký tự")
-    .max(100, "Mật khẩu không được quá 100 ký tự"),
+  password: strongPassword,
   role: z.enum(["admin", "user"]).default("user"),
   status: z.enum(["active", "locked"]).default("active"),
 });
@@ -200,11 +204,7 @@ export const AdminUpdateUserSchema = z.object({
     .optional(),
   role: z.enum(["admin", "user"]).optional(),
   status: z.enum(["active", "locked"]).optional(),
-  new_password: z
-    .string()
-    .min(4, "Mật khẩu mới phải có ít nhất 4 ký tự")
-    .max(100, "Mật khẩu mới không được quá 100 ký tự")
-    .optional(),
+  new_password: strongPassword.optional(),
 });
 
 export const ForgotPasswordSchema = z.object({
@@ -224,10 +224,7 @@ export const ResetPasswordSchema = z.object({
     .trim()
     .length(6, "Mã OTP phải gồm đúng 6 chữ số")
     .regex(/^\d{6}$/, "Mã OTP chỉ bao gồm các chữ số"),
-  new_password: z
-    .string()
-    .min(4, "Mật khẩu mới phải có ít nhất 4 ký tự")
-    .max(100, "Mật khẩu mới không được quá 100 ký tự"),
+  new_password: strongPassword,
   confirm_password: z
     .string()
     .min(1, "Vui lòng nhập lại mật khẩu mới"),
@@ -243,6 +240,15 @@ export const EmergencyStopPayloadSchema = z.object({
   triggered_by: nonEmptyString.default("Physical E-Stop Button #1"),
   timestamp: nonEmptyString.default(() => new Date().toISOString()),
   mode: z.enum(["realtime", "simulation"]).default("realtime"),
+}).passthrough();
+
+export const EmergencyStopAckPayloadSchema = z.object({
+  event: z.literal("estop_ack"),
+  device_id: nonEmptyString.default("ESP32_MAIN_CONTROLLER"),
+  hardware_state: z.string().default("ESTOP_LOCKED"),
+  actuators_stopped: z.boolean().default(true),
+  measured_speed: finiteNumber.nonnegative().optional(),
+  timestamp: nonEmptyString.default(() => new Date().toISOString()),
 }).passthrough();
 
 export const UnlockSystemSchema = z.object({
@@ -309,7 +315,7 @@ export const ShiftSummaryPayloadSchema = z.object({
 
 export const MqttDisconnectedPayloadSchema = z.object({
   event: z.literal("mqtt_disconnected"),
-  broker_url: nonEmptyString.default("wss://broker.emqx.io:8084/mqtt"),
+  broker_url: nonEmptyString.default("not configured"),
   disconnected_duration_seconds: finiteNumber.default(5),
   reconnect_attempt: finiteNumber.int().nonnegative().default(1),
   mode: z.enum(["realtime", "simulation"]).default("realtime"),
@@ -400,3 +406,36 @@ export const SyncActionSchema = z.discriminatedUnion("type", [
     senderId: nonEmptyString.max(128).optional(),
   }),
 ]);
+
+export const TelemetryIngestionSchema = z.object({
+  device_id: z.string().trim().min(1).max(64).default("ESP32_MAIN_CONTROLLER"),
+  temperature: finiteNumber.min(-40, "Nhiệt độ tối thiểu -40°C").max(125, "Nhiệt độ tối đa 125°C").optional(),
+  cpu_temp: finiteNumber.min(-40, "Nhiệt độ tối thiểu -40°C").max(125, "Nhiệt độ tối đa 125°C").optional(),
+  current_temp: finiteNumber.min(-40, "Nhiệt độ tối thiểu -40°C").max(125, "Nhiệt độ tối đa 125°C").optional(),
+  temp: finiteNumber.min(-40, "Nhiệt độ tối thiểu -40°C").max(125, "Nhiệt độ tối đa 125°C").optional(),
+  conveyor_speed: finiteNumber.min(0, "Tốc độ không thể âm").max(200, "Tốc độ tối đa 200").optional(),
+  conveyor_speed_mm_s: finiteNumber.nonnegative().optional(),
+  motor_speed: finiteNumber.min(0, "Tốc độ không thể âm").max(200, "Tốc độ tối đa 200").optional(),
+  speed: finiteNumber.min(0, "Tốc độ không thể âm").max(200, "Tốc độ tối đa 200").optional(),
+  optical_sensor: z.union([z.literal("CLEAR"), z.literal("BLOCKED"), z.boolean(), z.literal(0), z.literal(1)]).optional(),
+  sensor_optical: z.union([z.literal("CLEAR"), z.literal("BLOCKED"), z.boolean(), z.literal(0), z.literal(1)]).optional(),
+  optical_sensor_02: z.union([z.literal("CLEAR"), z.literal("BLOCKED"), z.boolean(), z.literal(0), z.literal(1)]).optional(),
+  s1_entry: z.boolean().optional(),
+  s1: z.union([z.literal("CLEAR"), z.literal("BLOCKED"), z.boolean(), z.literal(0), z.literal(1)]).optional(),
+  s2: z.union([z.literal("CLEAR"), z.literal("BLOCKED"), z.boolean(), z.literal(0), z.literal(1)]).optional(),
+  encoder_count: finiteNumber.optional(),
+  is_running: z.boolean().optional(),
+  conveyor_running: z.boolean().optional(),
+  estop_pressed: z.boolean().optional(),
+  s2_sorter1: z.boolean().nullable().optional(),
+  s3_sorter2: z.boolean().nullable().optional(),
+  unit: z.string().trim().max(10).optional(),
+  timestamp: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/, "Timestamp phải đúng định dạng ISO8601").optional(),
+  auth_token: z.string().optional(),
+  device_token: z.string().optional(),
+}).refine(
+  (data) => data.temperature !== undefined || data.cpu_temp !== undefined || data.current_temp !== undefined || data.temp !== undefined,
+  {
+    message: "Dữ liệu nhiệt độ (temperature / cpu_temp / current_temp) là bắt buộc và phải là số hữu hạn hợp lệ.",
+  }
+);

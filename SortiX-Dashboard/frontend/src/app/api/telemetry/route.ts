@@ -20,7 +20,11 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const result = TelemetryController.handlePostTelemetry(body);
+    const headers: Record<string, string | undefined> = {
+      "x-device-token": request.headers.get("x-device-token") || undefined,
+      "authorization": request.headers.get("authorization") || undefined,
+    };
+    const result = TelemetryController.handlePostTelemetry(body, headers);
     return NextResponse.json(result.body, { status: result.status });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Invalid JSON payload";

@@ -46,6 +46,7 @@ export interface LiveHealthAndBinWidgetProps {
   isSimulation: boolean;
   isRunning: boolean;
   binCounts: { bin1: number; bin2: number; bin3: number };
+  routedBinCounts?: { bin1: number; bin2: number; bin3: number };
   binCapacities?: { bin1: number; bin2: number; bin3: number };
   bin1Brands: string[];
   bin2Brands: string[];
@@ -67,6 +68,7 @@ export function LiveHealthAndBinWidget({
   isSimulation,
   isRunning,
   binCounts,
+  routedBinCounts = { bin1: 0, bin2: 0, bin3: 0 },
   binCapacities = { bin1: 50, bin2: 50, bin3: 50 },
   bin1Brands,
   bin2Brands,
@@ -193,6 +195,19 @@ export function LiveHealthAndBinWidget({
                 )}
               </div>
               <span>Dung lượng & Trạng thái</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-3 py-2 text-xs">
+              <span className="col-span-3 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                {isSimulation
+                  ? "Lượt phân loại trong mô phỏng"
+                  : "Lượt firmware đã điều hướng (chưa xác minh phôi đã vào khay)"}
+              </span>
+              {[1, 2, 3].map((bin) => (
+                <div key={bin} className="text-center font-mono font-bold text-cyan-700 dark:text-cyan-300">
+                  K{bin}: {routedBinCounts[`bin${bin}` as "bin1" | "bin2" | "bin3"]}
+                </div>
+              ))}
             </div>
 
             {/* MÁNG 1: LỌ THUỐC / ỐNG NGHIỆM */}
