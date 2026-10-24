@@ -102,10 +102,95 @@ git add SortiX-Dashboard/frontend/src/app/page.tsx
 git commit -m "feat(dashboard): them nut dung khan cap tren TopHeader"
 ```
 
-### 5. Đẩy code lên GitHub
+### 5. Đẩy code lên GitHub (Tổng Hợp Các Lệnh `git push` Cho Mọi Tình Huống)
+
+#### 5.1. Đẩy code thường ngày lên nhánh `main` (Daily Push)
+Sau khi đã hoàn thành `git add .` và `git commit`:
 ```bash
+# Đẩy các commit mới lên nhánh main trên GitHub
+git push origin main
+
+# Hoặc nếu nhánh hiện tại đã được cấu hình tracking upstream:
+git push
+```
+
+#### 5.2. Đẩy code lần đầu tiên khi khởi tạo dự án (First-Time Push & Upstream)
+Khi vừa tạo repository mới hoặc liên kết thư mục local với GitHub lần đầu:
+```bash
+# 1. Liên kết remote origin (nếu chưa liên kết)
+git remote add origin https://github.com/duyphong375/PBL3-SortiX-Med.git
+
+# 2. Đổi tên nhánh mặc định thành main (chuẩn GitHub)
+git branch -M main
+
+# 3. Đẩy code và thiết lập upstream (-u / --set-upstream)
+git push -u origin main
+```
+> **Ý nghĩa cờ `-u` (upstream):** Lệnh này giúp Git ghi nhớ nhánh `main` ở máy cục bộ sẽ liên kết trực tiếp với `origin/main`. Từ những lần sau, bạn chỉ cần gõ `git push` hoặc `git pull` ngắn gọn mà không cần gõ thêm `origin main`.
+
+#### 5.3. Đẩy một nhánh tính năng mới lên GitHub (Push Feature Branch)
+Khi bạn làm việc trên một nhánh riêng (ví dụ `feature/yolo-dataset`, `feature/esp32-encoder`):
+```bash
+# Đẩy nhánh tính năng lên GitHub và thiết lập tracking:
+git push -u origin feature/esp32-encoder
+
+# Hoặc cú pháp đẩy nhánh hiện tại tự động (không cần gõ lại tên nhánh):
+git push -u origin HEAD
+```
+
+#### 5.4. Đẩy toàn bộ các nhánh cùng lúc lên GitHub
+Khi bạn đã tạo hoặc cập nhật nhiều nhánh local và muốn đồng bộ tất cả lên GitHub:
+```bash
+# Đẩy tất cả các nhánh local lên remote origin
+git push origin --all
+```
+
+#### 5.5. Đẩy thẻ phiên bản / Release Tags lên GitHub
+Sau khi gắn nhãn phiên bản (`git tag`), các tag này **không tự động đẩy lên** bằng lệnh push thông thường mà cần lệnh riêng:
+```bash
+# Đẩy một tag cụ thể (ví dụ: v1.0.0)
+git push origin v1.0.0
+
+# Đẩy TOÀN BỘ các tag chưa có trên GitHub lên cùng một lúc:
+git push origin --tags
+```
+
+#### 5.6. Đẩy nhánh sao lưu khẩn cấp (Emergency Backup Push)
+Trước khi thực hiện các thay đổi lớn, bạn có thể đẩy nhanh trạng thái hiện tại thành một nhánh backup độc lập:
+```bash
+# Đẩy commit hiện tại thành nhánh backup có tên mới trên GitHub:
+git push origin HEAD:backup-truoc-khi-refactor
+```
+
+#### 5.7. Xử lý khi bị từ chối Push (`[rejected - non-fast-forward]`)
+Lỗi này xảy ra khi **thành viên khác trong nhóm vừa mới đẩy code lên GitHub** trước bạn, khiến nhánh remote có những commit mà máy bạn chưa có.
+```bash
+# Bước 1: Kéo cập nhật mới nhất từ GitHub về và gộp vào code của bạn
+git pull origin main --rebase
+# (Hoặc gộp thông thường): git pull origin main
+
+# Bước 2: Xử lý conflict nếu có, sau đó commit
+
+# Bước 3: Đẩy lại lên GitHub bình thường
 git push origin main
 ```
+
+#### 5.8. Xóa nhánh trên GitHub từ máy tính của bạn (Delete Remote Branch)
+Khi một nhánh tính năng đã được merge vào `main` và không còn cần thiết:
+```bash
+# Xóa nhánh feature/esp32-encoder trên GitHub:
+git push origin --delete feature/esp32-encoder
+```
+
+#### 5.9. Quy tắc an toàn bắt buộc khi Push (Safety Warnings)
+> [!CAUTION]
+> **Tuyệt đối không dùng `git push --force` (`-f`) lên nhánh `main` dùng chung của nhóm!**  
+> Lệnh này sẽ ghi đè lịch sử trên GitHub bằng lịch sử máy bạn, xóa vĩnh viễn các commit mà bạn bè trong nhóm vừa đẩy lên.  
+> Nếu bạn buộc phải ép cập nhật trên nhánh cá nhân của mình, hãy dùng cờ an toàn:
+> ```bash
+> git push --force-with-lease origin <ten-nhanh-rieng>
+> ```
+> Cờ `--force-with-lease` sẽ tự động hủy lệnh nếu phát hiện có ai khác vừa đẩy commit mới lên nhánh đó, tránh bị ghi đè oan.
 
 ---
 
@@ -272,13 +357,19 @@ git push origin main
 | **Cập nhật code** | `git pull origin main` | Kéo code mới nhất từ GitHub |
 | **Thêm toàn bộ file** | `git add .` | Đưa mọi file vào hàng đợi commit |
 | **Tạo commit** | `git commit -m "thông điệp"` | Lưu lại phiên bản thay đổi |
-| **Đẩy code lên GitHub** | `git push origin <branch>` | Đồng bộ code lên GitHub |
+| **Đẩy code thường ngày** | `git push origin main` (hoặc `git push`) | Đẩy commit lên nhánh main |
+| **Đẩy và đặt upstream** | `git push -u origin <branch>` | Nhớ liên kết remote cho lần sau |
+| **Đẩy nhánh hiện tại** | `git push -u origin HEAD` | Tự động lấy tên nhánh đang đứng |
+| **Đẩy tất cả các nhánh** | `git push origin --all` | Đồng bộ toàn bộ các nhánh local |
+| **Đẩy tất cả thẻ tag** | `git push origin --tags` | Đẩy toàn bộ release tags |
+| **Đẩy 1 thẻ tag cụ thể** | `git push origin <tag_name>` | Đẩy nhãn phiên bản chỉ định |
+| **Xóa nhánh trên GitHub** | `git push origin --delete <branch>` | Xóa nhánh remote từ local |
+| **Ép push an toàn (nhánh riêng)** | `git push --force-with-lease origin <branch>` | Ép cập nhật chống ghi đè commit người khác |
 | **Tạo và đổi nhánh** | `git checkout -b <branch>` | Tạo nhánh mới |
 | **Chuyển nhánh** | `git checkout <branch>` | Đổi sang nhánh đã có |
 | **Xem danh sách nhánh** | `git branch -a` | Xem cả nhánh local và remote |
 | **Cất tạm code** | `git stash` | Lưu tạm việc đang làm dở |
 | **Lấy lại code tạm** | `git stash pop` | Phục hồi việc dở ra tiếp tục |
 | **Tạo thẻ phiên bản** | `git tag -a v1.0 -m "ghi chú"` | Đánh dấu bản phát hành |
-| **Đẩy thẻ lên GitHub** | `git push origin v1.0` | Tạo Release trên GitHub |
 | **Hủy sửa file chưa commit**| `git restore <file>` | Trả file về nguyên bản |
 | **Hủy commit gần nhất** | `git reset --soft HEAD~1` | Giữ lại code nhưng bỏ commit |
