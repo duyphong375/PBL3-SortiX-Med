@@ -4,6 +4,24 @@ Tất cả các thay đổi về kiến trúc, tính năng, sửa lỗi và nân
 
 ---
 
+## [3.3.0] - 2026-10-24 (Chuẩn Hóa Toàn Diện Hệ Thống Tài Liệu Kỹ Thuật, Tích Hợp YOLO11 & Đồng Bộ Kiến Trúc Đa Tầng)
+
+### 📚 Chuẩn Hóa Hệ Thống Tài Liệu Markdown (Documentation Standardization)
+- **Đồng Bộ Phân Hệ Thị Giác Máy Tính (YOLO11 Integration)**:
+  - Cập nhật chuẩn hóa toàn bộ tài liệu từ YOLOv8 sang **Ultralytics YOLO11** (`PBL.v1i.yolov11`), mô tả chi tiết tập dữ liệu y tế (2 nhãn `HH` và `T`), script đa năng `test_yolo.py` và đường truyền MQTT topic `sorter/sorter_01/vision`.
+  - Khởi tạo tài liệu kiến trúc độc lập `PBL.v1i.yolov11/README.md`.
+- **Đồng Bộ Phần Cứng & Pinout Chuẩn**:
+  - Chuẩn hóa chân tín hiệu cơ cấu chấp hành: Servo 1 nối **GPIO6** (PWM LEDC), Servo 2 nối **GPIO24** (PWM LEDC), nút Start vật lý nối **GPIO23** (Debounce RC 20ms).
+  - Loại bỏ các mô tả lỗi thời về cảm biến quang học S2/S3 rời; đồng bộ hóa cơ chế theo dõi vị trí phôi qua **bộ đếm xung phần cứng New PCNT (GPIO1 & GPIO4)** và FIFO Tracking Ring Buffer.
+- **Đồng Bộ Bảng MQTT Topics & REST API**:
+  - Đồng bộ 100% danh mục MQTT topics giữa Firmware ESP32-C5 (`app_config.h`) và Dashboard (`DEFAULT_MQTT_TOPICS`).
+  - Bổ sung đặc tả REST API cho Webhook Telegram Bot SCADA 2 chiều (`/api/telegram/webhook`) và Trợ lý AI Copilot Google Gemini 3.5 Flash Lite (`/api/chat/copilot`).
+- **Cập Nhật Cây Thư Mục & QA Testing Gate**:
+  - Cập nhật toàn diện sơ đồ thư mục Monorepo root `README.md`, bổ sung `PBL.v1i.yolov11` và `huong-dan-backup-git.md`.
+  - Cập nhật tài liệu kiểm định với đầy đủ 26 test suites tự động trong `SortiX-Dashboard/tests/`.
+
+---
+
 ## [3.2.0] - 2026-10-16 (AI Copilot Gemini 3.5 Flash Lite 2 Chiều, Telegram Bot Gateway SCADA & SCADA Kiosk Zero-Scroll Fit Màn Hình)
 
 ### 🤖 Trợ Lý AI Copilot 2 Chiều & Telegram Bot Gateway
@@ -75,7 +93,7 @@ Tất cả các thay đổi về kiến trúc, tính năng, sửa lỗi và nân
   - `med_vial`: "Lọ thuốc / Ống nghiệm" (Xanh ngọc Emerald `#10B981`, Khay 3 - General Supplies).
   - Tương thích ngược hoàn toàn (Backward Compatible) với các mã cũ (`brand_c` -> `med_syringe`, `brand_p` -> `med_forceps`, `brand_r` -> `med_scissors`, `brand_a` -> `med_vial`).
 - **Tên & Chức Năng 3 Khay Chứa Y Tế Chuyên Dụng**:
-  - **Khay 1**: "Thùng vật sắc nhọn lây nhiễm (Sharps Waste)" — Tiếp nhận bơm tiêm, dao mổ, lưỡi trích (Cơ cấu Servo 1 - PWM IO23 gạt vào).
+  - **Khay 1**: "Thùng vật sắc nhọn lây nhiễm (Sharps Waste)" — Tiếp nhận bơm tiêm, dao mổ, lưỡi trích (Cơ cấu Servo 1 - PWM GPIO6 gạt vào).
   - **Khay 2**: "Khay hấp tiệt trùng Autoclave (Surgical Instruments)" — Tiếp nhận kẹp phẫu thuật Pean và kéo mổ bằng thép không gỉ (Cơ cấu Servo 2 - PWM IO24 gạt vào).
   - **Khay 3**: "Khay vật tư y tế & Phục hồi / Khay mặc định (General Supplies)" — Tiếp nhận lọ thuốc, ống nghiệm qua máng trượt trọng lực cuối băng tải.
 - **Cơ Chế An Toàn Sinh Học Fail-Safe**:

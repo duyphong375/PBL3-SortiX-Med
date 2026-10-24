@@ -568,6 +568,44 @@ Xác thực mã OTP 6 chữ số và thiết lập mật khẩu mới.
 - **Request Body**: Tương tự email alert, tự động chèn cờ `🧪 Chế độ Giả Lập` hoặc `🔴 Phần cứng Thực Tế`.
 - **Response `200 OK`**.
 
+### 6.5. Webhook Telegram Bot SCADA 2 Chiều
+- **Method**: `POST`
+- **Path**: `/api/telegram/webhook`
+- **Mục đích**: Nhận cập nhật từ máy chủ Telegram (`@SortiX_Med_Bot`), xử lý lệnh hỏi đáp và tương tác bàn phím Inline Keyboard SCADA:
+  - `/start`: Bật băng tải (yêu cầu xác thực tài khoản có quyền vận hành).
+  - `/stop`: Dừng băng tải bình thường.
+  - `/estop`: Dừng khẩn cấp tức thời (Hardware Lock).
+  - `/status`: Báo cáo tình trạng thời gian thực của máy, tốc độ, số lượng khay và kết nối.
+  - `/temp`: Kiểm tra nhiệt độ động cơ và SoC ESP32-C5.
+  - `/clear_bin`: Đặt lại số đếm khay đã dọn.
+- **Request Body**: Chuẩn Telegram Update Object từ Telegram Bot API.
+- **Response `200 OK`**: `{ "ok": true }`.
+
+### 6.6. Trợ Lý AI Copilot Phân Loại Dụng Cụ Y Tế (Google Gemini 3.5 Flash Lite)
+- **Method**: `POST`
+- **Path**: `/api/chat/copilot`
+- **Mục đích**: Truy vấn trợ lý AI về trạng thái băng tải, quy trình khử trùng Autoclave, hướng dẫn an toàn sinh học và xử lý sự cố.
+- **Mô hình AI**: Trực tiếp gọi Google AI Studio API v1beta với `gemini-3.5-flash-lite` (fallback `gemini-3.5-flash`, `gemini-flash-lite-latest`).
+- **Request Body**:
+```json
+{
+  "message": "Nhiệt độ động cơ hiện tại là bao nhiêu và có cần dừng khẩn cấp không?",
+  "history": [
+    { "role": "user", "content": "..." },
+    { "role": "model", "content": "..." }
+  ]
+}
+```
+- **Response `200 OK`**:
+```json
+{
+  "success": true,
+  "reply": "Nhiệt độ động cơ hiện tại là 42.5°C nằm trong giới hạn an toàn (<75°C)...",
+  "model": "gemini-3.5-flash-lite",
+  "latency_ms": 1050
+}
+```
+
 ---
 
 ## 7. An Toàn Công Nghiệp & Quản Lý Sự Cố

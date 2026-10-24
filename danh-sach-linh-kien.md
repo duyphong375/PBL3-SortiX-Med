@@ -31,12 +31,12 @@ Module XL4015 là phương án buck đang xem xét. Dòng liên tục thực t�
 | **17** | **Đèn LED báo hiển thị** | • 01 LED phi 5mm Đỏ (Báo nguồn 12V sau E-Stop & Cầu chì)<br>• 01 LED phi 5mm Xanh lá (Báo trạng thái hệ thống chạy từ GPIO10) | **02 con** | LED tròn siêu sáng phi 5mm | • [Mua tại Thế Giới IC](https://www.thegioiic.com/products/led-phi-5mm-do)<br>• [Tìm mua trên Shopee](https://shopee.vn/search?keyword=led%20phi%205mm) |
 | **18** | **Socket cắm bo WeAct** | **Thanh rào cái 16 chân đơn (Female Header 1x16P 2.54mm thẳng)** | **02 thanh** | Làm đế cắm bo WeAct ESP32-C5 tháo lắp tiện lợi | • [Mua tại Thế Giới IC](https://www.thegioiic.com/products/thanh-rao-cai-1-16p-2-54mm-thang)<br>• [Tìm mua trên Shopee](https://shopee.vn/search?keyword=thanh%20rao%20cai%2016%20chan%202.54mm) |
 | **19** | **Cọc đấu dây nguồn 12V** | **Domino 2 chân vặn vít KF301-2P (bước chân 5.08mm)** | **01 cái** | Đấu nối dây nguồn 12V từ bộ nguồn tổ ong vào bo mạch chắc chắn | • [Mua tại Thế Giới IC](https://www.thegioiic.com/products/domino-kf301-2p-5-08mm)<br>• [Tìm mua trên Shopee](https://shopee.vn/search?keyword=domino%20kf301%202p) |
-| **20** | **Thiết bị thị giác máy tính (Camera AI)** | **Webcam USB 2K QHD Plug & Play** (Chuẩn UVC, kèm cáp USB & kẹp gá) | **01 cái** | Độ phân giải 2K, cắm trực tiếp vào Laptop/PC chạy mô hình YOLOv8, gửi kết quả phân loại qua MQTT | Có sẵn của bạn (hoặc mua webcam USB chuẩn UVC) |
+| **20** | **Thiết bị thị giác máy tính (Camera AI)** | **Webcam USB 2K QHD Plug & Play** (Chuẩn UVC, kèm cáp USB & kẹp gá) | **01 cái** | Độ phân giải 2K, cắm trực tiếp vào Laptop/PC trạm AI chạy mô hình **YOLO11** (`PBL.v1i.yolov11/test_yolo.py`), gửi kết quả phân loại qua MQTT topic `sorter/sorter_01/vision` | Có sẵn của bạn (hoặc mua webcam USB chuẩn UVC) |
 
 > [!NOTE]
-> **Kiến trúc mục tiêu xử lý ảnh (đang ở mức đề xuất cho hệ thống):**  
+> **Kiến trúc phân hệ xử lý ảnh thị giác máy tính (Computer Vision Station):**  
 > Chiếc **Webcam USB 2K** được cắm trực tiếp vào **Laptop / Máy tính trạm**, **KHÔNG** cắm vào ESP32-C5.  
-> - **Laptop / PC:** Dự kiến chạy script Python (OpenCV + YOLO), nhận diện và publish JSON qua MQTT. Topic và schema cần thống nhất với firmware trước khi tích hợp.
+> - **Laptop / PC:** Chạy script Python `PBL.v1i.yolov11/test_yolo.py` (Ultralytics YOLO11 + OpenCV), nhận diện dụng cụ y tế và publish kết quả JSON thời gian thực lên MQTT broker theo topic `sorter/sorter_01/vision`.
 
 ---
 

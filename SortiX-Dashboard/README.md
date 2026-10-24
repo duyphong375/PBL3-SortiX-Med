@@ -1,6 +1,6 @@
 # SortiX-Med — Hệ Thống Tự Động Phân Loại Dụng Cụ Y Tế & Chuẩn Bị Khử Trùng Phòng Mổ (Biomedical & Industrial IoT)
 
-> **Đồ án PBL3 / Capstone Project**: Hệ thống điều khiển, giám sát và tự động phân loại dụng cụ y tế sau phẫu thuật (Bơm kim tiêm / Dao mổ, Kẹp phẫu thuật Pean, Kéo phẫu thuật, Lọ thuốc / Ống nghiệm) theo thời gian thực trên băng tải thông minh nhằm chuẩn bị cho quy trình khử trùng Autoclave phòng mổ. Tích hợp vi điều khiển IoT (**ESP32-C5**), camera thị giác máy tính (**YOLOv8 AI**), bảng điều khiển quản trị phân tầng và ứng dụng di động đa nền tảng (Android APK & iOS PWA) từ một cơ sở mã nguồn duy nhất (1-Codebase Hybrid Architecture).
+> **Đồ án PBL3 / Capstone Project**: Hệ thống điều khiển, giám sát và tự động phân loại dụng cụ y tế sau phẫu thuật (Bơm kim tiêm / Dao mổ, Kẹp phẫu thuật Pean, Kéo phẫu thuật, Lọ thuốc / Ống nghiệm) theo thời gian thực trên băng tải thông minh nhằm chuẩn bị cho quy trình khử trùng Autoclave phòng mổ. Tích hợp vi điều khiển IoT (**ESP32-C5**), camera thị giác máy tính (**YOLO11 AI**), bảng điều khiển quản trị phân tầng và ứng dụng di động đa nền tảng (Android APK & iOS PWA) từ một cơ sở mã nguồn duy nhất (1-Codebase Hybrid Architecture).
 
 ---
 
@@ -221,17 +221,17 @@ Phần này mô tả chi tiết cách thức toàn bộ hệ thống phối hợ
 ```mermaid
 flowchart TD
     subgraph HARDWARE_LAYER["1. Tầng Phần Cứng & Thu Thập Dữ Liệu"]
-        CAM["Camera AI YOLOv8"] -->|"Nhận diện dụng cụ y tế"| DETECT["Kết quả Detection (loại dụng cụ, confidence)"]
-        SENSORS["Cụm Cảm Biến S1-S3 + Encoder + Cảm biến nội vi ESP32-C5"] -->|"Đo tốc độ, nhiệt độ, kẹt dụng cụ"| ESP32["Vi điều khiển ESP32-C5"]
-        DETECT -->|"UART Serial / Wi-Fi 6"| ESP32
+        CAM["Camera AI YOLO11"] -->|"Nhận diện dụng cụ y tế"| DETECT["Kết quả Detection (loại dụng cụ, confidence)"]
+        SENSORS["Cảm Biến S1 (GPIO0) + Encoder PCNT + Cảm biến nội vi ESP32-C5"] -->|"Đo tốc độ, nhiệt độ, kẹt dụng cụ"| ESP32["Vi điều khiển ESP32-C5"]
+        DETECT -->|"MQTT sorter/sorter_01/vision"| ESP32
     end
 
     subgraph IOT_COMMUNICATION["2. Tầng Truyền Thông IoT (MQTT Broker)"]
-        ESP32 -->|"Publish: sorter/01/vision"| BROKER["MQTT Broker (EMQX / Mosquitto)"]
-        ESP32 -->|"Publish: sorter/01/telemetry"| BROKER
+        ESP32 -->|"Publish: sorter/sorter_01/vision"| BROKER["MQTT Broker (EMQX / Mosquitto)"]
+        ESP32 -->|"Publish: sorter/sorter_01/telemetry"| BROKER
         ESP32 -->|"Publish: conveyor/heartbeat (chu kỳ 2s)"| BROKER
         ESP32 -->|"Publish: conveyor/sensor/jam"| BROKER
-        ESP32 -->|"Publish: conveyor/storage/bin_status"| BROKER
+        ESP32 -->|"Publish: conveyor/telemetry/temp"| BROKER
     end
 
     subgraph SERVER_LAYER["3. Tầng Máy Chủ Backend (node:http Port 5000)"]
@@ -257,23 +257,23 @@ flowchart TD
 ### 3.2. Luồng Phân Loại Dụng Cụ Y Tế Máy Thật (Live Hardware Sorting Flow)
 
 1. **Dụng cụ đi vào băng tải**: Động cơ băng tải quay với vận tốc được giám sát qua cảm biến Encoder (`conveyor_speed`). Dụng cụ y tế sau phẫu thuật lần lượt đi qua Cảm biến S1 (IO0 - Phát hiện vật vào và kích hoạt cụm camera).
-2. **Camera AI YOLOv8 nhận diện dụng cụ y tế**:
+2. **Camera AI YOLO11 nhận diện dụng cụ y tế**:
    - Camera công nghiệp tại trạm nhận diện chụp ảnh khi dụng cụ đi qua vùng ROI của Cảm biến S1.
-   - Mô hình Vision AI YOLOv8 phân loại 4 nhóm dụng cụ y tế và xuất độ tin cậy `confidence` (0.00 – 1.00):
+   - Mô hình Vision AI YOLO11 phân loại 4 nhóm dụng cụ y tế và xuất độ tin cậy `confidence` (0.00 – 1.00):
      - `med_syringe`: Bơm kim tiêm / Dao mổ (Vàng y tế `#EAB308`)
      - `med_forceps`: Kẹp phẫu thuật Pean (Xanh dương y tế `#0284C7`)
      - `med_scissors`: Kéo phẫu thuật (Xanh tím tiệt trùng `#6366F1`)
      - `med_vial`: Lọ thuốc / Ống nghiệm (Xanh ngọc Emerald `#10B981`)
-   - Kết quả được đóng gói vào payload `VisionDetection` và gửi lên MQTT topic `sorter/01/vision`.
+   - Kết quả được đóng gói vào payload `VisionDetection` và gửi lên MQTT topic `sorter/sorter_01/vision`.
 3. **Tra cứu quy tắc phân loại & Cơ chế An toàn Fail-safe**:
    - ESP32-C5 so khớp `brand` với bảng quy tắc cấu hình `rules` hiện tại:
-     - `med_syringe` -> **Khay 1: Thùng vật sắc nhọn lây nhiễm (Sharps Waste)** (Servo 1 - PWM IO23 gạt vào khay)
-     - `med_forceps` / `med_scissors` -> **Khay 2: Khay hấp tiệt trùng Autoclave (Surgical Instruments)** (Servo 2 - PWM IO24 gạt vào khay)
+     - `med_syringe` -> **Khay 1: Thùng vật sắc nhọn lây nhiễm (Sharps Waste)** (Servo 1 - PWM GPIO6 gạt vào khay)
+     - `med_forceps` / `med_scissors` -> **Khay 2: Khay hấp tiệt trùng Autoclave (Surgical Instruments)** (Servo 2 - PWM GPIO24 gạt vào khay)
      - `med_vial` -> **Khay 3: Khay vật tư y tế & Phục hồi** (Chạy thẳng cuối băng tải qua máng trượt trọng lực, không kích hoạt servo)
      - **Nguyên tắc An toàn Sinh học (Fail-safe)**: Mọi vật phẩm không nhận diện được hoặc độ tin cậy `confidence < 60%` (0.60) sẽ tự động chạy thẳng vào **Khay 3** để nhân viên y tế kiểm tra lại, tuyệt đối không gạt nhầm vào Khay 2 tiệt trùng.
-4. **Kích hoạt cơ cấu Servo gạt**:
-   - Cảm biến vị trí S2 (IO1) hoặc S3 (IO6) kích hoạt đúng thời điểm dụng cụ đi ngang qua máng khay mục tiêu.
-   - Vi điều khiển xuất xung PWM điều khiển góc quay Servo tương ứng đẩy dụng cụ vào đúng khay.
+4. **Kích hoạt cơ cấu Servo gạt theo Tracking Encoder**:
+   - Bộ đếm xung phần cứng New PCNT (GPIO1 & GPIO4) kết hợp FIFO Tracking Ring Buffer (tối đa 15 phôi) tính toán khoảng cách thực tế dụng cụ di chuyển trên băng chuyền (200 mm tới Servo 1, 400 mm tới Servo 2).
+   - Khi vật thể đến đúng cửa sổ kích hoạt (cửa sổ dung sai 15 mm), vi điều khiển kích hoạt Servo tương ứng qua FSM Non-blocking LEDC PWM để gạt dụng cụ vào đúng khay.
 5. **Cập nhật dữ liệu & Lịch sử**:
    - Số đếm khay tăng thêm 1 sản phẩm.
    - Bản ghi phân loại `ClassificationRecord` được gửi về backend qua API `POST /api/history` và lưu vào bộ nhớ đệm an toàn.
@@ -511,7 +511,7 @@ Lưu trữ từng dụng cụ y tế sau khi đi qua cơ cấu phân loại:
 | `routed_bin` | `INT` | NULL (0, 1, 2, 3) | Hướng mà firmware đã điều khiển; dùng thống kê lượt điều hướng, không xác nhận vật phẩm đã vào khay |
 | `actual_bin` | `INT` | NOT NULL (0, 1, 2, 3) | Hộp đã được cảm biến xác nhận; `0` nghĩa là chưa xác minh vật lý |
 | `status` | `STRING` | NOT NULL | Kết quả như `success`, `unverified`, `diverted_default`, `held_timeout`, `servo_failed` |
-| `confidence` | `FLOAT` | NOT NULL (0.0 - 1.0) | Độ tin cậy nhận diện từ mô hình YOLOv8 |
+| `confidence` | `FLOAT` | NOT NULL (0.0 - 1.0) | Độ tin cậy nhận diện từ mô hình YOLO11 |
 | `timestamp` | `TIMESTAMPTZ` | NOT NULL | Thời điểm dụng cụ rơi vào khay |
 
 > **Cơ chế Bounded Buffer cho History**: Backend duy trì bộ đệm tối đa **1.000 bản ghi lịch sử**. Cơ chế này loại trừ hoàn toàn nguy cơ tràn RAM (Out of Memory - OOM) trên Node.js khi băng chuyền vận hành liên tục qua nhiều ca làm việc.

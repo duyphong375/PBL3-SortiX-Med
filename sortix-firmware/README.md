@@ -4,7 +4,7 @@
 ---
 
 ## 1. Giới Thiệu
-Mã nguồn firmware điều khiển hệ thống băng tải phân loại dụng cụ y tế tự động SortiX. Firmware kết nối với hệ thống AI thị giác máy tính (YOLOv8 chạy trên PC) và ứng dụng điều khiển trung tâm **SortiX-Dashboard** thông qua giao thức **MQTT** và **HTTP REST**.
+Mã nguồn firmware điều khiển hệ thống băng tải phân loại dụng cụ y tế tự động SortiX. Firmware kết nối với trạm AI thị giác máy tính (**YOLO11** chạy trên PC trong thư mục `PBL.v1i.yolov11`) và ứng dụng điều khiển trung tâm **SortiX-Dashboard** thông qua giao thức **MQTT** và **HTTP REST**.
 
 ---
 
@@ -109,18 +109,18 @@ sortix-firmware/
 
 ## 3. Bảng Phân Bổ GPIO Chuẩn (Đối chiếu BOM danh-sach-linh-kien.md)
 
-| Chức năng                   | GPIO     | Vị trí Header WeAct | Chế độ / Cấu hình                 |
-|-----------------------------|----------|---------------------|-----------------------------------|
-| Cảm biến vật cản IR (S1)    | **GPIO0**  | Trái Pin 5          | Input, Pull-up, Falling Edge ISR |
-| Encoder Kênh A (Xung)       | **GPIO1**  | Trái Pin 6          | PCNT Pulse Counter (Edge Input)  |
-| Encoder Kênh B (Chiều)      | **GPIO4**  | Phải Pin 8          | PCNT Pulse Counter (Level Input) |
+| Chức năng                   | GPIO       | Vị trí Header WeAct | Chế độ / Cấu hình                 |
+|-----------------------------|------------|---------------------|-----------------------------------|
+| Cảm biến vật cản IR (S1)    | **GPIO0**  | Trái Pin 5          | Input, Pull-up, Falling Edge ISR  |
+| Encoder Kênh A (Xung)       | **GPIO1**  | Trái Pin 6          | PCNT Pulse Counter (Edge Input)   |
+| Encoder Kênh B (Chiều)      | **GPIO4**  | Phải Pin 8          | PCNT Pulse Counter (Level Input)  |
 | Cảm biến quang trở LDR (DO) | **GPIO5**  | Phải Pin 9          | Input Digital                     |
-| Servo 1 - PWM (Gạt 1)      | **GPIO6**  | Trái Pin 7          | LEDC PWM 50Hz (Timer 0, Ch 0)    |
+| Servo 1 - PWM (Gạt 1)       | **GPIO6**  | Trái Pin 7          | LEDC PWM 50Hz (Timer 0, Ch 0)     |
 | Driver L298N IN1            | **GPIO8**  | Trái Pin 9          | Output (FWD=1, REV=0, BRAKE=1)    |
 | Driver L298N IN2            | **GPIO9**  | Trái Pin 10         | Output (FWD=0, REV=1, BRAKE=1)    |
 | LED trạng thái (Xanh lá)    | **GPIO10** | Trái Pin 11         | Output, 100ms Software Timer      |
 | Nút Start vật lý            | **GPIO23** | Phải Pin 5          | Input Pull-up, Debounce RC + 20ms |
-| Servo 2 - PWM (Gạt 2)      | **GPIO24** | Phải Pin 4          | LEDC PWM 50Hz (Timer 0, Ch 1)    |
+| Servo 2 - PWM (Gạt 2)       | **GPIO24** | Phải Pin 4          | LEDC PWM 50Hz (Timer 0, Ch 1)     |
 
 ### ⚠ CÁC CHÂN CẤM SỬ DỤNG (FORBIDDEN GPIOs):
 - **GPIO15 (SPICS1):** Đã nối cứng nội bộ với IC PSRAM 8MB Quad SPI bên trong nắp shield kim loại.
@@ -130,7 +130,27 @@ sortix-firmware/
 
 ---
 
-## 4. Kiến Trúc Nhiệm Vụ FreeRTOS & An Toàn
+## 4. Bảng Tra Cứu MQTT Topics (Đồng Bộ 100% Với SortiX-Dashboard)
+
+| Nhóm | Topic MQTT | Hướng truyền | Mục đích / Payload |
+|---|---|:---:|---|
+| **Vision AI** | `sorter/sorter_01/vision` | Trạm AI -> Firmware | Nhận diện kết quả phân loại: `{ item_id, brand, confidence, timestamp }` |
+| **Điều khiển** | `sorter/sorter_01/control` | Dashboard -> Firmware | Lệnh vận hành: `{ command: "START" \| "STOP" \| "RESET", auth_token }` |
+| **Cấu hình** | `sorter/sorter_01/config/set` | Dashboard -> Firmware | Cập nhật cấu hình phân loại: `{ version, bins, apply_mode, auth_token }` |
+| **Trạng thái cấu hình** | `sorter/sorter_01/config/status` | Firmware -> Dashboard | Phản hồi xác nhận cấu hình: `{ version, status: "APPLIED", timestamp }` |
+| **Telemetry** | `sorter/sorter_01/telemetry` | Firmware -> Dashboard | Trạng thái định kỳ 1.5s: `{ state, speed, encoder_count, current_temp }` |
+| **Trạng thái máy** | `sorter/sorter_01/status` | Firmware -> Dashboard | Trạng thái máy tức thời: `{ state: "IDLE" \| "RUNNING" \| "JAMMED", uptime }` |
+| **Phân loại** | `sorter/sorter_01/classification` | Firmware -> Dashboard | Báo cáo phân loại hoàn tất: `{ item_id, routed_bin, brand, status }` |
+| **Heartbeat** | `conveyor/heartbeat` | Firmware -> Dashboard | Nhịp tim định kỳ 2.0s để Watchdog giám sát sống còn |
+| **Kẹt phôi** | `conveyor/sensor/jam` | Firmware -> Dashboard | Cảnh báo kẹt động cơ / cơ cấu băng tải (>1.8s không xung) |
+| **Nhiệt SoC** | `conveyor/telemetry/temp` | Firmware -> Dashboard | Cảnh báo nhiệt độ chip vượt ngưỡng an toàn (>75°C) |
+| **Dừng khẩn cấp** | `conveyor/safety/estop` | Dashboard -> Firmware | Lệnh dừng khẩn cấp: `{ event: "estop", auth_token, reason }` |
+| **ACK Dừng khẩn** | `conveyor/safety/estop/ack` | Firmware -> Dashboard | Xác nhận dừng an toàn: `{ event: "estop_ack", state: "SYSTEM_STATE_ESTOP" }` |
+| **Giải phóng E-Stop** | `conveyor/safety/estop/release` | Dashboard -> Firmware | Lệnh giải phóng E-Stop: `{ event: "estop_release", auth_token }` |
+
+---
+
+## 5. Kiến Trúc Nhiệm Vụ FreeRTOS & An Toàn
 
 1. **`task_conveyor` (Priority 6):**
    - Quản lý điều khiển cầu H L298N (Tiến, Lùi, Thắng động cơ, Thả trôi).
@@ -150,63 +170,61 @@ sortix-firmware/
    - Tuyệt đối không gửi trường `optical_sensor` để tránh xung đột với logic tự động dừng của backend.
 5. **`task_safety` (Priority 5):**
    - Đọc cảm biến nhiệt độ nội chip SoC ESP32-C5 qua `driver/temperature_sensor.h` (chu kỳ 2s). Cảnh báo lên MQTT khi nhiệt độ chip vượt 75°C.
-   - Tự động bật SoftAP + Captive Portal khi không có cấu hình MQTT hợp lệ lúc khởi động hoặc Wi-Fi mất kết nối kéo dài.
+   - Tự động bật SoftAP + Captive Portal khi không có cấu hình MQTT hợp lệ lúc khởi động hoặc Wi-Fi mất kết nối kéo dài (>10s).
 
 ---
 
-## 5. Hướng Dẫn Cấu Hình, Build & Nạp Code
+## 6. Hướng Dẫn Cấu Hình, Build & Nạp Code
 
-### 5.1 Kích hoạt môi trường ESP-IDF (PowerShell)
+### 6.1 Kích hoạt môi trường ESP-IDF (PowerShell)
 ```powershell
 . "C:\Espressif\tools\Microsoft.v5.5.4.PowerShell_profile.ps1"
 ```
 
-### 5.2 Thiết lập Target ESP32-C5
+### 6.2 Thiết lập Target ESP32-C5
 ```powershell
 cd d:\PBL3_NHOM5\sortix-firmware
 idf.py set-target esp32c5
 ```
 
-### 5.3 Provisioning cấu hình thiết bị
+### 6.3 Provisioning cấu hình thiết bị
 Cấu hình Wi-Fi, MQTT và token được provision qua Captive Portal; firmware không chứa SSID/password Wi-Fi, MQTT URI, Control Secret hoặc API token mặc định. Khi chưa có cấu hình MQTT hợp lệ, thiết bị bật SoftAP với SSID `SortiX-Setup-<đuôi MAC>` và mật khẩu ngẫu nhiên 16 ký tự. Lấy mật khẩu từ console serial cục bộ, kết nối SoftAP rồi mở `http://192.168.4.1`.
 
 Điền các trường sau:
 - Wi-Fi Station SSID và password. Đánh dấu tùy chọn mạng không mật khẩu nếu dùng Wi-Fi mở.
-- MQTT URI có TLS: `mqtts://<broker>:8883` hoặc `wss://<broker>:443`. Firmware từ chối `mqtt://` và `ws://`; broker công khai không có ACL vẫn không phù hợp cho triển khai thật.
+- MQTT URI có TLS: `mqtts://<broker>:8883` hoặc `wss://<broker>:443`. Firmware từ chối `mqtt://` và `ws://` không mã hóa khi triển khai thực tế.
 - MQTT username/password của broker nếu broker yêu cầu.
-- `Control Secret` dài 16–63 ký tự, phải khớp `SORTIX_CONTROL_SECRET` của Dashboard/backend. Lệnh `START`, `STOP`, `ESTOP`, mở khóa và cấu hình sorter đều phải mang token này. Producer Vision bên ngoài cũng phải gửi `auth_token` (hoặc `token`) khớp với secret.
+- `Control Secret` dài 16–63 ký tự, phải khớp `SORTIX_CONTROL_SECRET` của Dashboard/backend. Lệnh `START`, `STOP`, `ESTOP`, mở khóa và cấu hình sorter đều phải mang token này. Producer Vision bên ngoài (YOLO11) cũng phải gửi `auth_token` khớp với secret.
 - Nếu bật telemetry HTTP, dùng URL `https://...` và một `Device API Token` riêng, khớp `DEVICE_TOKEN` hoặc `SORTIX_DEVICE_TOKEN` ở backend. Firmware gửi token trong header `X-Device-Token`; để trống URL để tắt luồng HTTP telemetry.
-
-Không dùng Control Secret làm Device API Token. Mật khẩu SoftAP được ghi một lần vào serial để kỹ thuật viên tại chỗ có thể cấu hình thiết bị; không chia sẻ log serial.
 
 Thông số hiệu chuẩn có thể cập nhật trong cấu hình/NVS:
 - Chính sách an toàn khi quá hạn nhận diện Vision AI (`PAUSE_AND_HOLD` dừng băng tải an toàn hoặc `DIVERT_TO_DEFAULT`).
 - Khoảng cách hiệu chuẩn trạm phân loại lưu trong NVS (`dist_s1_servo1_mm`, `dist_s1_servo2_mm`, `dist_s1_end_mm`) và `counts_per_mm`.
 
-### 5.4 Biên dịch (Build)
+### 6.4 Biên dịch (Build)
 ```powershell
 idf.py build
 ```
 
-### 5.5 Nạp Firmware & Mở Console Monitor
+### 6.5 Nạp Firmware & Mở Console Monitor
 ```powershell
-idf.py -p COM_PORT flash monitor
+idf.py -p COM5 flash monitor
 ```
-*(Thay `COM_PORT` bằng cổng COM thực tế của bo WeAct, ví dụ `COM3` hoặc `COM5`).*
+*(Thay `COM5` bằng cổng COM thực tế của bo WeAct trên máy tính).*
 
 ---
 
-## 6. Giao Thức E-Stop & Mở Khóa An Toàn
+## 7. Giao Thức E-Stop & Mở Khóa An Toàn
 
 1. **E-Stop Vật Lý (Hard-wired Emergency Stop):**
-   - Firmware hiện không đọc tiếp điểm E-Stop vật lý trên GPIO và không thể xác minh mạch cắt nguồn độc lập đã được lắp.
-   - Cần thiết kế mạch E-Stop phần cứng ngắt nguồn động cơ độc lập với MCU, mạng và phần mềm; **không dùng lệnh MQTT hoặc firmware thay cho mạch này**.
-   - Hệ thống không tuyên bố đạt chứng nhận an toàn công nghiệp (như SIL hoặc PL) khi chưa được đánh giá và kiểm định phần cứng chuyên dụng.
+   - Thiết kế mạch E-Stop phần cứng ngắt nguồn động cơ 12V trước tiếp điểm contactor/rơ-le, độc lập với MCU, mạng và phần mềm.
+   - Khi E-Stop ngắt nguồn, toàn bộ cơ cấu chấp hành mất điện tức thời.
+   - Khi cấp điện trở lại, hệ thống luôn khởi động về trạng thái `SYSTEM_STATE_IDLE` an toàn, chờ lệnh `START` có chủ đích của con người.
 
 2. **Giao Thức E-Stop Phần Mềm & ACK Phần Cứng:**
    - Firmware chỉ chấp nhận E-Stop MQTT có `auth_token` hợp lệ; lệnh từ topic điều khiển dùng cùng cơ chế xác thực.
-   - Khi nhận E-Stop, firmware chốt `SYSTEM_STATE_ESTOP`, yêu cầu phanh động cơ và đưa duty điều khiển servo về 0. ACK chỉ báo `ESTOP_LOCKED`/`actuators_stopped: true` khi GPIO phanh được đặt thành công, servo signal được tắt và encoder đo tốc độ không quá 0.5 mm/s trong ít nhất 3 mẫu liên tiếp. Nếu không đủ điều kiện, ACK báo trạng thái chưa xác nhận và Dashboard không đánh dấu đã dừng phần cứng.
-   - `measured_speed` là tốc độ băng tải đo từ encoder, không phải giá trị giả định. Không có phản hồi vị trí servo hoặc công tắc xác nhận máng nên ACK này không thay thế mạch E-Stop độc lập và không xác nhận vị trí cơ khí của servo.
+   - Khi nhận E-Stop, firmware chốt `SYSTEM_STATE_ESTOP`, yêu cầu phanh động cơ và đưa duty điều khiển servo về 0. 
+   - Hàm `mqtt_handler_publish_estop_ack()` sẽ phát ACK lên topic `conveyor/safety/estop/ack` để báo trạng thái đã dừng an toàn cho Dashboard.
 
 3. **Luồng Mở Khóa An Toàn (ESTOP_RELEASE):**
    - Chỉ tài khoản Quản trị viên (Admin) được phép kích hoạt mở khóa từ Dashboard, bắt buộc phải nhập ghi chú hiện trường.
@@ -214,5 +232,3 @@ idf.py -p COM_PORT flash monitor
    - Firmware xác minh `auth_token` khớp với `control_secret` lưu trong NVS trước khi xử lý.
    - Khi mở khóa thành công, firmware chỉ chuyển về `SYSTEM_STATE_IDLE` nếu GPIO dừng động cơ được đặt thành công; hệ thống **không tự khởi động lại động cơ**.
    - Nếu còn vật phẩm chưa được xử lý trên băng tải (`sorting_engine_has_unresolved_items()`), hệ thống chặn lệnh START cho đến khi người vận hành xác nhận giải phóng vật thể an toàn.
-
-4. **Báo cáo đích phân loại:** Firmware hiện chỉ có cảm biến đầu vào S1, không có cảm biến xác nhận vật phẩm đã vào Bin 1/2/3. `routed_bin` ghi nhận hướng điều khiển mà firmware đã phát lệnh/điều phối để Dashboard thống kê lượt phân loại; trường này không xác nhận vật phẩm đã rơi vào hộp. `actual_bin: 0` cùng trạng thái `unverified` giữ nguyên ý nghĩa chưa xác minh vật lý. Muốn có số liệu máng thực tế cần lắp và tích hợp cảm biến phản hồi cho từng máng.

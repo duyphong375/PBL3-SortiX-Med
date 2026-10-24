@@ -1,6 +1,6 @@
 # THIẾT KẾ KIẾN TRÚC HỆ THỐNG SORTIX-MED (BIOMEDICAL & INDUSTRIAL IOT ARCHITECTURE)
 
-> **Tài liệu Kỹ Thuật Đồ Án PBL3**: Hệ thống điều khiển, giám sát và tự động phân loại dụng cụ y tế sau phẫu thuật chuẩn bị cho quy trình khử trùng Autoclave phòng mổ. Tích hợp vi điều khiển IoT (**ESP32-C5**), camera thị giác máy tính (**YOLOv8 AI**), bảng điều khiển quản trị phân tầng và ứng dụng di động đa nền tảng (Android APK & iOS PWA) từ một cơ sở mã nguồn duy nhất (1-Codebase Hybrid Architecture).
+> **Tài liệu Kỹ Thuật Đồ Án PBL3**: Hệ thống điều khiển, giám sát và tự động phân loại dụng cụ y tế sau phẫu thuật chuẩn bị cho quy trình khử trùng Autoclave phòng mổ. Tích hợp vi điều khiển IoT (**ESP32-C5**), camera thị giác máy tính (**YOLO11 AI**), bảng điều khiển quản trị phân tầng và ứng dụng di động đa nền tảng (Android APK & iOS PWA) từ một cơ sở mã nguồn duy nhất (1-Codebase Hybrid Architecture).
 
 ---
 
@@ -11,7 +11,7 @@ Các sơ đồ và phân tích chi tiết trong tài liệu này được giữ 
 - Backend runtime là HTTP server dùng `node:http` trong `backend/src/server.ts`, không phải Express. `routes/`, `controllers/`, `middlewares/` và `services/` vẫn giữ cách phân lớp tương ứng.
 - Frontend có hai lớp phục vụ API: Next.js route handlers tại `frontend/src/app/api` và backend standalone tại cổng `5000`. Các route tương thích có thể xuất hiện ở cả hai lớp.
 - JSON là persistence đang chạy: `data/history.json`, `data/notifications.json`, `data/sync_state.json`, `data/users.json`. `ConfigModel` giữ config hiện tại trong memory. Các DDL trong `backend/database/migrations` và seed là artifact tham chiếu, không phải adapter database đang được gọi bởi runtime.
-- Script root `npm test` hiện chạy toàn bộ **21 file test suites** tự động với **163/163 unit tests PASS 100%** qua lệnh `node --test tests/*.test.cjs`.
+- Script root `npm test` hiện chạy toàn bộ **26 file test suites** tự động qua lệnh `node --test tests/*.test.cjs`.
 - Tích hợp thêm kênh Telegram Bot Gateway hai chiều (`/api/telegram/webhook`) và trợ lý AI Copilot gọi trực tiếp mô hình `gemini-3.5-flash-lite` qua Google AI Studio API v1beta.
 
 ## 📌 Mục Lục
@@ -156,7 +156,7 @@ Hệ thống **SortiX-Med** được thiết kế theo mô hình kiến trúc ph
 Xây dựng trên nền tảng Next.js 14 App Router với hiệu năng tối ưu:
 - **Trực quan hóa vật lý 60fps & Cơ Cấu Gạt Servo (`useConveyorPhysics.ts`)**:
   - Vòng lặp `requestAnimationFrame` tính toán tọa độ di chuyển của dụng cụ y tế trên băng chuyền.
-  - Mô phỏng cơ cấu **Servo gạt xoay góc** (Servo 1 - PWM IO23, Servo 2 - PWM IO24) gạt dụng cụ vào đúng máng trượt Khay 1 (Sắc nhọn), Khay 2 (Tiệt trùng) hoặc trượt thẳng vào Khay 3 (Vật tư/Fail-safe).
+  - Mô phỏng cơ cấu **Servo gạt xoay góc** (Servo 1 - PWM GPIO6, Servo 2 - PWM GPIO24) gạt dụng cụ vào đúng máng trượt Khay 1 (Sắc nhọn), Khay 2 (Tiệt trùng) hoặc trượt thẳng vào Khay 3 (Vật tư/Fail-safe).
   - Cho phép người dùng **dọn khay chủ động bất kỳ lúc nào** ngay trên giao diện mà không cần đợi đủ định mức.
 - **Độ Rộng & Sức Chứa Khay Linh Hoạt (Dynamic Bin Capacities 5 - 50 SP)**:
   - Cung cấp 3 thanh trượt điều chỉnh độ rộng/sức chứa riêng biệt cho từng khay trên `ConveyorVisualizer.tsx`, `LiveHealthAndBinWidget.tsx` và `ConfigAndDiagnostics.tsx`.
@@ -197,17 +197,17 @@ Xây dựng trên nền tảng Next.js 14 App Router với hiệu năng tối ư
 ### 2.5. IoT & Hardware Layer (ESP32-C5, Sensors & Actuators)
 - **Vi điều khiển ESP32-C5**: Lõi RISC-V 240MHz, hỗ trợ Wi-Fi 6 tần số 2.4GHz & 5GHz, đảm bảo độ trễ thấp và tính ổn định cao trong môi trường phòng mổ / y tế.
 - **Cảm biến đầu vào**:
-  - Cảm biến quang học S1 (GPIO IO0): Phát hiện dụng cụ bắt đầu đi vào băng tải, kích hoạt vùng quét camera AI.
-  - Cảm biến quang học S2 (GPIO IO1): Xác định vị trí trước Khay 1 (Thùng vật sắc nhọn).
-  - Cảm biến quang học S3 (GPIO IO6): Xác định vị trí trước Khay 2 (Khay hấp tiệt trùng Autoclave).
-  - Cảm biến kẹt phôi (Optical Jam Sensor #02): Giám sát tắc nghẽn liên tục > 5s tại Zone A.
-  - Cảm biến nhiệt độ nội vi ESP32-C5: Tích hợp sẵn trên vi điều khiển ESP32-C5 (On-chip sensor), giám sát nhiệt độ vi điều khiển mà không cần cảm biến rời ngoại vi.
-  - Bộ mã hóa Encoder: Đo tốc độ quay thực tế của trục động cơ băng tải.
+  - Cảm biến quang học S1 (GPIO0): Phát hiện dụng cụ bắt đầu đi vào băng tải, kích hoạt chốt xung Encoder và gọi camera AI.
+  - Bộ mã hóa Encoder 2 pha New PCNT: Kênh A (GPIO1) & Kênh B (GPIO4) đo xung phần cứng chính xác (~31.5 counts/mm) để tracking vị trí phôi theo thời gian thực và phát hiện kẹt cơ khí (Encoder Stall > 1.8s).
+  - Cảm biến quang trở LDR DO (GPIO5): Giám sát cường độ sáng buồng quét AI.
+  - Cảm biến nhiệt độ nội vi ESP32-C5: Tích hợp sẵn trên vi điều khiển ESP32-C5 (`driver/temperature_sensor.h`), giám sát nhiệt độ vi điều khiển (>75°C kích hoạt cảnh báo).
+  - Nút nhấn Start vật lý (GPIO23): Kèm mạch lọc RC chống rung phím (debounce 20ms).
 - **Cơ cấu chấp hành (Actuators)**:
-  - Động cơ DC kéo băng tải điều khiển qua mạch MCPWM (GPIO IO4).
-  - 2 Cơ cấu Servo gạt phôi: Servo 1 (PWM IO23) cho Khay 1; Servo 2 (PWM IO24) cho Khay 2.
+  - Động cơ DC kéo băng tải điều khiển qua mạch cầu H L298N: IN1 (GPIO8) và IN2 (GPIO9).
+  - 2 Cơ cấu Servo gạt phôi: Servo 1 (PWM GPIO6) cho Khay 1; Servo 2 (PWM GPIO24) cho Khay 2 điều khiển qua LEDC PWM non-blocking.
   - Máng trượt trọng lực cuối băng tải: Cho Khay 3 (Lọ thuốc / fail-safe không cần servo).
-  - Nút dừng khẩn cấp vật lý E-Stop (chân GPIO IO10 với cơ chế ngắt phần cứng - Interrupt).
+  - LED chỉ báo trạng thái (GPIO10): Xanh lá chớp theo FSM (1Hz IDLE, ON RUNNING, 5Hz JAMMED).
+  - Nút dừng khẩn cấp vật lý E-Stop: Mạch ngắt cứng nguồn 12V trước tiếp điểm relay/driver bảo vệ toàn diện.
 
 ---
 
@@ -215,31 +215,33 @@ Xây dựng trên nền tảng Next.js 14 App Router với hiệu năng tối ư
 
 ### 3.1. Sơ Đồ Tuần Tự: Luồng Phân Loại Dụng Cụ Y Tế Thực Tế (End-to-End Sorting Pipeline)
 
+> [!NOTE]
+> **Trạng thái Dữ liệu Trạm AI Hiện Tại:** Mô hình AI trong thư mục `PBL.v1i.yolov11` hiện đang dùng **tập dữ liệu thử nghiệm nội bộ (Pilot / Sandbox Trial Dataset)** với 2 nhãn `HH` và `T` để phục vụ việc tập dượt quy trình train và kiểm chứng đường truyền MQTT với ESP32-C5 / Dashboard. Bộ dữ liệu mẫu vật y tế chính thức đầy đủ 4 nhóm sẽ được gán nhãn và tích hợp khi hoàn tất thu thập mẫu vật thực tế.
+
 ```mermaid
 sequenceDiagram
     autonumber
     participant Belt as Băng Tải & Cảm Biến S1
-    participant Cam as Camera & Vision AI (YOLOv8)
+    participant Cam as Camera & Vision AI (YOLO11)
     participant ESP as Vi Điều Khiển ESP32-C5
     participant Broker as MQTT Broker
     participant Servo as Cơ Cấu Gạt Servo
     participant Server as node:http Backend
     participant UI as Dashboard Web/Mobile
 
-    Belt->>ESP: Dụng cụ kích hoạt S1 (IO0)
-    Cam->>Cam: Chụp ảnh & Chạy mô hình YOLOv8 nhận diện dụng cụ
-    Cam->>Broker: Publish: sorter/01/vision { brand: "med_syringe", confidence: 0.96 }
-    Broker->>ESP: Forward vision payload
+    Belt->>ESP: Dụng cụ kích hoạt S1 (GPIO0) - Chốt xung Encoder
+    Cam->>Cam: Chụp ảnh & Chạy mô hình YOLO11 nhận diện dụng cụ
+    Cam->>Broker: Publish: sorter/sorter_01/vision { brand: "med_syringe", confidence: 0.96 }
+    Broker->>ESP: Forward vision payload (Ghép cặp FIFO Queue)
     Broker->>UI: WSS Telemetry update (Vẽ dụng cụ trên Canvas 60fps)
     
     ESP->>ESP: Tra cứu rules: med_syringe -> Bin 1 (Sharps Waste)
-    ESP->>Belt: Giám sát Encoder tính toán thời điểm đến vị trí Khay 1
+    ESP->>Belt: Encoder PCNT đếm xung tracking đến cự ly 200mm (Servo 1)
     
-    Belt->>ESP: Dụng cụ chạm cảm biến S2 (IO1 - Trước khay 1)
-    ESP->>Servo: Xuất xung PWM kích hoạt Servo #1 (IO23) gạt phôi
+    ESP->>Servo: Kích hoạt Servo #1 (GPIO6) gạt phôi non-blocking
     Servo->>Servo: Gạt dụng cụ sắc nhọn vào Khay 1 an toàn
     
-    ESP->>Broker: Publish: sorter/01/telemetry { bin_1_count: +1, speed: 1.2 }
+    ESP->>Broker: Publish: sorter/sorter_01/telemetry { bin_1_count: +1, speed: 1.2 }
     Broker->>UI: Cập nhật số đếm Khay 1 & Phát âm thanh phân loại
     
     UI->>Server: POST /api/history (Ghi bản ghi phân loại)
@@ -385,7 +387,7 @@ erDiagram
         int target_bin "Khay mục tiêu (1: Sắc nhọn, 2: Tiệt trùng, 3: Vật tư/Mặc định)"
         int actual_bin "Khay thực tế (1, 2, 3)"
         string status "Kết quả: success | misplaced | rejected"
-        float confidence "Độ tin cậy YOLOv8 (0.0 - 1.0)"
+        float confidence "Độ tin cậy YOLO11 (0.0 - 1.0)"
         datetime timestamp "Thời điểm phân loại"
     }
 

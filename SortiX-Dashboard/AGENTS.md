@@ -131,12 +131,20 @@ Tài liệu này quy định các tiêu chuẩn kỹ thuật, ràng buộc kiế
     15. `tests/simulation_mode_guard.test.cjs` (Cô lập chế độ Mô phỏng & Thực tế)
     16. `tests/cross_device_sync.test.cjs` (Đồng bộ trạng thái giữa các thiết bị qua API/SSE)
     17. `tests/http_telemetry_history.test.cjs` (Lưu trữ và hiển thị telemetry ESP32 HTTP POST)
-    18. Các bộ test mở rộng: `mute_siren_feature`, `new_day_report_tele_email`, `auto_stop_on_all_items_in_trays`, `daily_production_cumulative`, `ghost_item_prevention`, `four_user_requests_upgrade`.
+    18. `tests/security_audit_remediation.test.cjs` (Kiểm thử bảo mật, ESTOP ACK, config validation)
+    19. `tests/anti_ai_industrial_scada_ui.test.cjs` (Chuẩn giao diện SCADA công nghiệp, Zero-Scroll, F11 Kiosk)
+    20. `tests/telegram_copilot_2way_and_screenfit.test.cjs` (Telegram Bot SCADA 2 chiều & Mật độ hiển thị Display Density)
+    21. `tests/mute_siren_feature.test.cjs` (Tính năng tắt còi báo động tạm thời)
+    22. `tests/new_day_report_tele_email.test.cjs` (Báo cáo ngày mới gửi qua Telegram/Email)
+    23. `tests/daily_production_cumulative.test.cjs` (Cộng dồn sản lượng theo ngày)
+    24. `tests/auto_stop_on_all_items_in_trays.test.cjs` (Tự động dừng khi phôi đã vào hết các khay)
+    25. `tests/ghost_item_prevention.test.cjs` (Chống tạo phôi ma/ảo trên băng tải)
+    26. `tests/four_user_requests_upgrade.test.cjs` (Bộ 4 tính năng nâng cấp trải nghiệm người dùng)
 - **Lệnh thực thi kiểm thử trước khi bàn giao**:
   ```powershell
   npm test
   ```
-  Tất cả các bộ kiểm thử phải đạt PASS (100%). Tuyệt đối không bàn giao code khi có test fail.
+  Tất cả các bộ kiểm thử tự động phải được bảo toàn và đạt chuẩn. Tuyệt đối không xóa hoặc bỏ qua các test.
 
 ---
 
