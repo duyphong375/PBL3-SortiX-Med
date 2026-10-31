@@ -473,14 +473,6 @@ export const NextUsersStore = {
 
     const user = { ...users[index] };
 
-    // BẢO MẬT: Tài khoản Quản trị viên (Admin) chỉ được phép đổi mật khẩu khi đã đăng nhập bên trong hệ thống
-    if (user.role === "admin") {
-      return {
-        success: false,
-        message: "Vì lý do an toàn bảo mật, tài khoản Quản trị viên (Admin) chỉ có thể đổi mật khẩu sau khi đã đăng nhập vào hệ thống.",
-      };
-    }
-
     if (!user.reset_otp || !user.reset_otp_expires_at) {
       return { success: false, message: "Yêu cầu khôi phục không tồn tại hoặc đã bị hủy. Vui lòng tạo yêu cầu mới." };
     }

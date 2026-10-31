@@ -467,10 +467,10 @@ export function ForgotPasswordModal({
                     />
                   </div>
 
-                  <div className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-2.5">
-                    <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                  <div className="mt-3 rounded-xl border border-cyan-500/25 bg-cyan-500/10 p-3 text-[11px] text-cyan-800 dark:text-cyan-300 flex items-start gap-2.5">
+                    <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-cyan-600 dark:text-cyan-400" />
                     <span className="leading-relaxed">
-                      <strong>Quy tắc bảo mật:</strong> Tính năng Quên mật khẩu qua OTP bên ngoài chỉ áp dụng cho tài khoản <strong>Người dùng (User)</strong>. Tài khoản <strong>Quản trị viên (Admin)</strong> chỉ được phép đổi mật khẩu ở bên trong sau khi đã đăng nhập.
+                      <strong>Hệ thống SortiX:</strong> Mã xác thực OTP sẽ hiển thị trực tiếp trên màn hình để bạn dễ dàng thử nghiệm và khôi phục mật khẩu nhanh chóng.
                     </span>
                   </div>
                 </div>
@@ -543,6 +543,23 @@ export function ForgotPasswordModal({
                       required
                     />
                   </div>
+
+                  {/* Hiển thị mã OTP trực tiếp ngay trên form để người dùng dễ thao tác */}
+                  {mockOtpToast?.otp && (
+                    <div className="mt-2.5 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2 text-xs text-emerald-800 dark:text-emerald-300 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <div className="flex items-center gap-2 font-medium">
+                        <KeyRound className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span>Mã OTP: <strong className="font-mono text-sm tracking-widest text-emerald-600 dark:text-emerald-400 font-bold ml-1">{mockOtpToast.otp}</strong></span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAutoFillOtp(mockOtpToast.otp)}
+                        className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1 text-[11px] font-bold text-white transition-colors cursor-pointer shadow-xs active:scale-95"
+                      >
+                        Tự động điền
+                      </button>
+                    </div>
+                  )}
 
                   {/* Nút gửi lại mã nếu hết hạn */}
                   <div className="mt-1.5 flex items-center justify-between text-[11px]">
