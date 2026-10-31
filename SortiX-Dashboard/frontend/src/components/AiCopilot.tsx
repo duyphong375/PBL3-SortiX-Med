@@ -808,7 +808,7 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
 ------------------------------------------------------------
 [CẤU HÌNH THIẾT BỊ & KẾT NỐI IOT]:
 - Thiết bị điều khiển: ${telemetry?.device_id || "sorter_01"} (Phiên bản cấu hình: v${sorterConfig?.config_version ?? 1})
-- Trạng thái Actuator Servo: Servo 1 (GPIO6: ${telemetry?.arm1_active ? "Đang gạt" : "Chờ"}), Servo 2 (GPIO24: ${telemetry?.arm2_active ? "Đang gạt" : "Chờ"})
+- Trạng thái Actuator Servo: Servo 1 (GPIO6: ${telemetry?.arm1_active ? "Đang gạt" : "Chờ"}), Servo 2 (GPIO7: ${telemetry?.arm2_active ? "Đang gạt" : "Chờ"})
 - Kết nối MQTT Broker: ${mqttStatus || "connected"} (Ping: ${dashboard.pingMs ?? 15}ms)
 - Wi-Fi ESP32-C5: ${telemetry?.wifi_band || "5.0 GHz (Wi-Fi 6)"} (${telemetry?.wifi_rssi ?? -58} dBm)
 - Cảnh báo chưa giải quyết: ${unresolvedAlerts.length} sự cố ${unresolvedAlerts.length > 0 ? `(${unresolvedAlerts[0].description})` : ""}

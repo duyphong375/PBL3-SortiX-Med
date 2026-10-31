@@ -405,7 +405,7 @@ flowchart TD
 3. **Tra cứu quy tắc phân loại & Cơ chế An toàn Fail-safe**:
    - ESP32-C5 so khớp `brand` với bảng quy tắc cấu hình `rules` hiện tại:
      - `med_syringe` -> **Khay 1: Thùng vật sắc nhọn lây nhiễm (Sharps Waste)** (Servo 1 - PWM GPIO6 gạt vào khay)
-     - `med_forceps` / `med_scissors` -> **Khay 2: Khay hấp tiệt trùng Autoclave (Surgical Instruments)** (Servo 2 - PWM GPIO24 gạt vào khay)
+     - `med_forceps` / `med_scissors` -> **Khay 2: Khay hấp tiệt trùng Autoclave (Surgical Instruments)** (Servo 2 - PWM GPIO7 gạt vào khay)
      - `med_vial` -> **Khay 3: Khay vật tư y tế & Phục hồi** (Chạy thẳng cuối băng tải qua máng trượt trọng lực, không kích hoạt servo)
      - **Nguyên tắc An toàn Sinh học (Fail-safe)**: Mọi vật phẩm không nhận diện được hoặc độ tin cậy `confidence < 60%` (0.60) sẽ tự động chạy thẳng vào **Khay 3** để nhân viên y tế kiểm tra lại, tuyệt đối không gạt nhầm vào Khay 2 tiệt trùng.
 4. **Kích hoạt cơ cấu Servo gạt theo Tracking Encoder**:

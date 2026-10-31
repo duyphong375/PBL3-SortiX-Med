@@ -10,7 +10,7 @@ extern "C" {
 
 typedef enum {
     SERVO_ID_1 = 0,     // Cần gạt 1: GPIO6 (Ngăn phân loại 1)
-    SERVO_ID_2,         // Cần gạt 2: GPIO24 (Ngăn phân loại 2)
+    SERVO_ID_2,         // Cần gạt 2: GPIO7 (Ngăn phân loại 2)
     SERVO_COUNT
 } servo_id_t;
 
@@ -22,7 +22,7 @@ typedef enum {
 } servo_fsm_state_t;
 
 /**
- * @brief Khởi tạo 2 động cơ servo MG996R thông qua LEDC PWM tần số 50Hz (GPIO6 và GPIO24).
+ * @brief Khởi tạo 2 động cơ servo MG996R thông qua LEDC PWM tần số 50Hz (GPIO6 và GPIO7).
  *        Thiết lập máy trạng thái (FSM) điều khiển bằng timer non-blocking (không chặn). Cả 2 cần gạt bắt đầu ở trạng thái IDLE (thu về).
  * @return ESP_OK nếu thành công.
  */

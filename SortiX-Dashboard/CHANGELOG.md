@@ -11,7 +11,7 @@ Tất cả các thay đổi về kiến trúc, tính năng, sửa lỗi và nân
   - Cập nhật chuẩn hóa toàn bộ tài liệu từ YOLOv8 sang **Ultralytics YOLO11** (`PBL.v1i.yolov11`), mô tả chi tiết tập dữ liệu y tế (2 nhãn `HH` và `T`), script đa năng `test_yolo.py` và đường truyền MQTT topic `sorter/sorter_01/vision`.
   - Khởi tạo tài liệu kiến trúc độc lập `PBL.v1i.yolov11/README.md`.
 - **Đồng Bộ Phần Cứng & Pinout Chuẩn**:
-  - Chuẩn hóa chân tín hiệu cơ cấu chấp hành: Servo 1 nối **GPIO6** (PWM LEDC), Servo 2 nối **GPIO24** (PWM LEDC), nút Start vật lý nối **GPIO23** (Debounce RC 20ms).
+  - Chuẩn hóa chân tín hiệu cơ cấu chấp hành: Servo 1 nối **GPIO6** (PWM LEDC), Servo 2 nối **GPIO7** (PWM LEDC), nút Start vật lý nối **GPIO23** (Debounce RC 20ms).
   - Loại bỏ các mô tả lỗi thời về cảm biến quang học S2/S3 rời; đồng bộ hóa cơ chế theo dõi vị trí phôi qua **bộ đếm xung phần cứng New PCNT (GPIO1 & GPIO4)** và FIFO Tracking Ring Buffer.
 - **Đồng Bộ Bảng MQTT Topics & REST API**:
   - Đồng bộ 100% danh mục MQTT topics giữa Firmware ESP32-C5 (`app_config.h`) và Dashboard (`DEFAULT_MQTT_TOPICS`).

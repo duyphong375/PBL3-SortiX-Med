@@ -52,7 +52,7 @@
 #define DEFAULT_HTTP_TELEMETRY_URL          "http://192.168.1.100:5000/api/telemetry"    // Đường dẫn gửi HTTP Telemetry
 
 // wifi_manager sẽ tự tạo SSID duy nhất và mật khẩu ngẫu nhiên nếu để trống
-#define SOFTAP_SSID                         "phongchimto"
+#define SOFTAP_SSID                         "SortiX-Setup"
 #define SOFTAP_PASS                         "12345678"
 
 // =============================================================================

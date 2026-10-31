@@ -190,7 +190,7 @@ function AnalyticsPageContent() {
         return {
           binId: 2,
           name: `Khay 2: ${brandNames}`,
-          route: `Servo ${sorterConfig.servo_routes?.["2"]?.io || "GPIO24"} • Góc ${sorterConfig.servo_routes?.["2"]?.angle ?? 45}°`,
+          route: `Servo ${sorterConfig.servo_routes?.["2"]?.io || "GPIO7"} • Góc ${sorterConfig.servo_routes?.["2"]?.angle ?? 45}°`,
           badgeStyle: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
           dot: "bg-blue-500 shadow-[0_0_8px_#3b82f6]",
         };

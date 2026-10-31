@@ -156,7 +156,7 @@ Hệ thống **SortiX-Med** được thiết kế theo mô hình kiến trúc ph
 Xây dựng trên nền tảng Next.js 14 App Router với hiệu năng tối ưu:
 - **Trực quan hóa vật lý 60fps & Cơ Cấu Gạt Servo (`useConveyorPhysics.ts`)**:
   - Vòng lặp `requestAnimationFrame` tính toán tọa độ di chuyển của dụng cụ y tế trên băng chuyền.
-  - Mô phỏng cơ cấu **Servo gạt xoay góc** (Servo 1 - PWM GPIO6, Servo 2 - PWM GPIO24) gạt dụng cụ vào đúng máng trượt Khay 1 (Sắc nhọn), Khay 2 (Tiệt trùng) hoặc trượt thẳng vào Khay 3 (Vật tư/Fail-safe).
+  - Mô phỏng cơ cấu **Servo gạt xoay góc** (Servo 1 - PWM GPIO6, Servo 2 - PWM GPIO7) gạt dụng cụ vào đúng máng trượt Khay 1 (Sắc nhọn), Khay 2 (Tiệt trùng) hoặc trượt thẳng vào Khay 3 (Vật tư/Fail-safe).
   - Cho phép người dùng **dọn khay chủ động bất kỳ lúc nào** ngay trên giao diện mà không cần đợi đủ định mức.
 - **Độ Rộng & Sức Chứa Khay Linh Hoạt (Dynamic Bin Capacities 5 - 50 SP)**:
   - Cung cấp 3 thanh trượt điều chỉnh độ rộng/sức chứa riêng biệt cho từng khay trên `ConveyorVisualizer.tsx`, `LiveHealthAndBinWidget.tsx` và `ConfigAndDiagnostics.tsx`.
@@ -204,7 +204,7 @@ Xây dựng trên nền tảng Next.js 14 App Router với hiệu năng tối ư
   - Nút nhấn Start vật lý (GPIO23): Kèm mạch lọc RC chống rung phím (debounce 20ms).
 - **Cơ cấu chấp hành (Actuators)**:
   - Động cơ DC kéo băng tải điều khiển qua mạch cầu H L298N: IN1 (GPIO8) và IN2 (GPIO9).
-  - 2 Cơ cấu Servo gạt phôi: Servo 1 (PWM GPIO6) cho Khay 1; Servo 2 (PWM GPIO24) cho Khay 2 điều khiển qua LEDC PWM non-blocking.
+  - 2 Cơ cấu Servo gạt phôi: Servo 1 (PWM GPIO6) cho Khay 1; Servo 2 (PWM GPIO7) cho Khay 2 điều khiển qua LEDC PWM non-blocking.
   - Máng trượt trọng lực cuối băng tải: Cho Khay 3 (Lọ thuốc / fail-safe không cần servo).
   - LED chỉ báo trạng thái (GPIO10): Xanh lá chớp theo FSM (1Hz IDLE, ON RUNNING, 5Hz JAMMED).
   - Nút dừng khẩn cấp vật lý E-Stop: Mạch ngắt cứng nguồn 12V trước tiếp điểm relay/driver bảo vệ toàn diện.

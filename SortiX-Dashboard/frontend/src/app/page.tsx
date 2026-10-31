@@ -104,7 +104,7 @@ export default function DashboardPage() {
     {
       id: "servo_2",
       name: "Servo Gạt 2 (MG996R)",
-      pin: "GPIO24",
+      pin: "GPIO7",
       category: "actuator",
       type: "servo",
       isOn: isArm2On,

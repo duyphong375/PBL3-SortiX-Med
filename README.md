@@ -65,7 +65,7 @@ d:/PBL3_NHOM5/
 │   ├── components/                         # 14 module nhúng độc lập (Loose Coupling)
 │   │   ├── motor_control/                  # Điều khiển động cơ DC qua L298N (IN1: GPIO8, IN2: GPIO9)
 │   │   ├── encoder/                        # Bộ đếm xung New PCNT quadrature x4 (Kênh A: GPIO1, Kênh B: GPIO4)
-│   │   ├── servo/                          # Điều khiển 2 Servo MG996R non-blocking qua LEDC PWM (GPIO6, GPIO24)
+│   │   ├── servo/                          # Điều khiển 2 Servo MG996R non-blocking qua LEDC PWM (GPIO6, GPIO7)
 │   │   ├── sensors/                        # Ngắt IR S1 (GPIO0) và đọc quang trở LDR (GPIO5)
 │   │   ├── button/                         # Ngắt nút nhấn Start vật lý (GPIO23) + debounce 20ms
 │   │   ├── led_indicator/                  # Quản lý hiệu ứng LED xanh trạng thái (GPIO10) qua timer 100ms
@@ -130,7 +130,7 @@ d:/PBL3_NHOM5/
 - **Nền tảng:** ESP-IDF v5.5.x, chuẩn C11, target `esp32c5`.
 - **Cơ chế hoạt động:**
   - `task_conveyor` (Priority 6): Đọc xung bộ đếm phần cứng PCNT từ encoder motor, phát hiện kẹt cơ khí (Encoder Stall) khi motor quay nhưng trục không chuyển động trong 1.8s.
-  - `task_sorting` (Priority 5): Quản lý Tracking Ring Buffer (tối đa 15 phôi trên băng tải). Khi vật cản đi qua cảm biến IR S1 (GPIO0), ngắt cạnh xuống kích hoạt chốt xung encoder và timestamp. Khi có kết quả Vision AI từ MQTT, phôi được ghép cặp FIFO và tính toán cự ly để kích hoạt Servo 1 (GPIO6) hoặc Servo 2 (GPIO24) theo FSM non-blocking.
+  - `task_sorting` (Priority 5): Quản lý Tracking Ring Buffer (tối đa 15 phôi trên băng tải). Khi vật cản đi qua cảm biến IR S1 (GPIO0), ngắt cạnh xuống kích hoạt chốt xung encoder và timestamp. Khi có kết quả Vision AI từ MQTT, phôi được ghép cặp FIFO và tính toán cự ly để kích hoạt Servo 1 (GPIO6) hoặc Servo 2 (GPIO7) theo FSM non-blocking.
   - `task_mqtt` (Priority 4): Gửi định kỳ Telemetry (1.5s), Heartbeat (2.0s), kết quả phân loại (`classification`), cảnh báo kẹt (`conveyor/sensor/jam`) và nhiệt SoC (`conveyor/telemetry/temp`).
   - `task_http_tele` (Priority 2): Định kỳ 5s gửi dữ liệu HTTP POST lên Backend Node.js port 5000 (`/api/telemetry`).
   - `task_safety` (Priority 5): Giám sát nhiệt độ lõi chip qua cảm biến nhiệt nội (`driver/temperature_sensor.h`) và quản lý watchdog.

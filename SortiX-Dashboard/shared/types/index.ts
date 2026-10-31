@@ -121,7 +121,7 @@ export interface TelemetryData {
   s1_entry: boolean; // GPIO0 - Cảm biến vật cản hồng ngoại LM393 (Active Low)
   ldr_active?: boolean; // GPIO5 - Cảm biến quang trở ánh sáng buồng quét LM393
   arm1_active: boolean; // GPIO6 - Servo 1 (MG996R Khay 1)
-  arm2_active: boolean; // GPIO24 - Servo 2 (MG996R Khay 2)
+  arm2_active: boolean; // GPIO7 - Servo 2 (MG996R Khay 2)
   start_btn_pressed?: boolean; // GPIO23 - Nút nhấn Khởi Động Start (PBS-110)
   estop_pressed: boolean; // Firmware E-stop latch state; no separate physical contact feedback
   encoder_count: number; // GPIO1 (Phase A) & GPIO4 (Phase B) - Xung Encoder JGB37-520

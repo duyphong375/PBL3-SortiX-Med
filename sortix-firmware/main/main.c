@@ -205,7 +205,7 @@ void app_main(void)
     // 3. Khởi tạo điều khiển động cơ (GPIO8 IN1, GPIO9 IN2)
     ESP_ERROR_CHECK(motor_control_init());
 
-    // 4. Khởi tạo Servo MG996R non-blocking (GPIO6 S1, GPIO24 S2)
+    // 4. Khởi tạo Servo MG996R non-blocking (GPIO6 S1, GPIO7 S2)
     ESP_ERROR_CHECK(servo_init());
 
     // 5. Khởi tạo máy trạng thái FSM (Luôn khởi động an toàn ở trạng thái IDLE)

@@ -147,7 +147,7 @@ export const ConfigAndDiagnostics: React.FC<ConfigAndDiagnosticsProps> = ({
       timestamp: new Date().toISOString(),
       servo_routes: config.servo_routes || {
         "1": { io: "GPIO6", angle: 45 },
-        "2": { io: "GPIO24", angle: 45 },
+        "2": { io: "GPIO7", angle: 45 },
       },
     };
 

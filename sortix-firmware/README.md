@@ -37,7 +37,7 @@ sortix-firmware/
 │   │   ├── encoder.c                       # Code thực thi: Quadrature x4, bộ lọc nhiễu 1us, watchpoint overflow
 │   │   └── CMakeLists.txt
 │   │
-│   ├── servo/                              # Điều khiển 2 servo MG996R non-blocking qua LEDC PWM (GPIO6, GPIO24)
+│   ├── servo/                              # Điều khiển 2 servo MG996R non-blocking qua LEDC PWM (GPIO6, GPIO7)
 │   │   ├── include/servo.h                 # Header: trigger non-blocking, reset, đọc FSM state
 │   │   ├── servo.c                         # Code thực thi: FSM (IDLE->OPENING->HOLDING->CLOSING->IDLE) qua esp_timer
 │   │   └── CMakeLists.txt
@@ -120,7 +120,7 @@ sortix-firmware/
 | Driver L298N IN2            | **GPIO9**  | Trái Pin 10         | Output (FWD=0, REV=1, BRAKE=1)    |
 | LED trạng thái (Xanh lá)    | **GPIO10** | Trái Pin 11         | Output, 100ms Software Timer      |
 | Nút Start vật lý            | **GPIO23** | Phải Pin 5          | Input Pull-up, Debounce RC + 20ms |
-| Servo 2 - PWM (Gạt 2)       | **GPIO24** | Phải Pin 4          | LEDC PWM 50Hz (Timer 0, Ch 1)     |
+| Servo 2 - PWM (Gạt 2)       | **GPIO7**  | Trái Pin 8          | LEDC PWM 50Hz (Timer 0, Ch 1)     |
 
 ### ⚠ CÁC CHÂN CẤM SỬ DỤNG (FORBIDDEN GPIOs):
 - **GPIO15 (SPICS1):** Đã nối cứng nội bộ với IC PSRAM 8MB Quad SPI bên trong nắp shield kim loại.
@@ -160,7 +160,7 @@ sortix-firmware/
    - Quản lý bộ đệm xoay vòng FIFO (Tracking Queue) tối đa 15 vật thể trên băng tải.
    - Nhận ngắt từ S1 (GPIO0) kèm giá trị xung encoder và timestamp vi giây.
    - Ghép cặp kết quả Vision AI từ MQTT (`sorter/sorter_01/vision`) theo thứ tự FIFO.
-   - Điều khiển Servo 1 (GPIO6) và Servo 2 (GPIO24) qua FSM Non-blocking (`IDLE -> OPENING -> HOLDING -> CLOSING -> IDLE`).
+   - Điều khiển Servo 1 (GPIO6) và Servo 2 (GPIO7) qua FSM Non-blocking (`IDLE -> OPENING -> HOLDING -> CLOSING -> IDLE`).
    - Áp dụng `PAUSE_AND_HOLD` hoặc `DIVERT_TO_DEFAULT`; bản ghi có `routed_bin` để thống kê hướng firmware đã điều khiển, còn `actual_bin: 0` và trạng thái `unverified` nếu chưa có cảm biến xác nhận phôi vào khay.
 3. **`task_mqtt` (Priority 4):**
    - Quản lý kết nối MQTT Client với cơ chế tự động kết nối lại (exponential backoff: 3s, 5s, 10s, 30s).

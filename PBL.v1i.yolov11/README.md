@@ -50,7 +50,7 @@ PBL.v1i.yolov11/
 | Nhãn mô hình (`class`) | Ý nghĩa thử nghiệm | Khay đích mô phỏng | Cơ cấu chấp hành |
 |:---:|---|:---:|---|
 | **`HH`** | Mẫu vật phân loại 1 (Hư Hỏng / Bơm kim tiêm / Sắc nhọn) | **Khay 1** (Sharps Waste) | Kích hoạt **Servo 1** (GPIO6) gạt vào khay |
-| **`T`** | Mẫu vật phân loại 2 (Tiêu chuẩn / Kẹp Pean, Kéo mổ) | **Khay 2** (Autoclave) | Kích hoạt **Servo 2** (GPIO24) gạt vào khay |
+| **`T`** | Mẫu vật phân loại 2 (Tiêu chuẩn / Kẹp Pean, Kéo mổ) | **Khay 2** (Autoclave) | Kích hoạt **Servo 2** (GPIO7) gạt vào khay |
 | *Không nhận diện* / *Confidence < 60%* | Phôi không xác định / Lỗi nhận diện | **Khay 3** (General Supplies) | Chạy thẳng cuối băng tải (Không kích servo) |
 
 ### 3.2. Lộ Trình Cập Nhật Bộ Dữ Liệu Chính Thức Của Đề Tài
@@ -148,4 +148,4 @@ Khi trạm AI phát hiện vật thể, kết quả được publish trực ti�
 - **Quy trình ghép cặp tại ESP32-C5:**
   1. Cảm biến IR S1 (GPIO0) ngắt chốt xung Encoder đưa phôi vào FIFO Tracking Queue.
   2. Gói tin MQTT Vision nhận được sẽ được ghép cặp với phôi đứng đầu hàng đợi FIFO.
-  3. Firmware căn cứ vào `brand` / `label` và giá trị `confidence` để quyết định kích hoạt Servo 1 (GPIO6), Servo 2 (GPIO24) hoặc thả trôi về Khay 3.
+  3. Firmware căn cứ vào `brand` / `label` và giá trị `confidence` để quyết định kích hoạt Servo 1 (GPIO6), Servo 2 (GPIO7) hoặc thả trôi về Khay 3.

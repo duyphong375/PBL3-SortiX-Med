@@ -171,15 +171,15 @@ export const ConveyorStations: React.FC<ConveyorStationsProps> = ({
         </div>
       </div>
 
-      {/* 3. CƠ CẤU CÁNH TAY GẠT SERVO 2 (MG996R - GPIO24) & TRẠM ENCODER 400mm (72%) */}
+      {/* 3. CƠ CẤU CÁNH TAY GẠT SERVO 2 (MG996R - GPIO7) & TRẠM ENCODER 400mm (72%) */}
       <div className="absolute left-[72%] -top-4 bottom-0 z-30 flex flex-col items-center justify-between pointer-events-none -translate-x-1/2 w-16">
         {/* Thân Động Cơ Servo TowerPro MG996R Nhôm CNC */}
         <div className="relative z-40 flex flex-col items-center w-14 rounded-md border-2 border-slate-500 bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 shadow-xl px-1 py-1">
-          {/* Cụm dây cấp nguồn 3 pha: Tín hiệu Xanh (GPIO24), Nguồn Đỏ (5V XL4015), Mass Nâu (GND) */}
+          {/* Cụm dây cấp nguồn 3 pha: Tín hiệu Xanh (GPIO7), Nguồn Đỏ (5V XL4015), Mass Nâu (GND) */}
           <div className="flex w-full justify-between px-1 mb-0.5">
             <div
               className="h-1.5 w-1.5 rounded-full bg-blue-500 border border-blue-600 shadow-xs"
-              title="Tín hiệu PWM (Xanh - GPIO24)"
+              title="Tín hiệu PWM (Xanh - GPIO7)"
             />
             <div
               className="h-1.5 w-1.5 rounded-full bg-rose-500 border border-rose-600 shadow-xs"
@@ -205,7 +205,7 @@ export const ConveyorStations: React.FC<ConveyorStationsProps> = ({
             />
           </div>
           <div className="flex items-center justify-between w-full px-0.5 text-[6px] font-mono text-slate-400 uppercase tracking-tighter">
-            <span>GPIO24</span>
+            <span>GPIO7</span>
             <span className={arm2Active ? "text-blue-300 font-bold" : ""}>
               {arm2Active ? "SWEEP 45°" : "REST 0°"}
             </span>

@@ -64,8 +64,12 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# VS Code (preserve settings.json if needed, ignore workspace caches)
-.vscode/*
-!.vscode/settings.json
+# VS Code (ignore personal workspace & machine configs)
+.vscode/
+*/.vscode/
+
+# YOLO runs / training / inference outputs
+runs/
+**/runs/
 
 .vercel

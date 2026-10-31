@@ -8,7 +8,7 @@
 static const char *TAG = "SERVO_MG996R";
 
 #define SERVO_PIN_1             GPIO_NUM_6
-#define SERVO_PIN_2             GPIO_NUM_24
+#define SERVO_PIN_2             GPIO_NUM_7
 
 #define LEDC_SERVO_MODE         LEDC_LOW_SPEED_MODE
 #define LEDC_SERVO_TIMER        LEDC_TIMER_0

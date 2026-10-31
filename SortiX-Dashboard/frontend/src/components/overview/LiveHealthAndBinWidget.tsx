@@ -341,7 +341,7 @@ export function LiveHealthAndBinWidget({
                     </TooltipTrigger>
                     <TooltipContent side="top">
                       <p className="font-mono text-xs">
-                        Gạt Servo 2 (GPIO24 • MG996R) • Góc: 45° • Trạm 400mm
+                        Gạt Servo 2 (GPIO7 • MG996R) • Góc: 45° • Trạm 400mm
                       </p>
                     </TooltipContent>
                   </Tooltip>

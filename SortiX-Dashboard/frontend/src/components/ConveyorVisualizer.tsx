@@ -222,7 +222,7 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
           </div>
           <div className={`rounded-lg border py-1.5 px-2 flex items-center justify-center gap-1.5 shadow-sm font-mono min-w-0 ${bin2Theme.stationBadge}`}>
             <span className="shrink-0">🎛️</span>
-            <span className="truncate">3. SERVO 2 (GPIO24 • 400mm • 72%)</span>
+            <span className="truncate">3. SERVO 2 (GPIO7 • 400mm • 72%)</span>
           </div>
           <div className={`rounded-lg border py-1.5 px-2 flex items-center justify-center gap-1.5 shadow-sm font-mono min-w-0 ${bin3Theme.stationBadge}`}>
             <span className="shrink-0">📥</span>
@@ -511,7 +511,7 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
                       Máng 2: {bin2Brands.length > 0 ? bin2Brands.map((b) => CATALOG_BRANDS[b]?.name || b).join(", ") : "Kẹp PT / Dao mổ"}
                     </span>
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono block">
-                      Servo 2 (MG996R - GPIO24) • 400mm (72%)
+                      Servo 2 (MG996R - GPIO7) • 400mm (72%)
                     </span>
                   </div>
                 </div>

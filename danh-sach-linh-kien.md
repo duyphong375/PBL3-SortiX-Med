@@ -49,7 +49,7 @@ Module XL4015 là phương án buck đang xem xét. Dòng liên tục thực t�
 > 1. **Driver L298N (Động cơ 65 RPM):** Nối vào **GPIO8** (IN1 - Dãy Trái Pin 9) và **GPIO9** (IN2 - Dãy Trái Pin 10).
 > 2. **Cổng Type-C USB Native trên bo WeAct:** Dành riêng cho **GPIO13** (USB D- - Dãy Phải Pin 14) và **GPIO14** (USB D+ - Dãy Phải Pin 13), không dùng làm chân xuất tín hiệu khác để bảo toàn tính năng nạp code và debug native USB CDC/JTAG.
 > 3. **Động cơ Servo 1:** Điều khiển bằng xung PWM tại **GPIO6** (Dãy Trái Pin 7).
-> 4. **Động cơ Servo 2:** Điều khiển bằng xung PWM tại **GPIO24** (Dãy Phải Pin 4). Tuyệt đối không nối vào chân **GPIO15 / SPICS1** (Dãy Phải Pin 6) vì đây là đường chọn chip nội bộ của bộ nhớ 8 MB PSRAM.
+> 4. **Động cơ Servo 2:** Điều khiển bằng xung PWM tại **GPIO7** (Dãy Trái Pin 8). Tuyệt đối không nối vào chân **GPIO15 / SPICS1** (Dãy Phải Pin 6) vì đây là đường chọn chip nội bộ của bộ nhớ 8 MB PSRAM.
 > 5. **Bộ đọc Encoder:** Kênh A nối vào **GPIO1** (ngắt ngoài - Dãy Trái Pin 6), Kênh B nối vào **GPIO4** (Dãy Phải Pin 8).
 > 6. **Cảm biến:** Cảm biến vật cản nối vào **GPIO0** (Dãy Trái Pin 5), Cảm biến ánh sáng nối vào **GPIO5** (Dãy Phải Pin 9), cả hai đều được nuôi bằng nguồn 3.3V lấy từ Dãy Trái Pin 1.
 > 7. **Nút nhấn Start:** Nối vào **GPIO23** (Dãy Phải Pin 5) kèm mạch lọc RC ($10\text{k}\Omega // 0.1\mu\text{F}$).
@@ -187,11 +187,11 @@ Sơ đồ chỉ bắt đầu từ đầu ra 12VDC. Model nguồn, cầu chì, co
 (Cấp nguồn 3.3V) | Pin  1 [3V3]                |  Pin  1 [GND]                   | ---> Nối mass nút Start & C3
                  | Pin  2 [RST - Reset]        |  Pin  2 [TX0 - GPIO11]          | ---> (Type-C UART Debug)
                  | Pin  3 [GPIO2]              |  Pin  3 [RX0 - GPIO12]          | ---> (Type-C UART Debug)
-                 | Pin  4 [GPIO3]              |  Pin  4 [GPIO24]                | ---> Tín hiệu SERVO 2 (PWM)
+                 | Pin  4 [GPIO3]              |  Pin  4 [GPIO24]                |
 CẢM BIẾN VẬT CẢN | Pin  5 [GPIO0]              |  Pin  5 [GPIO23]                | <--- NÚT NHẤN START (RC)
 ENCODER KÊNH A   | Pin  6 [GPIO1]              |  Pin  6 [N/15 - SPICS1]         | (ĐỂ TRỐNG - 8MB PSRAM NỘI)
 Tín hiệu SERVO 1 | Pin  7 [GPIO6]              |  Pin  7 [GPIO27/RGB]            | (LED RGB trên bo WeAct)
-                 | Pin  8 [GPIO7]              |  Pin  8 [GPIO4]                 | <--- ENCODER KÊNH B
+Tín hiệu SERVO 2 | Pin  8 [GPIO7]              |  Pin  8 [GPIO4]                 | <--- ENCODER KÊNH B
 DRIVER L298N IN1 | Pin  9 [GPIO8]              |  Pin  9 [GPIO5]                 | <--- CẢM BIẾN ÁNH SÁNG
 DRIVER L298N IN2 | Pin 10 [GPIO9]              |  Pin 10 [NC]                    |
 LED TRẠNG THÁI   | Pin 11 [GPIO10]             |  Pin 11 [GPIO28/BOOT]           | (Nút BOOT trên bo WeAct)
@@ -221,7 +221,7 @@ MASS CHUNG (GND) | Pin 15 [GND]                |  Pin 15 [GND]                  
  3. ENCODER ĐỘNG CƠ 65 RPM (KÊNH A):                                                       GND    GND (Dãy Phải Pin 1)
     • Dây Kênh A -------> Nối vào chân GPIO1 (Dãy Trái Pin 6)
                                                                                  2. ĐỘNG CƠ SERVO 2 (MG996R - Gạt 2):
- 4. ĐỘNG CƠ SERVO 1 (MG996R - Gạt 1):                                               • Dây Cam/Vàng (Signal) -> GPIO24 (Phải Pin 4)
+ 4. ĐỘNG CƠ SERVO 1 (MG996R - Gạt 1):                                               • Dây Cam/Vàng (Signal) -> GPIO7 (Trái Pin 8)
     • Dây Cam/Vàng (Signal) -> Nối chân GPIO6 (Dãy Trái Pin 7)                      • Dây Đỏ      (VCC 5V)  -> Đường +5V (XL4015)
     • Dây Đỏ      (VCC 5V)  -> Đường +5V (từ mạch XL4015)                           • Dây Nâu/Đen (GND)     -> Mass chung (GND)
     • Dây Nâu/Đen (GND)     -> Mass chung (GND)
@@ -325,7 +325,7 @@ MASS CHUNG (GND) | Pin 15 [GND]                |  Pin 15 [GND]                  
  | BO WEACT ESP32-C5       |
  |                         |
  | GPIO6  (Trái Pin 7) ----+-----------------------> Dây Cam/Vàng (Signal) - SERVO 1 (Cửa gạt 1)
- | GPIO24 (Phải Pin 4) ----+-----------------------> Dây Cam/Vàng (Signal) - SERVO 2 (Cửa gạt 2)
+ | GPIO7  (Trái Pin 8) ----+-----------------------> Dây Cam/Vàng (Signal) - SERVO 2 (Cửa gạt 2)
  +-------------------------+
 
  +-------------------------+
@@ -422,7 +422,7 @@ Bảng sau minh họa hình học băng tải giả định dài 600 mm. Các t�
 | **Servo 1 (Gạt 1)** | Dây Signal | **Vàng / Cam** | **Dãy Trái - Pin 7 (GPIO6)** | Xuất xung PWM 50 Hz điều khiển góc gạt 1 |
 | | Dây VCC | **Đỏ** | **Ngõ ra +5.0V (Module XL4015)** | Nguồn công suất 5V nuôi motor servo |
 | | Dây GND | **Nâu / Đen** | **Mass chung (GND)** | Nối mass chung |
-| **Servo 2 (Gạt 2)** | Dây Signal | **Vàng / Cam** | **Dãy Phải - Pin 4 (GPIO24)** | Xuất xung PWM 50 Hz điều khiển góc gạt 2 |
+| **Servo 2 (Gạt 2)** | Dây Signal | **Vàng / Cam** | **Dãy Trái - Pin 8 (GPIO7)** | Xuất xung PWM 50 Hz điều khiển góc gạt 2 |
 | | Dây VCC | **Đỏ** | **Ngõ ra +5.0V (Module XL4015)** | Nguồn công suất 5V nuôi motor servo |
 | | Dây GND | **Nâu / Đen** | **Mass chung (GND)** | Nối mass chung |
 | **Driver L298N** | Chân IN1 | **Xanh lá** | **Dãy Trái - Pin 9 (GPIO8)** | Điều khiển chiều quay Thuận (kéo hàng tới) |

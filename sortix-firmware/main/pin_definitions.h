@@ -26,7 +26,7 @@
 #define PIN_SERVO_1             GPIO_NUM_6   // Hàng chân trái Pin 7: Xung PWM Servo 1 (Cần gạt 1 - Khay 1)
 #define PIN_MOTOR_IN1           GPIO_NUM_8   // Hàng chân trái Pin 9: L298N IN1 (Chiều quay/PWM)
 #define PIN_MOTOR_IN2           GPIO_NUM_9   // Hàng chân trái Pin 10: L298N IN2 (Chiều quay/PWM)
-#define PIN_SERVO_2             GPIO_NUM_24  // Hàng chân phải Pin 4: Xung PWM Servo 2 (Cần gạt 2 - Khay 2)
+#define PIN_SERVO_2             GPIO_NUM_7   // Hàng chân trái Pin 8: Xung PWM Servo 2 (Cần gạt 2 - Khay 2)
 
 // --- Giao diện người dùng & Đèn báo ---
 #define PIN_LED_STATUS          GPIO_NUM_10  // Hàng chân trái Pin 11: LED trạng thái (Màu xanh lá)
