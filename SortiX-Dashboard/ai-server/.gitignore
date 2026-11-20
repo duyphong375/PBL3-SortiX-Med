@@ -1,0 +1,10 @@
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+
+# YOLO cache, training runs & raw capture photos
+*.cache
+runs/
+raw_captures/
+auto_labeled_for_review/

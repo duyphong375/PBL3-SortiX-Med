@@ -1,0 +1,11 @@
+path: D:/PBL3_NHOM5/SortiX-Dashboard/ai-server/dataset
+
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 3
+names:
+  0: cotton
+  1: scissor
+  2: syringe
