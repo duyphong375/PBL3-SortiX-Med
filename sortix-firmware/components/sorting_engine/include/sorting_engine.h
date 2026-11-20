@@ -38,6 +38,13 @@ typedef struct {
     bool triggered;
     bool reported_error;        // Cờ ngăn chặn gọi callback báo lỗi trùng lặp
     bool servo_failed;          // Cờ báo hiệu kích hoạt servo gạt thất bại
+    int64_t travelled_counts;   // Số xung encoder tích lũy thực tế khi vật được phép di chuyển
+    int64_t pause_start_us;     // Mốc thời gian bắt đầu dừng 2s tại buồng quét DroidCam hoặc tại Ô chứa 3
+    bool at_camera_scanned;     // Đã đi 10cm tới buồng quét DroidCam và hoàn tất dừng 2s quét ảnh
+    bool scanning_now;          // Đang dừng 2s tại buồng quét DroidCam (10cm)
+    bool actuating_now;         // Đang dừng băng tải chờ Servo 1/2 quay hết chu trình 4 vòng thuận + 4 vòng ngược
+    bool moving;                // Đang được phép di chuyển theo luật ưu tiên liên động (Ô 1 -> Ô 2 -> Ô 3)
+    bool vision_assigned;       // Đã nhận nhãn phân loại từ Vision AI
 } tracked_item_t;
 
 // Cấu trúc cấu hình luật phân loại khay động
@@ -122,6 +129,11 @@ bool sorting_engine_has_unresolved_items(void);
  * @return ESP_OK nếu thành công.
  */
 esp_err_t sorting_engine_clear_unresolved(void);
+
+/**
+ * @brief Đặt lại toàn bộ hàng đợi vật phẩm khi hệ thống chuyển về trạng thái ngủ (IDLE/STOPPED).
+ */
+void sorting_engine_reset(void);
 
 /**
  * @brief Lấy số hiệu phiên bản cấu hình phân loại đang hoạt động.

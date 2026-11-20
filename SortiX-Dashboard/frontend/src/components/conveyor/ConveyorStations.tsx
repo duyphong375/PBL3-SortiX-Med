@@ -51,7 +51,7 @@ export const ConveyorStations: React.FC<ConveyorStationsProps> = ({
           )}
         </div>
 
-        {/* Cảm biến hồng ngoại S1 (GPIO0) với 2 LED vật lý PWR & OUT */}
+        {/* Cảm biến hồng ngoại S1 (GPIO3) với 2 LED vật lý PWR & OUT */}
         <div className="flex items-center gap-1.5 mt-0.5 bg-slate-950/90 border border-slate-700/80 rounded px-1.5 py-0.5 shadow-xs">
           {/* LED Đỏ: Báo nguồn PWR */}
           <span className="h-1.5 w-1.5 rounded-full bg-rose-500" title="LED PWR: Nguồn 5V ON" />
@@ -65,7 +65,7 @@ export const ConveyorStations: React.FC<ConveyorStationsProps> = ({
             title="LED OUT: Tín hiệu cảm biến phôi"
           />
           <span className="font-mono text-[7px] font-bold text-slate-300 whitespace-nowrap">
-            S1:GPIO0
+            S1:GPIO3
           </span>
         </div>
       </div>
@@ -106,7 +106,7 @@ export const ConveyorStations: React.FC<ConveyorStationsProps> = ({
           <div className="flex items-center justify-between w-full px-0.5 text-[6px] font-mono text-slate-400 uppercase tracking-tighter">
             <span>GPIO6</span>
             <span className={arm1Active ? "text-amber-300 font-bold" : ""}>
-              {arm1Active ? "SWEEP 45°" : "REST 0°"}
+              {arm1Active ? "SWEEP 360°" : "REST 0°"}
             </span>
           </div>
 
@@ -142,7 +142,7 @@ export const ConveyorStations: React.FC<ConveyorStationsProps> = ({
                 GẠT 1
               </span>
               <span className="text-[6px] font-mono font-bold text-amber-900 leading-none">
-                45°
+                360°
               </span>
             </div>
           </div>
@@ -207,7 +207,7 @@ export const ConveyorStations: React.FC<ConveyorStationsProps> = ({
           <div className="flex items-center justify-between w-full px-0.5 text-[6px] font-mono text-slate-400 uppercase tracking-tighter">
             <span>GPIO7</span>
             <span className={arm2Active ? "text-blue-300 font-bold" : ""}>
-              {arm2Active ? "SWEEP 45°" : "REST 0°"}
+              {arm2Active ? "SWEEP 360°" : "REST 0°"}
             </span>
           </div>
 
@@ -243,7 +243,7 @@ export const ConveyorStations: React.FC<ConveyorStationsProps> = ({
                 GẠT 2
               </span>
               <span className="text-[6px] font-mono font-bold text-cyan-900 leading-none">
-                45°
+                360°
               </span>
             </div>
           </div>

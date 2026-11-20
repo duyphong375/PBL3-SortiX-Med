@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Cpu,
   Pause,
@@ -12,13 +12,17 @@ import {
   Shuffle,
   Lock,
   Box,
-  Sliders,
+  Video,
+  Camera,
+  RefreshCw,
 } from "lucide-react";
 import type { TelemetryData } from "@/lib/types";
 
 export interface ConveyorToolbarProps {
   telemetry: TelemetryData;
   isRunning: boolean;
+  isJammed?: boolean;
+  isBinFull?: boolean;
   itemsCount: number;
   isSimulation: boolean;
   onToggleRun?: () => void;
@@ -37,6 +41,8 @@ export interface ConveyorToolbarProps {
 export const ConveyorToolbar: React.FC<ConveyorToolbarProps> = ({
   telemetry,
   isRunning,
+  isJammed = false,
+  isBinFull = false,
   itemsCount,
   isSimulation,
   onToggleRun,
@@ -51,6 +57,47 @@ export const ConveyorToolbar: React.FC<ConveyorToolbarProps> = ({
   rollerRpm,
   actuatorPanel,
 }) => {
+  const defaultStreamUrl =
+    process.env.NEXT_PUBLIC_AI_STREAM_URL || "http://localhost:8000/video_feed";
+  const [streamStatus, setStreamStatus] = useState<"loading" | "live" | "offline">("loading");
+  const [streamKey, setStreamKey] = useState(0);
+  const [fillFrame, setFillFrame] = useState(false);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+
+  const reconnectStream = useCallback(() => {
+    if (imgRef.current) {
+      imgRef.current.src = "";
+    }
+    setStreamStatus("loading");
+    setStreamKey((k) => k + 1);
+  }, []);
+
+  // Dong socket MJPEG cu ngay khi chuyen che do hoac unmount de tranh ket noi ma chiem gioi han 6 socket/origin
+  useEffect(() => {
+    if (isSimulation && imgRef.current) {
+      imgRef.current.src = "";
+      setStreamStatus("loading");
+    }
+    return () => {
+      if (imgRef.current) {
+        imgRef.current.src = "";
+      }
+    };
+  }, [isSimulation]);
+
+  // Tu dong thu ket noi lai sau 2.5s khi stream bi offline hoac bi treo o trang thai loading qua 8s
+  useEffect(() => {
+    if (isSimulation) return;
+    if (streamStatus === "offline") {
+      const retryTimer = window.setTimeout(reconnectStream, 2500);
+      return () => window.clearTimeout(retryTimer);
+    }
+    if (streamStatus === "loading") {
+      const stallTimer = window.setTimeout(reconnectStream, 8000);
+      return () => window.clearTimeout(stallTimer);
+    }
+  }, [isSimulation, streamStatus, streamKey, reconnectStream]);
+
   return (
     <>
       {/* TIÊU ĐỀ: Thông tin vận hành và nút điều khiển nhanh */}
@@ -60,13 +107,13 @@ export const ConveyorToolbar: React.FC<ConveyorToolbarProps> = ({
             <Cpu className="h-5 w-5" />
             <div
               className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white dark:border-slate-900 ${
-                telemetry.estop_pressed
+                telemetry.estop_pressed || isJammed
                   ? "bg-rose-500 shadow-[0_0_6px_#f43f5e]"
-                  : !isRunning
+                  : isBinFull || !isRunning
                   ? "bg-amber-400 shadow-[0_0_6px_#f59e0b]"
                   : isBeltMoving
-                  ? "bg-emerald-400 shadow-[0_0_6px_#3b82f6]"
-                  : "bg-slate-400"
+                  ? "bg-emerald-400 shadow-[0_0_6px_#34d399]"
+                  : "bg-cyan-400 shadow-[0_0_6px_#22d3ee]"
               }`}
             />
           </div>
@@ -78,36 +125,44 @@ export const ConveyorToolbar: React.FC<ConveyorToolbarProps> = ({
               </h3>
               <span
                 className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider border shrink-0 ${
-                  telemetry.estop_pressed
+                  telemetry.estop_pressed || isJammed
                     ? "bg-rose-500/10 text-rose-600 border-rose-500/20 dark:text-rose-400"
-                    : !isRunning
+                    : isBinFull || !isRunning
                     ? "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400"
                     : isBeltMoving
                     ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400"
-                    : "bg-white/[0.08] text-slate-300 border-white/[0.05]"
+                    : "bg-cyan-500/10 text-cyan-700 border-cyan-500/25 dark:text-cyan-300"
                 }`}
               >
                 {telemetry.estop_pressed
                   ? "Dừng khẩn"
+                  : isJammed
+                  ? "Kẹt phôi"
+                  : isBinFull
+                  ? "Đầy khay"
                   : !isRunning
-                  ? itemsCount === 0
-                    ? "Đã dừng (Đã vào khay hết)"
-                    : "Tạm dừng"
-                  : itemsCount > 0 || isBeltMoving
-                  ? `Đang chạy (${itemsCount} phôi mẫu)`
-                  : "Chờ phôi mẫu (Đã dừng)"}
+                  ? "Tạm dừng"
+                  : isBeltMoving
+                  ? itemsCount > 0
+                    ? `Đang chạy (${itemsCount} phôi mẫu)`
+                    : "Đang chạy đồng bộ"
+                  : "Chờ phôi"}
               </span>
             </div>
             <p className="text-xs font-normal text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1 sm:line-clamp-none">
               {telemetry.estop_pressed
                 ? "Băng tải đã ngắt điện do kích hoạt E-Stop"
-                : !isRunning
-                ? itemsCount === 0
-                  ? "Toàn bộ mẫu vật đã vào khay • Băng tải tự động dừng • Đặt thêm mẫu vật lên là tự động chạy"
-                  : "Hệ thống đang tạm dừng • Nhấn Khởi động để tiếp tục"
-                : itemsCount > 0 || isBeltMoving
-                ? `Băng tải đang vận chuyển ${itemsCount} phôi mẫu qua trạm quét AI và cơ cấu gạt`
-                : "Băng tải đã tự động dừng khi phôi vào khay hết • Đặt thêm mẫu vật lên là tự động chạy"}
+                : isJammed
+                ? "Phát hiện kẹt phôi • Băng tải đã tự động dừng để bảo vệ cơ cấu"
+                : isBinFull
+                ? "Khay chứa đã đạt định mức • Băng tải tạm dừng để chờ thay khay"
+                : isBeltMoving
+                ? itemsCount > 0
+                  ? `Băng tải đang vận chuyển ${itemsCount} phôi mẫu qua trạm quét AI và cơ cấu gạt`
+                  : "Băng tải đang chạy đồng bộ • Sẵn sàng tiếp nhận phôi từ trạm cảm biến"
+                : isRunning && itemsCount === 0
+                ? "Băng tải đã tự động dừng khi phôi vào khay hết • Đặt thêm mẫu vật lên là tự động chạy"
+                : "Hệ thống đang tạm dừng • Nhấn Khởi động hoặc bật nút phần cứng để tiếp tục"}
             </p>
           </div>
         </div>
@@ -137,13 +192,25 @@ export const ConveyorToolbar: React.FC<ConveyorToolbarProps> = ({
 
           {/* Nút Start/Pause */}
           <button
+            type="button"
             onClick={onToggleRun}
-            disabled={telemetry.estop_pressed}
+            disabled={Boolean(telemetry.estop_pressed || isJammed || isBinFull)}
+            title={
+              telemetry.estop_pressed
+                ? "Đang kích hoạt E-Stop — Mở khóa an toàn trước khi khởi động"
+                : isJammed
+                ? "Đang kẹt phôi — Gỡ kẹt trước khi khởi động"
+                : isBinFull
+                ? "Khay chứa đang đầy — Dọn khay trước khi khởi động"
+                : isRunning
+                ? "Tạm dừng băng tải (Space)"
+                : "Khởi động băng tải (Space)"
+            }
             className={`flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition-all shadow-sm ${
               isRunning
                 ? "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25"
                 : "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25"
-            } disabled:opacity-40 cursor-pointer active:scale-95`}
+            } disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-95`}
           >
             {isRunning ? (
               <>
@@ -193,7 +260,7 @@ export const ConveyorToolbar: React.FC<ConveyorToolbarProps> = ({
       {/* ========================================================================= */}
       <div
         className={`grid grid-cols-1 ${
-          actuatorPanel ? "lg:grid-cols-2" : "grid-cols-1"
+          actuatorPanel && (isSimulation || !fillFrame) ? "lg:grid-cols-2" : "grid-cols-1"
         } gap-3 items-stretch`}
       >
         {/* CỘT TRÁI: NẠP DỤNG CỤ Y TẾ & ĐIỀU TỐC BĂNG TẢI */}
@@ -215,11 +282,11 @@ export const ConveyorToolbar: React.FC<ConveyorToolbarProps> = ({
                 <button
                   type="button"
                   onClick={() => onSpawnPackage?.("med_syringe")}
-                  disabled={!isSimulation || !isRunning || telemetry.estop_pressed}
+                  disabled={!isSimulation || !isRunning || telemetry.estop_pressed || isJammed || isBinFull}
                   className="flex items-center justify-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] font-bold text-amber-800 transition-all hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs active:scale-95 cursor-pointer truncate"
-                  title={`Nạp Bơm kim tiêm (${getBrandTargetBinName("med_syringe")})`}
+                  title={`Nạp Kim tiêm (${getBrandTargetBinName("med_syringe")})`}
                 >
-                  <span className="truncate">Nạp Bơm kim tiêm</span>
+                  <span className="truncate">Nạp Kim tiêm</span>
                   <span className="text-[9px] font-mono font-normal opacity-75 shrink-0">
                     ({getBrandTargetBinName("med_syringe")})
                   </span>
@@ -227,25 +294,12 @@ export const ConveyorToolbar: React.FC<ConveyorToolbarProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => onSpawnPackage?.("med_forceps")}
-                  disabled={!isSimulation || !isRunning || telemetry.estop_pressed}
-                  className="flex items-center justify-center gap-1 rounded-lg border border-sky-300 bg-sky-50 px-2 py-1.5 text-[11px] font-bold text-sky-800 transition-all hover:bg-sky-100 dark:border-sky-500/40 dark:bg-sky-500/15 dark:text-sky-300 dark:hover:bg-sky-500/25 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs active:scale-95 cursor-pointer truncate"
-                  title={`Nạp Kẹp Pean (${getBrandTargetBinName("med_forceps")})`}
-                >
-                  <span className="truncate">Nạp Kẹp Pean</span>
-                  <span className="text-[9px] font-mono font-normal opacity-75 shrink-0">
-                    ({getBrandTargetBinName("med_forceps")})
-                  </span>
-                </button>
-
-                <button
-                  type="button"
                   onClick={() => onSpawnPackage?.("med_scissors")}
-                  disabled={!isSimulation || !isRunning || telemetry.estop_pressed}
-                  className="flex items-center justify-center gap-1 rounded-lg border border-indigo-300 bg-indigo-50 px-2 py-1.5 text-[11px] font-bold text-indigo-800 transition-all hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs active:scale-95 cursor-pointer truncate"
-                  title={`Nạp Kéo mổ (${getBrandTargetBinName("med_scissors")})`}
+                  disabled={!isSimulation || !isRunning || telemetry.estop_pressed || isJammed || isBinFull}
+                  className="flex items-center justify-center gap-1 rounded-lg border border-sky-300 bg-sky-50 px-2 py-1.5 text-[11px] font-bold text-sky-800 transition-all hover:bg-sky-100 dark:border-sky-500/40 dark:bg-sky-500/15 dark:text-sky-300 dark:hover:bg-sky-500/25 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs active:scale-95 cursor-pointer truncate"
+                  title={`Nạp Kéo (${getBrandTargetBinName("med_scissors")})`}
                 >
-                  <span className="truncate">Nạp Kéo mổ</span>
+                  <span className="truncate">Nạp Kéo</span>
                   <span className="text-[9px] font-mono font-normal opacity-75 shrink-0">
                     ({getBrandTargetBinName("med_scissors")})
                   </span>
@@ -253,21 +307,21 @@ export const ConveyorToolbar: React.FC<ConveyorToolbarProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => onSpawnPackage?.("med_vial")}
-                  disabled={!isSimulation || !isRunning || telemetry.estop_pressed}
+                  onClick={() => onSpawnPackage?.("med_cotton")}
+                  disabled={!isSimulation || !isRunning || telemetry.estop_pressed || isJammed || isBinFull}
                   className="flex items-center justify-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-1.5 text-[11px] font-bold text-emerald-800 transition-all hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs active:scale-95 cursor-pointer truncate"
-                  title={`Nạp Ống nghiệm (${getBrandTargetBinName("med_vial")})`}
+                  title={`Nạp Bông (${getBrandTargetBinName("med_cotton")})`}
                 >
-                  <span className="truncate">Nạp Ống nghiệm</span>
+                  <span className="truncate">Nạp Bông</span>
                   <span className="text-[9px] font-mono font-normal opacity-75 shrink-0">
-                    ({getBrandTargetBinName("med_vial")})
+                    ({getBrandTargetBinName("med_cotton")})
                   </span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => onSpawnPackage?.()}
-                  disabled={!isSimulation || !isRunning || telemetry.estop_pressed}
+                  disabled={!isSimulation || !isRunning || telemetry.estop_pressed || isJammed || isBinFull}
                   className="flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-slate-100 px-2 py-1.5 text-[11px] font-bold text-slate-700 transition-all hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs active:scale-95 cursor-pointer truncate"
                   title="Nạp ngẫu nhiên một dụng cụ y tế"
                 >
@@ -279,7 +333,7 @@ export const ConveyorToolbar: React.FC<ConveyorToolbarProps> = ({
                   type="button"
                   onClick={onGenerateDemoData}
                   disabled={telemetry.estop_pressed}
-                  className="flex items-center justify-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2 py-1.5 text-[11px] font-bold text-teal-700 transition-all hover:bg-teal-100 dark:border-teal-500/40 dark:bg-teal-500/15 dark:text-teal-400 dark:hover:bg-teal-500/25 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs active:scale-95 cursor-pointer truncate"
+                  className="col-span-2 sm:col-span-2 flex items-center justify-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2 py-1.5 text-[11px] font-bold text-teal-700 transition-all hover:bg-teal-100 dark:border-teal-500/40 dark:bg-teal-500/15 dark:text-teal-400 dark:hover:bg-teal-500/25 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs active:scale-95 cursor-pointer truncate"
                   title="Tạo dữ liệu lịch sử demo ngẫu nhiên"
                 >
                   <span className="truncate">Tạo dữ liệu demo</span>
@@ -287,49 +341,93 @@ export const ConveyorToolbar: React.FC<ConveyorToolbarProps> = ({
               </div>
             </div>
           ) : (
-            <div className="flex flex-col justify-center flex-1 gap-2 rounded-xl border border-emerald-500/20 bg-emerald-50/50 p-3 dark:border-emerald-500/20 dark:bg-emerald-950/20">
-              <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 dark:text-emerald-300">
-                <Lock className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span>Chế độ phần cứng thực tế (ESP32):</span>
+            <div className="relative flex flex-col justify-between flex-1 gap-2 rounded-xl border border-slate-700/60 bg-slate-900/90 p-3 shadow-inner overflow-hidden min-h-[145px]">
+              {/* Header Video Stream */}
+              <div className="flex items-center justify-between z-10">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
+                  <Video className="h-4 w-4 text-cyan-400 shrink-0" />
+                  <span>Luồng Video Camera AI (CAM-01 / YOLO11 Stream):</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFillFrame((v) => !v)}
+                    className="flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/80 px-2 py-0.5 text-[10px] font-medium text-slate-300 hover:bg-slate-700 cursor-pointer"
+                    title="Chuyển chế độ hiển thị: Đầy khung hoặc Vừa khung"
+                  >
+                    <span>{fillFrame ? "Vừa khung" : "Đầy khung"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={reconnectStream}
+                    className="flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/80 px-2 py-0.5 text-[10px] font-medium text-slate-300 hover:bg-slate-700 cursor-pointer"
+                    title="Tải lại luồng Camera AI"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    <span>Kết nối lại</span>
+                  </button>
+                  <span
+                    className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-mono font-bold border ${
+                      streamStatus === "live"
+                        ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                        : "bg-cyan-500/15 text-cyan-400 border-cyan-500/30"
+                    }`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        streamStatus === "live"
+                          ? "bg-emerald-400 animate-ping"
+                          : "bg-cyan-400"
+                      }`}
+                    />
+                    {streamStatus === "live" ? "LIVE AI" : "STREAM READY"}
+                  </span>
+                </div>
               </div>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                Phôi vật tư y tế được cấp tự động qua phễu thực tế. Cảm biến quang S1 (GPIO 0) và Camera AI sẽ ghi nhận và kích hoạt phân loại.
-              </p>
+
+              {/* Vùng phát Video Stream MJPEG từ ai-server/server.py */}
+              <div
+                className={`relative flex flex-col items-center justify-center flex-1 rounded-lg border border-dashed border-slate-700/80 bg-slate-950/70 overflow-hidden transition-all duration-200 ${
+                  fillFrame ? "h-[240px] sm:h-[280px]" : "h-[180px]"
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  ref={imgRef}
+                  key={streamKey}
+                  src={`${defaultStreamUrl}?t=${streamKey}`}
+                  alt="Luồng Camera AI YOLO11"
+                  onLoad={() => setStreamStatus("live")}
+                  onError={() => setStreamStatus("offline")}
+                  className={`h-full ${
+                    fillFrame ? "w-full object-cover" : "max-w-[260px] w-auto object-contain"
+                  } ${streamStatus === "offline" ? "hidden" : "block"}`}
+                />
+                {streamStatus === "offline" && (
+                  <div className="flex flex-col items-center justify-center p-3 text-center">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400 mb-1 shadow-sm">
+                      <Camera className="h-4.5 w-4.5" />
+                    </div>
+                    <p className="text-xs font-bold text-slate-200">
+                      Chưa nhận được luồng từ AI Server ({defaultStreamUrl})
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Chạy <code className="text-cyan-300">run_camera.bat</code> (DroidCam iPhone) rồi bấm Kết nối lại
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Thông tin metadata kỹ thuật */}
+              <div className="flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-800/80 pt-1.5 z-10">
+                <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  Cảm biến S1 (GPIO 3) Active
+                </span>
+                <span className="font-mono text-slate-500">Camera iPhone • MJPEG</span>
+              </div>
             </div>
           )}
-
-          {/* THANH ĐIỀU TỐC BĂNG TẢI (PWM MCPWM IO4) */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-white/[0.06] dark:bg-[#111319]">
-            <div className="flex flex-wrap items-center gap-1.5 text-xs">
-              <Sliders className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400 shrink-0" />
-              <span className="font-bold text-slate-700 dark:text-slate-300 text-xs">
-                Tốc độ băng tải:
-              </span>
-              <span className="font-mono text-xs font-black text-cyan-600 dark:text-cyan-400">
-                {isBeltMoving ? `${speed}%` : "0% (Đứng yên)"}
-              </span>
-              <span className="font-mono text-slate-500 dark:text-slate-400 text-[10px]">
-                ({linearSpeedCms} cm/s • {rollerRpm} RPM)
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[10px] font-bold text-slate-400">10%</span>
-              <input
-                type="range"
-                min="10"
-                max="100"
-                value={speed}
-                disabled={telemetry.estop_pressed}
-                onChange={(e) => onSpeedChange(Number(e.target.value))}
-                className="h-1.5 w-24 sm:w-28 cursor-pointer appearance-none rounded-lg bg-slate-200 accent-teal-600 dark:bg-slate-800 dark:accent-cyan-500 disabled:opacity-40"
-              />
-              <span className="text-[10px] font-bold text-teal-600 dark:text-cyan-400">100%</span>
-              <span className="shrink-0 rounded-md border border-teal-500/30 bg-teal-500/10 px-1.5 py-0.5 font-mono text-[11px] font-black text-teal-700 dark:text-cyan-300">
-                {speed}%
-              </span>
-            </div>
-          </div>
         </div>
 
         {/* CỘT PHẢI: KIỂM THỬ 3 TẢI CHẤP HÀNH */}

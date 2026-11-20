@@ -8,6 +8,7 @@
 #include "motor_control.h"
 #include "safety_monitor.h"
 #include "sensors.h"
+#include "button.h"
 #include "servo.h"
 #include "led_indicator.h"
 #include "mqtt_client.h"
@@ -161,6 +162,9 @@ static void handle_incoming_control(const char *data, int data_len)
         } else if (strcmp(cmd_str, "CLEAR_UNRESOLVED") == 0 || strcmp(cmd_str, "CLEAR_BELT") == 0) {
             ESP_LOGI(TAG, "Operator confirmed belt cleared via authenticated command");
             sorting_engine_clear_unresolved();
+            if (state_machine_get_state() == SYSTEM_STATE_JAMMED) {
+                state_machine_process_event(SYSTEM_EVENT_ESTOP_RELEASE);
+            }
         } else if (strcmp(cmd_str, "trigger_servo_1") == 0) {
             if (val_int == 0) {
                 servo_reset_all();
@@ -179,11 +183,12 @@ static void handle_incoming_control(const char *data, int data_len)
             }
         } else if (strcmp(cmd_str, "trigger_buzzer") == 0) {
             if (val_int == 0) {
-                led_indicator_set_mode(LED_MODE_IDLE);
-                ESP_LOGI(TAG, "Manual test: Buzzer/LED silenced to IDLE");
+                system_state_t cur_st = state_machine_get_state();
+                led_indicator_set_mode(cur_st == SYSTEM_STATE_RUNNING ? LED_MODE_RUNNING : LED_MODE_IDLE);
+                ESP_LOGI(TAG, "Manual test: LED turned OFF / returned to automatic mode");
             } else {
-                led_indicator_set_mode(LED_MODE_ERROR);
-                ESP_LOGI(TAG, "Manual test: Buzzer/LED alarm triggered (fast blink)");
+                led_indicator_set_mode(LED_MODE_ON);
+                ESP_LOGI(TAG, "Manual test: LED turned ON solid");
             }
         } else if (strcmp(cmd_str, "reset_actuators") == 0) {
             servo_reset_all();
@@ -498,9 +503,11 @@ esp_err_t mqtt_handler_publish_telemetry(void)
     if (measured_speed_valid) {
         cJSON_AddNumberToObject(root, "conveyor_speed_mm_s", measured_speed_mm_s);
     }
-    cJSON_AddBoolToObject(root, "s1_entry", sensors_is_s1_blocked());
+    cJSON_AddBoolToObject(root, "s1_entry", is_running && sensors_is_s1_blocked());
+    cJSON_AddBoolToObject(root, "ldr_active", sensors_get_ldr_level() != LDR_DARK_LEVEL);
     cJSON_AddNullToObject(root, "s2_sorter1");
     cJSON_AddNullToObject(root, "s3_sorter2");
+    cJSON_AddBoolToObject(root, "start_btn_pressed", button_get_level() == 0);
     cJSON_AddBoolToObject(root, "estop_pressed", state == SYSTEM_STATE_ESTOP);
     cJSON_AddBoolToObject(root, "arm1_active", servo_is_busy(SERVO_ID_1));
     cJSON_AddBoolToObject(root, "arm2_active", servo_is_busy(SERVO_ID_2));
@@ -548,6 +555,20 @@ esp_err_t mqtt_handler_publish_heartbeat(void)
 esp_err_t mqtt_handler_publish_status(const char *status_str)
 {
     if (!s_is_connected || s_mqtt_client == NULL || status_str == NULL) return ESP_ERR_INVALID_STATE;
+    cJSON *root = cJSON_CreateObject();
+    if (root != NULL) {
+        cJSON_AddStringToObject(root, "device_id", SORTIX_DEVICE_ID);
+        cJSON_AddStringToObject(root, "status", status_str);
+        bool is_running = (strcmp(status_str, "RUNNING") == 0);
+        cJSON_AddBoolToObject(root, "conveyor_running", is_running);
+        char *json_out = cJSON_PrintUnformatted(root);
+        cJSON_Delete(root);
+        if (json_out != NULL) {
+            esp_mqtt_client_publish(s_mqtt_client, SORTIX_TOPIC_STATUS, json_out, 0, 1, 1);
+            free(json_out);
+            return ESP_OK;
+        }
+    }
     esp_mqtt_client_publish(s_mqtt_client, SORTIX_TOPIC_STATUS, status_str, 0, 1, 1);
     return ESP_OK;
 }
@@ -564,6 +585,15 @@ esp_err_t mqtt_handler_publish_classification(const tracked_item_t *item)
     cJSON_AddStringToObject(root, "product_id", item->product_id);
     const char *reported_brand_id = item->brand_id[0] != '\0' ? item->brand_id : "unknown";
     const char *reported_brand_name = item->brand_id[0] != '\0' ? item->brand_id : "Chưa phân loại";
+    if (strcmp(reported_brand_id, "brand_a") == 0 || strcmp(reported_brand_id, "med_forceps") == 0) {
+        reported_brand_name = "Kẹp phẫu thuật (Pean)";
+    } else if (strcmp(reported_brand_id, "brand_b") == 0 || strcmp(reported_brand_id, "med_scissors") == 0) {
+        reported_brand_name = "Kéo phẫu thuật";
+    } else if (strcmp(reported_brand_id, "brand_c") == 0 || strcmp(reported_brand_id, "med_syringe") == 0) {
+        reported_brand_name = "Bơm kim tiêm / Dao mổ";
+    } else if (strcmp(reported_brand_id, "brand_d") == 0 || strcmp(reported_brand_id, "med_vial") == 0) {
+        reported_brand_name = "Lọ thuốc / Ống nghiệm";
+    }
     cJSON_AddStringToObject(root, "brand_id", reported_brand_id);
     cJSON_AddStringToObject(root, "brand_name", reported_brand_name);
     cJSON_AddNumberToObject(root, "confidence", (double)item->confidence);

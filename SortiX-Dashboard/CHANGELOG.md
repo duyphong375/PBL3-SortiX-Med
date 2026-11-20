@@ -4,6 +4,27 @@ Tất cả các thay đổi về kiến trúc, tính năng, sửa lỗi và nân
 
 ---
 
+## [3.4.0] - 2026-11-20 (Tích Hợp AI Camera Server YOLO11 3 Lớp, Tái Cấu Hình Phần Cứng GPIO7 & Hiển Thị OTP Trực Tiếp)
+
+### 📷 AI Camera Server & Bộ Dữ Liệu 3 Lớp Chính Thức (`ai-server/`)
+- **Thay thế thư mục pilot `PBL.v1i.yolov11` bằng `SortiX-Dashboard/ai-server/`**:
+  - Xây dựng máy chủ FastAPI MJPEG Stream (`server.py`, cổng `8000`) tích hợp trực tiếp mô hình **YOLO11** (`weights/best.pt`), hỗ trợ iPhone DroidCam (Wi-Fi/USB) và Webcam USB, tự động xoay khung hình, tự động lọc vùng ROI băng tải xanh, chống ngược sáng và phát endpoint `/video_feed` & `/health` cho Dashboard.
+  - Chuẩn hóa bộ dữ liệu **1.205 ảnh** với **3 lớp y tế chính thức**: `cotton` (Bông), `scissor` (Kéo), `syringe` (Kim tiêm) (`train`: 954, `valid`: 150, `test`: 101 ảnh), huấn luyện 80 epochs (`runs/sortix_med_3class`).
+  - Bổ sung bộ công cụ thu thập & tiền xử lý dữ liệu: `capture_samples.py`, `auto_label.py` (tách nền HSV băng tải xanh + fallback YOLO), `train.py`, `detect_iphone.py`, `run_camera.bat` và `Khoidong/09_Chi_Chay_AI_Camera_8000.bat`.
+- **Chuẩn Hóa Danh Mục `CATALOG_BRANDS` & Khay Chứa**:
+  - Cập nhật 3 nhóm dụng cụ chính (`med_syringe` -> Khay 1, `med_scissors` -> Khay 2, `med_cotton` -> Khay 3) và giữ các alias tương thích ngược (`med_forceps`, `med_vial`, `brand_a..d`).
+
+### ⚙️ Phần Cứng ESP32-C5 & Khởi Tạo Hệ Thống
+- **Tái cấu hình Servo 2 sang `GPIO7`** (Servo 1 tại `GPIO6`), cập nhật duty LEDC ngay khi boot cho các ngõ ra PWM và tinh chỉnh thông số hiệu chuẩn thực tế trong `app_config.h` (`CALIB_ENCODER_COUNTS_PER_MM = 63.0f`, S1→Camera `100mm` dừng 2s, S1→Servo 1 `250mm`, S1→Servo 2 `400mm`, S1→Khay 3 `650mm`).
+- Bổ sung script nạp firmware nhanh `sortix-firmware/flash_firmware.bat` và `flash_firmware.ps1`; cập nhật bộ script Windows trong `Khoidong/` và phím tắt gốc `KHOI_DONG_HE_THONG.bat`.
+
+### 🔐 Xác Thực OTP, AI Copilot & QA
+- **Hiển thị OTP trực tiếp trên Web & Modal (`ForgotPasswordModal.tsx` & `/api/auth/forgot-password`)**: Hỗ trợ khôi phục mật khẩu nhanh ngay trên giao diện người dùng (song song gửi email SMTP nếu được cấu hình).
+- **AI Copilot Gemini**: Định tuyến mô hình chính `gemini-3.1-flash-lite` kèm chuỗi fallback ổn định (`gemini-3-flash-preview`, `gemini-3.5-flash-lite`, `gemini-3.8-flash`, ...).
+- **Kiểm thử tự động**: Toàn bộ **27 test suites / 182 unit tests PASS 100%** qua `npm test`.
+
+---
+
 ## [3.3.0] - 2026-10-24 (Chuẩn Hóa Toàn Diện Hệ Thống Tài Liệu Kỹ Thuật, Tích Hợp YOLO11 & Đồng Bộ Kiến Trúc Đa Tầng)
 
 ### 📚 Chuẩn Hóa Hệ Thống Tài Liệu Markdown (Documentation Standardization)

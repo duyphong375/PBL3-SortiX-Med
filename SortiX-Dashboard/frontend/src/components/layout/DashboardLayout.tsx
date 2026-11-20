@@ -182,7 +182,7 @@ export interface DashboardState {
   handleClearBin: (binIndex: 1 | 2 | 3) => void;
   handleResetConfigToDefault: () => void;
   handleResetActuatorStates: () => void;
-  handleTestActuator: (type: "servo_1" | "servo_2" | "buzzer", value?: number) => void;
+  handleTestActuator: (type: "servo_1" | "servo_2" | "buzzer" | "led_status", value?: number) => void;
 
   // Theme & Audio
   themeMode: ThemeMode;
@@ -233,6 +233,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   const [estopConfirmModalOpen, setEstopConfirmModalOpen] = useState(false);
   const [hardwareEstopAcked, setHardwareEstopAcked] = useState(false);
   const isSystemLockedRef = useRef(isSystemLocked);
+  isSystemLockedRef.current = isSystemLocked;
   const lastUnlockedTimeRef = useRef(0);
 
   // Jam Detection State
@@ -262,6 +263,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   const [deviceOfflineIncident, setDeviceOfflineIncident] = useState<DeviceOfflinePayload | null>(null);
   const isDeviceOfflineRef = useRef(isDeviceOffline);
   isDeviceOfflineRef.current = isDeviceOffline;
+  // Cooldown 8s sau khi người dùng bấm "Đã ghi nhận" để tránh watchdog spam popup liên tục mỗi giây
+  const deviceOfflineCooldownUntilRef = useRef<number>(0);
   const lastHeartbeatTimeRef = useRef<number>(Date.now());
   const simHeartbeatStoppedRef = useRef<boolean>(false);
   const triggerDeviceOfflineRef = useRef<
@@ -405,6 +408,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   >(() => Promise.resolve());
   const setIsRunningRef = useRef<(running: boolean) => void>(() => {});
   const lastOpticalBlockedRef = useRef<boolean>(false);
+  const lastUserCommandTimeRef = useRef<number>(0);
 
   // Hook 2: Sorter Data (Records, Bins, Brands, Mode, Alerts)
   const sorterData = useSorterData({
@@ -422,6 +426,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   });
 
   const handlePublishCommandForConveyor = useCallback((cmd: string, value?: number) => {
+    lastUserCommandTimeRef.current = Date.now();
     publishCommandRef.current(cmd, value);
   }, []);
 
@@ -446,6 +451,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       const binId = binIdx === 1 ? "BIN_RED_01" : binIdx === 2 ? "BIN_BLUE_02" : "BIN_DEFAULT_03";
       void triggerBinFullRef.current({ bin_id: binId }, "counter_in");
     },
+    lastUserCommandTimeRef,
   });
   spawnRealItemRef.current = (item) => {
     conveyor.setVisualItems((prev) => [...prev, item]);
@@ -553,30 +559,69 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
 
       if (isBlocked && !lastOpticalBlockedRef.current) {
         lastOpticalBlockedRef.current = true;
-        const targetBin = (Math.floor(Math.random() * 3) + 1) as 1 | 2 | 3;
-        const brands = ["brand_c", "brand_a", "brand_b"];
-        const brandKey = brands[targetBin - 1] || "brand_c";
-        const newItem: VisualItem = {
-          id: `ESP32_${Date.now().toString().slice(-4)}`,
-          brandKey: brandKey,
-          progress: 0,
-          targetBin: targetBin,
-          yOffset: 0,
-          opacity: 1,
-          deflected: false,
-          sorted: false,
-          isSim: sorterData.isSimulation,
-          timestamp: new Date().toISOString(),
-        };
-        spawnRealItemRef.current(newItem);
-        setIsRunningRef.current(true);
+        // Chỉ ở chế độ Mô phỏng mới tự tạo phôi random giả lập khi test.
+        // Ở chế độ Thực tế, camera AI (YOLO) sẽ phát hiện và gửi bản tin vision qua MQTT để định danh phôi chính xác!
+        if (sorterData.isSimulationRef.current) {
+          const targetBin = (Math.floor(Math.random() * 3) + 1) as 1 | 2 | 3;
+          const brands = ["med_syringe", "med_scissors", "med_cotton"];
+          const brandKey = brands[targetBin - 1] || "med_syringe";
+          const newItem: VisualItem = {
+            id: `ESP32_${Date.now().toString().slice(-4)}`,
+            brandKey: brandKey,
+            progress: 0,
+            targetBin: targetBin,
+            yOffset: 0,
+            opacity: 1,
+            deflected: false,
+            sorted: false,
+            isSim: true,
+            timestamp: new Date().toISOString(),
+          };
+          spawnRealItemRef.current(newItem);
+          if (
+            !isSystemLockedRef.current &&
+            !telemetryRef.current.estop_pressed &&
+            !isJammedRef.current &&
+            !isBinFullRef.current
+          ) {
+            conveyor.isRunningRef.current = true;
+            setIsRunningRef.current(true);
+          }
+        }
       } else if (!isBlocked) {
         lastOpticalBlockedRef.current = false;
       }
 
+      // ĐỒNG BỘ TRẠNG THÁI CHẠY 2 CHIỀU TỪ PHẦN CỨNG VÀO WEB (Real Hardware Sync)
+      // Chống trễ nhịp (telemetry debounce): Nếu người dùng vừa gửi lệnh điều khiển trên Web trong vòng 2.5s,
+      // bỏ qua trạng thái cũ của telemetry đang bay trên mạng để tránh bị giật/đè trạng thái.
+      const isRecentUserCmd = Date.now() - lastUserCommandTimeRef.current < 2500;
+      if (!sorterData.isSimulationRef.current && !isRecentUserCmd && typeof payload?.conveyor_running === "boolean") {
+        if (payload.conveyor_running !== conveyor.isRunningRef.current) {
+          conveyor.isRunningRef.current = payload.conveyor_running;
+          setIsRunningRef.current(payload.conveyor_running);
+          void updateSyncState({ isRunning: payload.conveyor_running });
+        }
+      }
+
+      // Kích hoạt Dừng khẩn cấp từ phần cứng nếu telemetry báo estop_pressed = true mà Web chưa bị khóa
+      if (payload?.estop_pressed === true && !isSystemLockedRef.current) {
+        void triggerEmergencyStopRef.current(
+          {
+            station_id: payload.device_id || "STATION_01",
+            triggered_by: "Hardware E-Stop Button",
+            mode: sorterData.isSimulation ? "simulation" : "realtime",
+          },
+          "mqtt_in"
+        );
+      }
+
       setTelemetry((prev) => {
         const updated = cleanTelemetryPayload(payload, prev);
-        const detected = detectAnomalies(updated);
+        if (isRecentUserCmd) {
+          updated.conveyor_running = prev.conveyor_running;
+        }
+        const detected = detectAnomalies(updated, prev);
         if (detected.length > 0) {
           detected.forEach((alt) => {
             const alertWithMode: AlertEvent = {
@@ -701,12 +746,15 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       setEstopIncident(payload);
 
       // Dừng ngay lập tức băng chuyền
+      lastUserCommandTimeRef.current = Date.now();
+      conveyor.isRunningRef.current = false;
       conveyor.setIsRunning(false);
       setTelemetry((prev) => ({
         ...prev,
         estop_pressed: true,
         conveyor_running: false,
       }));
+      void updateSyncState({ isRunning: false });
 
       // Báo động âm thanh còi hú E-Stop liên tục cho đến khi mở khóa
       industrialAudio.startContinuousEmergencyAlarm();
@@ -755,12 +803,15 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       industrialAudio.silenceAll();
       industrialAudio.playClick();
 
+      const validNote = note?.trim() || "Đã kiểm tra hiện trường & xác nhận an toàn";
+
       const res = await ApiSafetyClient.unlockSystem(
         { userId: currentUser?.id, role: currentUser?.role },
-        { note }
+        { note: validNote }
       );
 
-      if (res.success) {
+      // Nếu mở khóa thành công từ server, hoặc nếu đang ở chế độ mô phỏng
+      if (res.success || sorterData.isSimulationRef.current) {
         lastUnlockedTimeRef.current = Date.now();
         setIsSystemLocked(false);
         setEstopIncident(null);
@@ -832,12 +883,15 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       setJamIncident(payload);
 
       // Dừng ngay lập tức băng chuyền
+      lastUserCommandTimeRef.current = Date.now();
+      conveyor.isRunningRef.current = false;
       conveyor.setIsRunning(false);
       setTelemetry((prev) => ({
         ...prev,
         conveyor_running: false,
         s2_sorter1: true,
       }));
+      void updateSyncState({ isRunning: false });
 
       // Báo động âm thanh còi hú kẹt phôi liên tục
       industrialAudio.startContinuousJamAlarm();
@@ -880,13 +934,17 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     setIsJammed(false);
     setJamIncident(null);
     conveyor.clearJam?.();
+    lastUserCommandTimeRef.current = Date.now();
+    conveyor.isRunningRef.current = true;
     setTelemetry((prev) => ({
       ...prev,
       s2_sorter1: false,
       conveyor_running: true,
     }));
     conveyor.setIsRunning(true);
+    mqtt.publishCommand("CLEAR_BELT");
     mqtt.publishCommand("START");
+    void updateSyncState({ isRunning: true });
     toast.success("Đã gỡ kẹt phôi thành công! Băng chuyền tự động tiếp tục vận hành.");
     sorterData.setAlerts((prev) =>
       prev.map((a) => (a.event_type === "jam_detected" ? { ...a, resolved: true } : a))
@@ -942,8 +1000,11 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       setFullBinIndex(binIdx);
 
       // Tạm dừng băng tải ngay lập tức để bảo vệ các mẫu phôi còn lại trên băng tải
+      lastUserCommandTimeRef.current = Date.now();
+      conveyor.isRunningRef.current = false;
       conveyor.setIsRunning(false);
       setTelemetry((prev) => ({ ...prev, conveyor_running: false }));
+      void updateSyncState({ isRunning: false });
 
       // Nếu đang trong chế độ mô phỏng, cập nhật số đếm khay lên bằng sức chứa để đồng bộ toàn bộ giao diện
       if (sorterData.isSimulationRef.current) {
@@ -978,6 +1039,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         await Promise.allSettled([
           ApiSafetyClient.triggerBinFullAlert(payload),
           mqtt.publishBinFullAlert(payload),
+          mqtt.publishCommand("STOP"),
         ]);
       }
     },
@@ -1008,13 +1070,17 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
 
       // 5. Khởi động lại băng tải nếu không bị E-Stop hoặc kẹt phôi để tiếp tục xử lý các mẫu còn lại trên băng
       if (!telemetryRef.current.estop_pressed && !isJammedRef.current) {
+        lastUserCommandTimeRef.current = Date.now();
+        conveyor.isRunningRef.current = true;
         conveyor.setIsRunning(true);
         setTelemetry((prev) => ({ ...prev, conveyor_running: true }));
+        mqtt.publishCommand("START");
+        void updateSyncState({ isRunning: true });
       }
 
       toast.success(`Đã xác nhận thay khay mới cho Khay ${targetIdx}! Số lượng đã được đặt lại về 0.`);
     },
-    [conveyor, sorterData, setTelemetry, toast]
+    [conveyor, mqtt, sorterData, setTelemetry, toast]
   );
 
   // Handler: Kích hoạt / Cập nhật Cảnh báo Quá Nhiệt (temperature_warning)
@@ -1154,6 +1220,10 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         return; // Đã báo offline rồi, không lặp lại
       }
 
+      if (source !== "user_action" && Date.now() < deviceOfflineCooldownUntilRef.current) {
+        return; // Đang trong thời gian nghỉ 8s sau khi người dùng đã ghi nhận, tránh spam
+      }
+
       const payload: DeviceOfflinePayload = {
         event: "device_offline",
         device_id: customPayload?.device_id || "ESP32_MAIN_CONTROLLER",
@@ -1202,17 +1272,19 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   // Handler: Xác nhận đã kiểm tra thiết bị mất kết nối và tắt còi
   const handleAcknowledgeDeviceOffline = useCallback(() => {
     industrialAudio.stopContinuousDeviceOfflineAlarm();
+    deviceOfflineCooldownUntilRef.current = Date.now() + 8000;
     setIsDeviceOffline(false);
     setDeviceOfflineIncident(null);
     sorterData.setAlerts((prev) =>
       prev.map((a) => (a.event_type === "device_offline" ? { ...a, resolved: true } : a))
     );
-    toast.info("Đã ghi nhận sự cố mất kết nối vi điều khiển.");
+    toast.info("Đã ghi nhận sự cố mất kết nối (tạm ẩn cảnh báo 8s).");
   }, [sorterData, toast]);
 
   // Handler: Khôi phục kết nối thiết bị ESP32 (Chế độ mô phỏng)
   const handleReconnectDevice = useCallback(() => {
     simHeartbeatStoppedRef.current = false;
+    deviceOfflineCooldownUntilRef.current = 0;
     lastHeartbeatTimeRef.current = Date.now();
     industrialAudio.stopContinuousDeviceOfflineAlarm();
     setIsDeviceOffline(false);
@@ -1340,6 +1412,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   // Khởi tạo trạng thái an toàn & Đồng bộ kênh thời gian thực SSE
+  const conveyorIsRunningRef = conveyor.isRunningRef;
   useEffect(() => {
     if (!sorterData.isClient || isLoginPage || !isAuthenticated) return;
 
@@ -1486,6 +1559,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
             const s = data.state;
             applyIncomingSyncStateRef.current(s);
             if (s.isRunning !== undefined) {
+              lastUserCommandTimeRef.current = Date.now();
+              conveyorIsRunningRef.current = s.isRunning;
               setIsRunningRef.current(s.isRunning);
               setTelemetry((prev) => ({ ...prev, conveyor_running: s.isRunning }));
             }
@@ -1534,39 +1609,24 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
 
       eventSource.addEventListener("telemetry", (e) => {
         try {
+          if (sorterData.isSimulationRef.current) return;
           const telem = JSON.parse(e.data);
           setLastTelemetryTime(new Date().toLocaleTimeString("vi-VN", { hour12: false }));
-          setTelemetry((prev) => cleanTelemetryPayload(telem, prev));
-
-          // Kích hoạt phôi mẫu chạy khi cảm biến hồng ngoại S1 từ HTTP POST SSE phát hiện vật
-          const isBlocked =
-            telem?.optical_sensor === "BLOCKED" ||
-            telem?.optical_sensor === 1 ||
-            telem?.optical_sensor === "1" ||
-            telem?.s1_entry === true;
-
-          if (isBlocked && !lastOpticalBlockedRef.current) {
-            lastOpticalBlockedRef.current = true;
-            const targetBin = (Math.floor(Math.random() * 3) + 1) as 1 | 2 | 3;
-            const brands = ["brand_c", "brand_a", "brand_b"];
-            const brandKey = brands[targetBin - 1] || "brand_c";
-            const newItem: VisualItem = {
-              id: `ESP32_${Date.now().toString().slice(-4)}`,
-              brandKey: brandKey,
-              progress: 0,
-              targetBin: targetBin,
-              yOffset: 0,
-              opacity: 1,
-              deflected: false,
-              sorted: false,
-              isSim: sorterData.isSimulationRef.current,
-              timestamp: new Date().toISOString(),
-            };
-            spawnRealItemRef.current(newItem);
-            setIsRunningRef.current(true);
-          } else if (!isBlocked) {
-            lastOpticalBlockedRef.current = false;
-          }
+          const isRecentUserCmd = Date.now() - lastUserCommandTimeRef.current < 2500;
+          setTelemetry((prev) => {
+            const updated = cleanTelemetryPayload(telem, prev);
+            if (isRecentUserCmd) {
+              updated.conveyor_running = prev.conveyor_running;
+            } else if (
+              typeof updated.conveyor_running === "boolean" &&
+              updated.conveyor_running !== conveyorIsRunningRef.current
+            ) {
+              conveyorIsRunningRef.current = updated.conveyor_running;
+              setIsRunningRef.current(updated.conveyor_running);
+              void updateSyncState({ isRunning: updated.conveyor_running });
+            }
+            return updated;
+          });
         } catch (err) {
           console.warn("Lỗi phân tích SSE telemetry:", err);
         }
@@ -1578,7 +1638,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     return () => {
       eventSource?.close();
     };
-  }, [sorterData.isClient, sorterData.isSimulationRef, isLoginPage, isAuthenticated]);
+  }, [sorterData.isClient, sorterData.isSimulationRef, conveyorIsRunningRef, isLoginPage, isAuthenticated]);
 
   // Auth Redirect check
   useEffect(() => {
@@ -1611,16 +1671,20 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         (it) => !it.sorted && !it.deflected && (it.progress ?? 0) < 96
       );
       
-      // Băng chuyền chỉ chuyển động khi có mẫu vật/phôi trên băng, dừng chờ khi rỗng (ở cả User và Admin)
-      const isBeltMoving =
-        isRunningRef.current &&
-        !telemetryRef.current.estop_pressed &&
-        !isJammedRef.current &&
-        !isBinFullRef.current &&
-        hasItems;
+      // Đồng bộ băng tải thực tế và trên web: Lúc chạy thì chạy chung, lúc dừng thì dừng chung
+      const isBeltMoving = isSimMode
+        ? isRunningRef.current &&
+          hasItems &&
+          !telemetryRef.current.estop_pressed &&
+          !isJammedRef.current &&
+          !isBinFullRef.current
+        : isRunningRef.current &&
+          !telemetryRef.current.estop_pressed &&
+          !isJammedRef.current &&
+          !isBinFullRef.current;
 
-      if (isBeltMoving) {
-        if (isSimMode) {
+      if (isSimMode) {
+        if (isBeltMoving) {
           setTelemetry((prev) => ({
             ...prev,
             uptime: prev.uptime + 1,
@@ -1635,14 +1699,9 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         } else {
           setTelemetry((prev) => ({
             ...prev,
-            conveyor_running: true,
+            conveyor_running: false,
           }));
         }
-      } else {
-        setTelemetry((prev) => ({
-            ...prev,
-            conveyor_running: false,
-        }));
       }
 
       const nowStr = new Date().toLocaleTimeString("vi-VN", {
@@ -1849,9 +1908,9 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   }, [conveyor, mqtt]);
 
   const handleTestActuator = useCallback(
-    (type: "servo_1" | "servo_2" | "buzzer", value?: number) => {
+    (type: "servo_1" | "servo_2" | "buzzer" | "led_status", value?: number) => {
       const isSim = sorterData.isSimulationRef.current;
-      const angle = value ?? 45;
+      const angle = value ?? 360;
 
       if (type === "servo_1") {
         if (angle === 0) {
@@ -1887,10 +1946,10 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         if (angle === 0) {
           conveyor.setArm2Active(false);
           setTelemetry((prev) => ({ ...prev, arm2_active: false }));
-          logHardwareTestAction("TẮT / Thu tay gạt Servo 2 (0°)", "GPIO 24 (LEDC PWM)", user?.username || "admin1", "actuator", "success");
+          logHardwareTestAction("TẮT / Thu tay gạt Servo 2 (0°)", "GPIO 7 (LEDC PWM)", user?.username || "admin1", "actuator", "success");
           if (!isSim) {
             mqtt.publishCommand("trigger_servo_2", 0);
-            toast.info("[THỰC TẾ] Đã TẮT / trả Servo 2 (GPIO 24) về vị trí nghỉ 0°");
+            toast.info("[THỰC TẾ] Đã TẮT / trả Servo 2 (GPIO 7) về vị trí nghỉ 0°");
           } else {
             toast.info("[MÔ PHỎNG] Đã TẮT / trả tay gạt Máng 2 về 0°");
           }
@@ -1900,7 +1959,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         // BẬT tay gạt Máng 2
         conveyor.setArm2Active(true);
         setTelemetry((prev) => ({ ...prev, arm2_active: true }));
-        logHardwareTestAction(`BẬT / Gạt Servo 2 góc ${angle}°`, "GPIO 24 (LEDC PWM)", user?.username || "admin1", "actuator", "success");
+        logHardwareTestAction(`BẬT / Gạt Servo 2 góc ${angle}°`, "GPIO 7 (LEDC PWM)", user?.username || "admin1", "actuator", "success");
         industrialAudio.playClick();
         setTimeout(() => {
           conveyor.setArm2Active(false);
@@ -1909,27 +1968,26 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
 
         if (!isSim) {
           mqtt.publishCommand("trigger_servo_2", angle);
-          toast.success(`[THỰC TẾ] Đã BẬT gạt Servo 2 (GPIO 24) góc ${angle}°`);
+          toast.success(`[THỰC TẾ] Đã BẬT gạt Servo 2 (GPIO 7) góc ${angle}°`);
         } else {
           toast.info(`[MÔ PHỎNG] Đã BẬT tay gạt Máng 2 góc ${angle}°`);
         }
-      } else if (type === "buzzer") {
+      } else if (type === "buzzer" || type === "led_status") {
         if (value === 0) {
-          industrialAudio.stopContinuousEmergencyAlarm();
-          industrialAudio.silenceAll();
-          logHardwareTestAction("TẮT / Ngắt Đèn LED & Báo động", "GPIO 10 (LED Status Indicator)", user?.username || "admin1", "alarm", "success");
+          industrialAudio.playClick();
+          logHardwareTestAction("TẮT / Kiểm thử Đèn LED Báo Trạng Thái", "GPIO 10 (LED Status Indicator)", user?.username || "admin1", "actuator", "success");
           if (!isSim) {
             mqtt.publishCommand("trigger_buzzer", 0);
-            toast.info("[THỰC TẾ] Đã TẮT Đèn LED / Cảnh báo (GPIO 10)");
+            toast.info("[THỰC TẾ] Đã TẮT Đèn LED Báo Trạng Thái (GPIO 10)");
           } else {
-            toast.info("[MÔ PHỎNG] Đã TẮT Đèn LED / Cảnh báo");
+            toast.info("[MÔ PHỎNG] Đã TẮT Đèn LED Báo Trạng Thái");
           }
           return;
         }
 
-        // BẬT Đèn LED / Báo động
-        logHardwareTestAction("BẬT Đèn LED & Báo động", "GPIO 10 (LED Status Indicator)", user?.username || "admin1", "alarm", "success");
-        industrialAudio.startContinuousEmergencyAlarm();
+        // BẬT Đèn LED Báo Trạng Thái
+        industrialAudio.playClick();
+        logHardwareTestAction("BẬT / Kiểm thử Đèn LED Báo Trạng Thái", "GPIO 10 (LED Status Indicator)", user?.username || "admin1", "actuator", "success");
 
         if (!isSim) {
           mqtt.publishCommand("trigger_buzzer", 1);
@@ -2011,12 +2069,18 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
 
       // Tự động khởi động lại băng tải nếu đang tạm dừng và không bị E-Stop hoặc Kẹt phôi
       if (!telemetryRef.current.estop_pressed && !isJammedRef.current && !isAnyFull) {
+        lastUserCommandTimeRef.current = Date.now();
+        conveyor.isRunningRef.current = true;
         conveyor.setIsRunning(true);
         setTelemetry((prev) => ({ ...prev, conveyor_running: true }));
+        if (!isSim) {
+          mqtt.publishCommand("START");
+        }
+        void updateSyncState({ isRunning: true });
         toast.success(`Đã dọn khay ${binIndex}. Băng tải tự động tiếp tục vận hành!`);
       }
     },
-    [conveyor, sorterData, setTelemetry, toast]
+    [conveyor, mqtt, sorterData, setTelemetry, toast]
   );
 
   // Handler: Điều chỉnh sức chứa định mức của khay qua thanh trượt (5 - 50 SP)
@@ -2289,7 +2353,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
             isLocked={isSystemLocked}
             incident={estopIncident}
             isHardwareAcked={hardwareEstopAcked}
-            onOpenUnlockDialog={() => handleUnlockSystem()}
+            onOpenUnlockDialog={() => handleUnlockSystem("Đã kiểm tra hiện trường & xác nhận an toàn từ Banner")}
           />
 
 

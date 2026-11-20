@@ -55,10 +55,10 @@ export const DEFAULT_INITIAL_CONFIG: SorterConfig = {
   device_id: "sorter_01",
   catalog_version: "catalog_01",
   bins: [
-    { bin_id: 1, brand_ids: ["med_syringe"] }, // Khay 1: Bơm kim tiêm / Dao mổ
-    { bin_id: 2, brand_ids: ["med_forceps", "med_scissors"] }, // Khay 2: Kẹp phẫu thuật & Kéo phẫu thuật
+    { bin_id: 1, brand_ids: ["med_syringe"] }, // Khay 1: Kim tiêm
+    { bin_id: 2, brand_ids: ["med_scissors"] }, // Khay 2: Kéo
   ],
-  default_bin: 3, // Khay 3: Mặc định (Vật tư y tế, Lọ thuốc / Ống nghiệm hoặc vật phẩm khác)
+  default_bin: 3, // Khay 3: Mặc định (Bông y tế)
   apply_mode: "when_line_empty",
   timestamp: new Date().toISOString(),
 };
@@ -302,15 +302,16 @@ export function updateBinCountsLocal(actualBin: number, isSim: boolean = true): 
 export function loadBrandCountsLocal(isSim: boolean = true): Record<string, number> {
   const brCounts: Record<string, number> = {
     med_syringe: 0,
-    med_forceps: 0,
     med_scissors: 0,
-    med_vial: 0,
+    med_cotton: 0,
   };
   const aliasMap: Record<string, string> = {
     brand_c: "med_syringe",
-    brand_a: "med_forceps",
+    brand_a: "med_scissors",
     brand_b: "med_scissors",
-    brand_d: "med_vial",
+    brand_d: "med_cotton",
+    med_forceps: "med_scissors",
+    med_vial: "med_cotton",
   };
   const records = loadClassificationHistory(isSim);
   records.forEach((r) => {

@@ -16,8 +16,9 @@ typedef enum {
 } system_state_t;
 
 typedef enum {
-    SYSTEM_EVENT_START = 0,     // Nhấn nút Start vật lý hoặc nhận lệnh START qua MQTT
-    SYSTEM_EVENT_STOP,          // Lệnh STOP từ MQTT hoặc dừng giữ vật thể
+    SYSTEM_EVENT_START = 0,     // Nhấn nút Start vật lý, nhận lệnh START qua MQTT, hoặc tự động đánh thức từ S1
+    SYSTEM_EVENT_STOP,          // Lệnh STOP từ MQTT hoặc nút bấm
+    SYSTEM_EVENT_STANDBY,       // Tự động chuyển về trạng thái chờ an toàn (IDLE) khi hết vật thể
     SYSTEM_EVENT_JAM_DETECTED,  // Phát hiện dừng quay encoder khi đang chạy
     SYSTEM_EVENT_ESTOP_RELEASE, // Lệnh mở khóa ESTOP_RELEASE (chuyển về IDLE, KHÔNG tự ý bật động cơ)
     SYSTEM_EVENT_ESTOP          // Kích hoạt dừng khẩn cấp (qua nút phần cứng hoặc MQTT)
@@ -44,6 +45,13 @@ esp_err_t state_machine_process_event(system_event_t event);
  * @brief Lấy trạng thái hệ thống hiện tại.
  */
 system_state_t state_machine_get_state(void);
+
+/**
+ * @brief Kiểm tra xem MCU đã được đánh thức bởi nút GPIO23 (hoặc lệnh START) hay chưa.
+ *        - true: Đang trong phiên làm việc (RUNNING hoặc tạm dừng 10s chờ vật cản IDLE -> S1 tự kích chạy lại).
+ *        - false: Đang ở trạng thái ngủ/tắt hoàn toàn (mới cắm nguồn hoặc đã bấm GPIO23 tắt -> S1 bị khóa).
+ */
+bool state_machine_is_awake(void);
 
 /**
  * @brief Lấy chuỗi ký tự mô tả trạng thái hiện tại ("IDLE", "RUNNING", "STOPPED", "JAMMED", "ESTOP").

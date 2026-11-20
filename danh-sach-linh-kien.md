@@ -31,12 +31,12 @@ Module XL4015 là phương án buck đang xem xét. Dòng liên tục thực t�
 | **17** | **Đèn LED báo hiển thị** | • 01 LED phi 5mm Đỏ (Báo nguồn 12V sau E-Stop & Cầu chì)<br>• 01 LED phi 5mm Xanh lá (Báo trạng thái hệ thống chạy từ GPIO10) | **02 con** | LED tròn siêu sáng phi 5mm | • [Mua tại Thế Giới IC](https://www.thegioiic.com/products/led-phi-5mm-do)<br>• [Tìm mua trên Shopee](https://shopee.vn/search?keyword=led%20phi%205mm) |
 | **18** | **Socket cắm bo WeAct** | **Thanh rào cái 16 chân đơn (Female Header 1x16P 2.54mm thẳng)** | **02 thanh** | Làm đế cắm bo WeAct ESP32-C5 tháo lắp tiện lợi | • [Mua tại Thế Giới IC](https://www.thegioiic.com/products/thanh-rao-cai-1-16p-2-54mm-thang)<br>• [Tìm mua trên Shopee](https://shopee.vn/search?keyword=thanh%20rao%20cai%2016%20chan%202.54mm) |
 | **19** | **Cọc đấu dây nguồn 12V** | **Domino 2 chân vặn vít KF301-2P (bước chân 5.08mm)** | **01 cái** | Đấu nối dây nguồn 12V từ bộ nguồn tổ ong vào bo mạch chắc chắn | • [Mua tại Thế Giới IC](https://www.thegioiic.com/products/domino-kf301-2p-5-08mm)<br>• [Tìm mua trên Shopee](https://shopee.vn/search?keyword=domino%20kf301%202p) |
-| **20** | **Thiết bị thị giác máy tính (Camera AI)** | **Webcam USB 2K QHD Plug & Play** (Chuẩn UVC, kèm cáp USB & kẹp gá) | **01 cái** | Độ phân giải 2K, cắm trực tiếp vào Laptop/PC trạm AI chạy mô hình **YOLO11** (`PBL.v1i.yolov11/test_yolo.py`), gửi kết quả phân loại qua MQTT topic `sorter/sorter_01/vision` | Có sẵn của bạn (hoặc mua webcam USB chuẩn UVC) |
+| **20** | **Thiết bị thị giác máy tính (Camera AI)** | **iPhone DroidCam (Wi-Fi/USB) hoặc Webcam USB** | **01 cái** | Kết nối tới Laptop/PC trạm AI chạy `SortiX-Dashboard/ai-server/server.py` (YOLO11 3 lớp: `cotton`, `scissor`, `syringe`), phát stream MJPEG `:8000/video_feed` và gửi kết quả qua MQTT topic `sorter/sorter_01/vision` | Sử dụng DroidCam trên iPhone (`http://192.168.137.155:4747/video` hoặc USB index `1`) hoặc webcam USB chuẩn UVC |
 
 > [!NOTE]
 > **Kiến trúc phân hệ xử lý ảnh thị giác máy tính (Computer Vision Station):**  
-> Chiếc **Webcam USB 2K** được cắm trực tiếp vào **Laptop / Máy tính trạm**, **KHÔNG** cắm vào ESP32-C5.  
-> - **Laptop / PC:** Chạy script Python `PBL.v1i.yolov11/test_yolo.py` (Ultralytics YOLO11 + OpenCV), nhận diện dụng cụ y tế và publish kết quả JSON thời gian thực lên MQTT broker theo topic `sorter/sorter_01/vision`.
+> Camera (iPhone DroidCam hoặc Webcam USB) được kết nối tới **Laptop / Máy tính trạm**, **KHÔNG** cắm trực tiếp vào ESP32-C5.  
+> - **Laptop / PC:** Chạy script Python `SortiX-Dashboard/ai-server/server.py` (Ultralytics YOLO11 + OpenCV + FastAPI + Paho-MQTT), nhận diện dụng cụ y tế (3 lớp `cotton`, `scissor`, `syringe`), phát luồng video MJPEG tại `http://localhost:8000/video_feed` lên Dashboard và publish kết quả JSON thời gian thực lên MQTT broker theo topic `sorter/sorter_01/vision`.
 
 ---
 
@@ -51,7 +51,7 @@ Module XL4015 là phương án buck đang xem xét. Dòng liên tục thực t�
 > 3. **Động cơ Servo 1:** Điều khiển bằng xung PWM tại **GPIO6** (Dãy Trái Pin 7).
 > 4. **Động cơ Servo 2:** Điều khiển bằng xung PWM tại **GPIO7** (Dãy Trái Pin 8). Tuyệt đối không nối vào chân **GPIO15 / SPICS1** (Dãy Phải Pin 6) vì đây là đường chọn chip nội bộ của bộ nhớ 8 MB PSRAM.
 > 5. **Bộ đọc Encoder:** Kênh A nối vào **GPIO1** (ngắt ngoài - Dãy Trái Pin 6), Kênh B nối vào **GPIO4** (Dãy Phải Pin 8).
-> 6. **Cảm biến:** Cảm biến vật cản nối vào **GPIO0** (Dãy Trái Pin 5), Cảm biến ánh sáng nối vào **GPIO5** (Dãy Phải Pin 9), cả hai đều được nuôi bằng nguồn 3.3V lấy từ Dãy Trái Pin 1.
+> 6. **Cảm biến:** Cảm biến vật cản nối vào **GPIO3** (Dãy Trái Pin 4), Cảm biến ánh sáng nối vào **GPIO5** (Dãy Phải Pin 9), cả hai đều được nuôi bằng nguồn 3.3V lấy từ Dãy Trái Pin 1.
 > 7. **Nút nhấn Start:** Nối vào **GPIO23** (Dãy Phải Pin 5) kèm mạch lọc RC ($10\text{k}\Omega // 0.1\mu\text{F}$).
 > 8. **Đèn LED Báo Trạng Thái:** Nối vào **GPIO10** (Dãy Trái Pin 11) qua điện trở hạn dòng $220\Omega$.
 
@@ -187,8 +187,8 @@ Sơ đồ chỉ bắt đầu từ đầu ra 12VDC. Model nguồn, cầu chì, co
 (Cấp nguồn 3.3V) | Pin  1 [3V3]                |  Pin  1 [GND]                   | ---> Nối mass nút Start & C3
                  | Pin  2 [RST - Reset]        |  Pin  2 [TX0 - GPIO11]          | ---> (Type-C UART Debug)
                  | Pin  3 [GPIO2]              |  Pin  3 [RX0 - GPIO12]          | ---> (Type-C UART Debug)
-                 | Pin  4 [GPIO3]              |  Pin  4 [GPIO24]                |
-CẢM BIẾN VẬT CẢN | Pin  5 [GPIO0]              |  Pin  5 [GPIO23]                | <--- NÚT NHẤN START (RC)
+CẢM BIẾN VẬT CẢN | Pin  4 [GPIO3]              |  Pin  4 [GPIO24]                |
+                 | Pin  5 [GPIO0]              |  Pin  5 [GPIO23]                | <--- NÚT NHẤN START (RC)
 ENCODER KÊNH A   | Pin  6 [GPIO1]              |  Pin  6 [N/15 - SPICS1]         | (ĐỂ TRỐNG - 8MB PSRAM NỘI)
 Tín hiệu SERVO 1 | Pin  7 [GPIO6]              |  Pin  7 [GPIO27/RGB]            | (LED RGB trên bo WeAct)
 Tín hiệu SERVO 2 | Pin  8 [GPIO7]              |  Pin  8 [GPIO4]                 | <--- ENCODER KÊNH B
@@ -214,7 +214,7 @@ MASS CHUNG (GND) | Pin 15 [GND]                |  Pin 15 [GND]                  
     • Nối vào 1 đầu điện trở kéo R5 (10k) của nút Start                                     |
                                                                                             +------+---> Chân GPIO23 (Phải Pin 5)
  2. CẢM BIẾN VẬT CẢN HỒNG NGOẠI (LM393):                                                    |      |
-    • Chân DO   --------> Nối vào chân GPIO0 (Dãy Trái Pin 5)                             [C3]   [NÚT START]
+    • Chân DO   --------> Nối vào chân GPIO3 (Dãy Trái Pin 4)                             [C3]   [NÚT START]
     • Chân VCC  --------> Cấp nguồn 3.3V (Dãy Trái Pin 1)                               (0.1uF)   (PBS-110)
     • Chân GND  --------> Nối Mass chung (GND)                                              |      |
                                                                                            ===    ===
@@ -264,7 +264,7 @@ MASS CHUNG (GND) | Pin 15 [GND]                |  Pin 15 [GND]                  
                  GND                   GND (Dãy Phải - Pin 1)
 ```
 - **Nguyên lý hoạt động:** Điện trở $R_5$ ($10\text{k}\Omega$) và tụ $C_3$ ($0.1\mu\text{F}$) tạo mạch lọc thông thấp với hằng số thời gian $\tau = R \times C = 1\text{ ms}$, giúp dập tắt phần lớn xung nhọn cao tần sinh ra do ma sát cơ khí khi bấm nút.
-- **Phần mềm (Firmware Debounce):** Bắt buộc duy trì kiểm tra trễ phần mềm từ **15ms – 25ms** trong ngắt/vòng quét để đảm bảo không bị kích hoạt kép khi nút nhấn bị rung tiếp điểm cơ khí.
+- **Phần mềm (Firmware Debounce):** Firmware hiện tại trong `button.c` sử dụng điện trở kéo lên nội (Pull-up) và lấy mẫu phần mềm chu kỳ 10ms (3 mẫu liên tiếp = **30ms** ổn định, kèm cooldown 300ms trong `main.c`), không bắt buộc phải có mạch RC ngoài nhưng giữ mạch RC giúp chống nhiễu tiếp điểm tốt hơn.
 
 ---
 
@@ -346,7 +346,7 @@ MASS CHUNG (GND) | Pin 15 [GND]                |  Pin 15 [GND]                  
  | BO WEACT ESP32-C5       |                        | CẢM BIẾN HỒNG NGOẠI VẬT CẢN (LM393)|
  | 3V3   (Trái Pin 1)  ----+----------------------->| Chân VCC (+3.3V an toàn cho chip)  |
  | GND   (Trái Pin 15) ----+----------------------->| Chân GND                           |
- | GPIO0 (Trái Pin 5)  <---+------------------------| Chân DO (Phát hiện phôi hàng)      |
+ | GPIO3 (Trái Pin 4)  <---+------------------------| Chân DO (Phát hiện phôi hàng)      |
  +-------------------------+                        +------------------------------------+
 
  +-------------------------+                        +------------------------------------+
@@ -385,9 +385,9 @@ Các dữ liệu dưới đây chỉ là giả định ban đầu từ tên gọ
 - Nếu datasheet xác nhận 11 chu kỳ quadrature/vòng và firmware đếm đủ 4 cạnh: $N_{out}=11 × 4 × 90=3960$ count/vòng, tức khoảng **31.5 count/mm**.
 - Tại tốc độ trục ra giả định 60 RPM, vận tốc lý thuyết là khoảng **125.66 mm/s**. Tốc độ thực phụ thuộc tải, motor, hộp số, driver và nguồn; cần đo bằng encoder hoặc đánh dấu chiều dài thực.
 
-### 6.2 Bảng Vị Trí Mẫu — Cần Thay Bằng Kích Thước Đã Đo
+### 6.2 Bảng Vị Trí Mẫu & Tham Số Hiệu Chuẩn Hiện Tại Trong Firmware
 
-Bảng sau minh họa hình học băng tải giả định dài 600 mm. Các tọa độ, tốc độ và số đếm không phải cấu hình đã có trong firmware. Sau khi lắp, đo đường kính hiệu dụng, tỉ số truyền, số count/mm, trượt băng và độ trễ servo; sau đó hiệu chuẩn lại từng trạm.
+Bảng sau minh họa hình học băng tải giả định ban đầu (dài 600 mm) để đối chiếu công thức lý thuyết. **Thông số hiệu chuẩn thực tế đang cấu hình trong firmware (`app_config.h`):** `CALIB_ENCODER_COUNTS_PER_MM = 63.0f` (3960 counts/vòng), khoảng cách từ S1 đến buồng quét DroidCam = **100 mm** (dừng quét 2.0s), đến Servo 1 = **250 mm**, đến Servo 2 = **400 mm**, đến Khay 3 cuối băng = **650 mm** (cửa sổ kích hoạt `±15 mm`). Sau khi bảo trì cơ khí, luôn đo kiểm lại count/mm và cập nhật `app_config.h`.
 
 | Vị trí mẫu | Tọa độ giả định | Khoảng cách từ S1 | Thời gian tại 125.66 mm/s | Count kênh A (giả định 7.88 xung/mm) |
 |---|:---:|:---:|:---:|:---:|
@@ -413,7 +413,7 @@ Bảng sau minh họa hình học băng tải giả định dài 600 mm. Các t�
 |---|---|:---:|---|---|
 | **Nút nhấn Start** | Chân tín hiệu 1 | **Xanh dương** | **Dãy Phải - Pin 5 (GPIO23)** | Đọc tín hiệu nút bấm (Chưa bấm = 1, Bấm = 0) |
 | | Chân mass 2 | **Đen** | **Dãy Phải - Pin 1 (GND)** | Nối mass cho nút bấm và tụ $C_3$ (0.1µF) |
-| **Cảm biến Vật cản** | Chân DO | **Vàng** | **Dãy Trái - Pin 5 (GPIO0)** | Ngõ ra phát hiện sản phẩm (Có vật = 0, Trống = 1) |
+| **Cảm biến Vật cản** | Chân DO | **Vàng** | **Dãy Trái - Pin 4 (GPIO3)** | Ngõ ra phát hiện sản phẩm (Có vật = 0, Trống = 1) |
 | | Chân VCC | **Cam** | **Dãy Trái - Pin 1 (3V3)** | Cấp nguồn nuôi 3.3V an toàn cho chip |
 | | Chân GND | **Đen** | **Dãy Trái - Pin 15 (GND)** | Nối mass chung |
 | **Cảm biến Ánh sáng**| Chân DO | **Trắng** | **Dãy Phải - Pin 9 (GPIO5)** | Báo điều kiện ánh sáng buồng quét camera |

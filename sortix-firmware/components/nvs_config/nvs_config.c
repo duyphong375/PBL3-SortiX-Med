@@ -13,7 +13,7 @@ static const char *TAG = "NVS_CONFIG";
 #define NVS_SORTER_CONFIG_KEY "sorter_cfg"
 #define SORTER_CONFIG_MAX_JSON 4096
 
-static char s_device_token[64] = {0};
+static char s_device_token[64] = SORTIX_CONTROL_SECRET;
 
 static sortix_sys_config_t s_config = {
     .wifi_ssid = DEFAULT_WIFI_SSID,
@@ -27,9 +27,9 @@ static sortix_sys_config_t s_config = {
     .active_config_version = 1,
     .fallback_policy = SORTIX_FALLBACK_POLICY,
     .counts_per_mm = CALIB_ENCODER_COUNTS_PER_MM,
-    .dist_s1_servo1_mm = 200.0f,
-    .dist_s1_servo2_mm = 400.0f,
-    .dist_s1_end_mm = 540.0f
+    .dist_s1_servo1_mm = DIST_S1_TO_SERVO1_MM,
+    .dist_s1_servo2_mm = DIST_S1_TO_SERVO2_MM,
+    .dist_s1_end_mm = DIST_S1_TO_END_MM
 };
 
 static bool config_strings_are_terminated(const sortix_sys_config_t *cfg)
@@ -76,9 +76,17 @@ esp_err_t nvs_config_init(void)
         ret = nvs_get_blob(handle, NVS_BLOB_KEY, &loaded, &required_size);
         if (ret == ESP_OK && required_size == sizeof(sortix_sys_config_t) &&
             config_values_are_valid(&loaded)) {
+            // Luôn đồng bộ khoảng cách vật lý thực tế của phần cứng (25cm, 45cm, 65cm) và hệ số encoder chuẩn,
+            // tránh bị thông số cũ lưu trong Flash NVS từ các phiên trước ghi đè sai vị trí Servo.
+            loaded.dist_s1_servo1_mm = DIST_S1_TO_SERVO1_MM;
+            loaded.dist_s1_servo2_mm = DIST_S1_TO_SERVO2_MM;
+            loaded.dist_s1_end_mm = DIST_S1_TO_END_MM;
+            loaded.counts_per_mm = CALIB_ENCODER_COUNTS_PER_MM;
+            loaded.fallback_policy = SORTIX_FALLBACK_POLICY;
             memcpy(&s_config, &loaded, sizeof(sortix_sys_config_t));
-            ESP_LOGI(TAG, "Loaded configuration from NVS (SSID: %s, MQTT: %s)",
-                     s_config.wifi_ssid, s_config.mqtt_broker_uri);
+            ESP_LOGI(TAG, "Loaded configuration from NVS (SSID: %s, MQTT: %s, S1->Servo1=%.0fmm, Servo2=%.0fmm, End=%.0fmm)",
+                     s_config.wifi_ssid, s_config.mqtt_broker_uri,
+                     s_config.dist_s1_servo1_mm, s_config.dist_s1_servo2_mm, s_config.dist_s1_end_mm);
         } else {
             ESP_LOGW(TAG, "Config blob missing, incompatible, or invalid; using firmware defaults");
         }

@@ -5,6 +5,7 @@
 #include "safety_monitor.h"
 #include "encoder.h"
 #include "sensors.h"
+#include "button.h"
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"
 #include "cJSON.h"
@@ -16,11 +17,17 @@
 
 static const char *TAG = "HTTP_TELEMETRY";
 
-static bool is_https_url_with_host(const char *url)
+static bool is_valid_http_url_with_host(const char *url)
 {
-    if (url == NULL || strncmp(url, "https://", 8) != 0 || url[8] == '\0' ||
-        url[8] == '/' || url[8] == '?' || url[8] == '#' || url[8] == ':') return false;
-    for (const unsigned char *p = (const unsigned char *)url + 8;
+    if (url == NULL) return false;
+    size_t scheme_len = 0;
+    if (strncmp(url, "http://", 7) == 0) scheme_len = 7;
+    else if (strncmp(url, "https://", 8) == 0) scheme_len = 8;
+    else return false;
+
+    if (url[scheme_len] == '\0' || url[scheme_len] == '/' || url[scheme_len] == '?' ||
+        url[scheme_len] == '#' || url[scheme_len] == ':') return false;
+    for (const unsigned char *p = (const unsigned char *)url + scheme_len;
          *p != '\0' && *p != '/' && *p != '?' && *p != '#'; p++) {
         if (*p == '@' || isspace(*p)) return false;
     }
@@ -31,11 +38,11 @@ esp_err_t http_telemetry_init(void)
 {
     const sortix_sys_config_t *sys_cfg = nvs_config_get();
     if (sys_cfg->http_telemetry_url[0] == '\0') {
-        ESP_LOGI(TAG, "HTTPS telemetry disabled until provisioned");
-    } else if (!is_https_url_with_host(sys_cfg->http_telemetry_url)) {
-        ESP_LOGW(TAG, "Ignoring non-HTTPS telemetry endpoint; reconfigure it through the setup portal");
+        ESP_LOGI(TAG, "HTTP telemetry disabled until provisioned");
+    } else if (!is_valid_http_url_with_host(sys_cfg->http_telemetry_url)) {
+        ESP_LOGW(TAG, "Ignoring invalid telemetry endpoint: %s", sys_cfg->http_telemetry_url);
     } else {
-        ESP_LOGI(TAG, "HTTPS telemetry initialized (Endpoint: %s)", sys_cfg->http_telemetry_url);
+        ESP_LOGI(TAG, "HTTP telemetry initialized (Endpoint: %s)", sys_cfg->http_telemetry_url);
     }
     return ESP_OK;
 }
@@ -44,8 +51,11 @@ esp_err_t http_telemetry_send_post(void)
 {
     const sortix_sys_config_t *sys_cfg = nvs_config_get();
     if (strlen(sys_cfg->http_telemetry_url) == 0) return ESP_ERR_INVALID_STATE;
-    if (!is_https_url_with_host(sys_cfg->http_telemetry_url)) return ESP_ERR_INVALID_ARG;
+    if (!is_valid_http_url_with_host(sys_cfg->http_telemetry_url)) return ESP_ERR_INVALID_ARG;
     const char *device_token = nvs_config_get_device_token();
+    if (device_token == NULL || strlen(device_token) < 16) {
+        device_token = sys_cfg->control_secret; // Fallback dùng chung control_secret nếu chưa cấu hình token riêng
+    }
     if (device_token == NULL || strlen(device_token) < 16) return ESP_ERR_INVALID_STATE;
     float cpu_temp_c = 0.0f;
     if (!safety_monitor_get_cpu_temp(&cpu_temp_c)) return ESP_ERR_INVALID_STATE;
@@ -67,9 +77,11 @@ esp_err_t http_telemetry_send_post(void)
         cJSON_AddNumberToObject(root, "conveyor_speed_mm_s", measured_speed_mm_s);
     }
     cJSON_AddBoolToObject(root, "conveyor_running", is_running);
-    cJSON_AddBoolToObject(root, "s1_entry", sensors_is_s1_blocked());
+    cJSON_AddBoolToObject(root, "s1_entry", is_running && sensors_is_s1_blocked());
+    cJSON_AddBoolToObject(root, "ldr_active", sensors_get_ldr_level() != LDR_DARK_LEVEL);
     cJSON_AddNullToObject(root, "s2_sorter1");
     cJSON_AddNullToObject(root, "s3_sorter2");
+    cJSON_AddBoolToObject(root, "start_btn_pressed", button_get_level() == 0);
     cJSON_AddBoolToObject(root, "estop_pressed", state == SYSTEM_STATE_ESTOP);
     cJSON_AddNumberToObject(root, "encoder_count", (double)encoder_get_count());
 

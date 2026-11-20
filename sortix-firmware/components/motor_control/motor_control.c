@@ -2,6 +2,7 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "freertos/semphr.h"
 
 static const char *TAG = "MOTOR_CTRL";
@@ -87,9 +88,19 @@ esp_err_t motor_control_brake(void)
 
 esp_err_t motor_control_stop(void)
 {
+    // Nếu động cơ đang chạy hoặc đang hãm, áp dụng hãm động năng (IN1=1, IN2=1) trong 150ms
+    // để dập tắt 100% quán tính trượt (vận tốc về 0), sau đó mới ngắt điện về COAST (0, 0)
+    // để IC L298N và cuộn dây động cơ hoàn toàn mát lạnh không tốn dòng nuôi.
+    motor_direction_t current_dir = motor_control_get_direction();
+    if (current_dir == MOTOR_DIR_FORWARD || current_dir == MOTOR_DIR_REVERSE || current_dir == MOTOR_DIR_BRAKE) {
+        (void)set_motor_pins(MOTOR_DIR_BRAKE, 1, 1);
+        if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+            vTaskDelay(pdMS_TO_TICKS(150));
+        }
+    }
     esp_err_t ret = set_motor_pins(MOTOR_DIR_COAST, 0, 0);
     if (ret != ESP_OK) return ret;
-    ESP_LOGD(TAG, "Motor set to COAST/STOP");
+    ESP_LOGD(TAG, "Motor set to COAST/STOP (safe de-energized)");
     return ret;
 }
 

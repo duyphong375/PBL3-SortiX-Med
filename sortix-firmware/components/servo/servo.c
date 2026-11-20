@@ -21,18 +21,21 @@ typedef struct {
     ledc_channel_t channel;
     servo_fsm_state_t state;
     int64_t state_start_us;
+    bool closing_braking;
 } servo_channel_ctx_t;
 
 static servo_channel_ctx_t s_servos[SERVO_COUNT] = {
-    { .pin = SERVO_PIN_1, .channel = LEDC_CHANNEL_0, .state = SERVO_STATE_IDLE, .state_start_us = 0 },
-    { .pin = SERVO_PIN_2, .channel = LEDC_CHANNEL_1, .state = SERVO_STATE_IDLE, .state_start_us = 0 }
+    { .pin = SERVO_PIN_1, .channel = LEDC_CHANNEL_0, .state = SERVO_STATE_IDLE, .state_start_us = 0, .closing_braking = false },
+    { .pin = SERVO_PIN_2, .channel = LEDC_CHANNEL_1, .state = SERVO_STATE_IDLE, .state_start_us = 0, .closing_braking = false }
 };
 
-static uint32_t s_rest_us = 1000;       // Vị trí nghỉ ~0 độ
-static uint32_t s_active_us = 2000;     // Vị trí gạt ~90 độ
-static uint32_t s_open_time_ms = 200;   // Thời gian cơ cấu di chuyển để mở ra
-static uint32_t s_hold_time_ms = 600;   // Thời gian giữ cần gạt tại vị trí gạt
-static uint32_t s_close_time_ms = 250;  // Thời gian cơ cấu di chuyển thu về vị trí cũ
+static uint32_t s_rest_us = 500;        // Xung quay ngược (CCW) 4 vòng 360 độ (500us)
+static uint32_t s_active_us = 2500;     // Xung quay thuận (CW) 4 vòng 360 độ (2500us)
+static uint32_t s_stop_us = 1500;       // Xung dừng trung tính (1500us)
+static uint32_t s_open_time_ms = 2000;  // Thời gian quay thuận 4 vòng 360 độ (2000ms)
+static uint32_t s_hold_time_ms = 200;   // Thời gian dừng nghỉ giữa chiều thuận và chiều ngược (200ms)
+static uint32_t s_close_time_ms = 2000; // Thời gian quay ngược thu về 4 vòng 360 độ (2000ms)
+static uint32_t s_brake_time_ms = 80;   // Thời gian hãm xung dừng trung tính 1500us trước khi ngắt PWM
 
 static esp_timer_handle_t s_fsm_timer = NULL;
 static SemaphoreHandle_t s_servo_mutex = NULL;
@@ -68,28 +71,40 @@ static void servo_fsm_timer_cb(void *arg)
                     if (elapsed_ms >= s_open_time_ms) {
                         ctx->state = SERVO_STATE_HOLDING;
                         ctx->state_start_us = now_us;
-                        ESP_LOGD(TAG, "Servo %d reached HOLDING", i + 1);
+                        (void)servo_set_pulse_raw((servo_id_t)i, s_stop_us);
+                        ESP_LOGI(TAG, "Servo %d completed 4 CW revolutions -> HOLDING/STOP before reverse", i + 1);
                     }
                     break;
 
                 case SERVO_STATE_HOLDING:
-                    if (elapsed_ms >= s_hold_time_ms) {
+                    if (elapsed_ms >= (s_hold_time_ms / 2) && elapsed_ms < s_hold_time_ms) {
+                        (void)servo_set_pulse_raw((servo_id_t)i, 0);
+                    } else if (elapsed_ms >= s_hold_time_ms) {
                         ctx->state = SERVO_STATE_CLOSING;
                         ctx->state_start_us = now_us;
                         esp_err_t pulse_ret = servo_set_pulse_raw((servo_id_t)i, s_rest_us);
                         if (pulse_ret != ESP_OK) {
-                            ESP_LOGE(TAG, "Failed to command Servo %d to rest: %s", i + 1,
+                            ESP_LOGE(TAG, "Failed to command Servo %d to CCW: %s", i + 1,
                                      esp_err_to_name(pulse_ret));
                         }
-                        ESP_LOGD(TAG, "Servo %d returning to REST (CLOSING)", i + 1);
+                        ESP_LOGI(TAG, "Servo %d starting 4 CCW revolutions (CLOSING)", i + 1);
                     }
                     break;
 
                 case SERVO_STATE_CLOSING:
-                    if (elapsed_ms >= s_close_time_ms) {
+                    if (!ctx->closing_braking) {
+                        if (elapsed_ms >= s_close_time_ms) {
+                            ctx->closing_braking = true;
+                            ctx->state_start_us = now_us;
+                            (void)servo_set_pulse_raw((servo_id_t)i, s_stop_us); // Hãm chủ động tại 1500us tránh trôi quán tính
+                            ESP_LOGI(TAG, "Servo %d completed CCW stroke -> BRAKING at 1500us", i + 1);
+                        }
+                    } else if (elapsed_ms >= s_brake_time_ms) {
+                        ctx->closing_braking = false;
                         ctx->state = SERVO_STATE_IDLE;
                         ctx->state_start_us = now_us;
-                        ESP_LOGI(TAG, "Servo %d divert cycle COMPLETE (IDLE)", i + 1);
+                        (void)servo_set_pulse_raw((servo_id_t)i, 0); // TẮT HOÀN TOÀN xung PWM khi đã dừng hẳn
+                        ESP_LOGI(TAG, "Servo %d braked and stopped -> IDLE (PWM off)", i + 1);
                     }
                     break;
             }
@@ -127,7 +142,7 @@ esp_err_t servo_init(void)
             .timer_sel = LEDC_SERVO_TIMER,
             .intr_type = LEDC_INTR_DISABLE,
             .gpio_num = s_servos[i].pin,
-            .duty = pulse_to_duty(s_rest_us),
+            .duty = 0, // Khởi động ở mức 0: TẮT HOÀN TOÀN xung PWM, servo đứng yên tuyệt đối
             .hpoint = 0
         };
         ret = ledc_channel_config(&chan_conf);
@@ -136,7 +151,7 @@ esp_err_t servo_init(void)
             return ret;
         }
 
-        // Cập nhật giá trị duty ra thanh ghi phần cứng ngay khi khởi động để chân GPIO phát xung liền
+        // Cập nhật duty = 0 ra phần cứng ngay khi khởi động
         ret = ledc_update_duty(LEDC_SERVO_MODE, s_servos[i].channel);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "Failed to update duty for LEDC channel %d: %s", i, esp_err_to_name(ret));
@@ -144,6 +159,7 @@ esp_err_t servo_init(void)
         }
 
         s_servos[i].state = SERVO_STATE_IDLE;
+        s_servos[i].closing_braking = false;
     }
 
     // Khởi chạy software timer chu kỳ 20ms cho máy trạng thái FSM (không chặn CPU)
@@ -176,6 +192,7 @@ esp_err_t servo_trigger(servo_id_t id)
         ret = servo_set_pulse_raw(id, s_active_us);
         if (ret == ESP_OK) {
             s_servos[id].state = SERVO_STATE_OPENING;
+            s_servos[id].closing_braking = false;
             s_servos[id].state_start_us = esp_timer_get_time();
             ESP_LOGI(TAG, "Servo %d TRIGGERED -> OPENING", id + 1);
         }
@@ -191,7 +208,8 @@ void servo_reset_all(void)
     xSemaphoreTake(s_servo_mutex, portMAX_DELAY);
     for (int i = 0; i < SERVO_COUNT; i++) {
         s_servos[i].state = SERVO_STATE_IDLE;
-        esp_err_t ret = servo_set_pulse_raw((servo_id_t)i, s_rest_us);
+        s_servos[i].closing_braking = false;
+        esp_err_t ret = servo_set_pulse_raw((servo_id_t)i, 0); // Ngắt xung PWM
         if (ret != ESP_OK) ESP_LOGE(TAG, "Failed to reset Servo %d: %s", i + 1, esp_err_to_name(ret));
     }
     xSemaphoreGive(s_servo_mutex);
@@ -205,6 +223,7 @@ esp_err_t servo_emergency_stop(void)
     esp_err_t result = ESP_OK;
     for (int i = 0; i < SERVO_COUNT; i++) {
         s_servos[i].state = SERVO_STATE_IDLE;
+        s_servos[i].closing_braking = false;
         s_servos[i].state_start_us = esp_timer_get_time();
         esp_err_t ret = servo_set_pulse_raw((servo_id_t)i, 0);
         if (result == ESP_OK && ret != ESP_OK) result = ret;

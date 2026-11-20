@@ -49,7 +49,7 @@ export interface ConveyorVisualizerProps {
   brandCounts?: Record<string, number>;
   onToggleSimulationMode?: () => void;
   jamIncident?: any;
-  onTestActuator?: (type: "servo_1" | "servo_2" | "buzzer", value?: number) => void;
+  onTestActuator?: (type: "servo_1" | "servo_2" | "buzzer" | "led_status", value?: number) => void;
 }
 
 export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
@@ -94,9 +94,12 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
   const activeItemsCount = items.filter(
     (it) => !it.sorted && !it.deflected && (it.progress ?? 0) < 96
   ).length;
+  // Đồng bộ chạy chung, dừng chung giữa Web, băng tải 3D và Thực tế:
+  // Trạng thái isRunning đã được đồng bộ 2 chiều với telemetry.conveyor_running
+  const isActualRunning = isRunning;
   const isBeltMoving =
-    isRunning &&
-    (isSimulation ? hasActiveItems : hasActiveItems) &&
+    isActualRunning &&
+    (isSimulation ? hasActiveItems : true) &&
     !telemetry.estop_pressed &&
     !isBinFull &&
     !isJammed;
@@ -142,10 +145,12 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
   );
 
   return (
-    <div className="relate-card relative flex flex-col rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm transition-all duration-300 dark:border-white/[0.07] dark:bg-[#161822] min-h-full justify-between gap-3 sm:gap-4">
+    <div className="relate-card relative flex flex-col rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm transition-all duration-300 dark:border-white/[0.07] dark:bg-[#161822] h-full overflow-y-auto justify-between gap-3 sm:gap-4">
       <ConveyorToolbar
         telemetry={telemetry}
-        isRunning={isRunning}
+        isRunning={isActualRunning}
+        isJammed={isJammed}
+        isBinFull={isBinFull}
         itemsCount={activeItemsCount}
         isSimulation={isSimulation}
         onToggleRun={onToggleRun}
@@ -164,6 +169,7 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
               isSimulation={isSimulation}
               arm1Active={arm1Active}
               arm2Active={arm2Active}
+              ledActive={isActualRunning || Boolean(telemetry.estop_pressed)}
               onTestActuator={onTestActuator}
             />
           ) : undefined
@@ -186,31 +192,31 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
           <div className="h-1.5 w-1.5 rounded-xs bg-slate-500 dark:bg-slate-900 border border-slate-400/50 dark:border-slate-600 rotate-45" />
         </div>
 
-        {/* Thanh Ray Trượt Mạ Crom Có Thước Đo Milimet Chuẩn Kích Thước Thực Tế 600mm (60cm) */}
+        {/* Thanh Ray Trượt Mạ Crom Có Thước Đo Milimet Chuẩn Kích Thước Thực Tế 650mm (65cm) */}
         <div className="chrome-rail-ruler rounded-md relative flex items-center px-2 h-5">
           <div className="absolute inset-0 ruler-ticks opacity-60 pointer-events-none" />
           <div className="relative z-10 w-full h-full font-mono font-bold tracking-tight text-slate-700 dark:text-slate-300 pointer-events-none text-[8px] sm:text-[9px]">
-            <span className="absolute left-2 top-1/2 -translate-y-1/2 whitespace-nowrap">▲ 0mm</span>
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 whitespace-nowrap">▲ 0mm (S1)</span>
             <span className="absolute left-[15%] top-1/2 -translate-y-1/2 -translate-x-1/2 whitespace-nowrap text-cyan-700 dark:text-cyan-300 font-black">
-              ▲ 90mm <span className="hidden sm:inline">(CAM & S1)</span>
+              ▲ 100mm <span className="hidden sm:inline">(CAM DroidCam)</span>
             </span>
-            <span className={`absolute left-[45%] top-1/2 -translate-y-1/2 -translate-x-1/2 whitespace-nowrap font-black ${bin1Theme.rulerText}`}>
-              ▲ 270mm <span className="hidden sm:inline">(SERVO 1)</span>
+            <span className={`absolute left-[40%] top-1/2 -translate-y-1/2 -translate-x-1/2 whitespace-nowrap font-black ${bin1Theme.rulerText}`}>
+              ▲ 250mm <span className="hidden sm:inline">(SERVO 1)</span>
             </span>
-            <span className={`absolute left-[72%] top-1/2 -translate-y-1/2 -translate-x-1/2 whitespace-nowrap font-black ${bin2Theme.rulerText}`}>
-              ▲ 430mm <span className="hidden sm:inline">(SERVO 2)</span>
+            <span className={`absolute left-[65%] top-1/2 -translate-y-1/2 -translate-x-1/2 whitespace-nowrap font-black ${bin2Theme.rulerText}`}>
+              ▲ 400mm <span className="hidden sm:inline">(SERVO 2)</span>
             </span>
             <span className={`absolute right-2 top-1/2 -translate-y-1/2 whitespace-nowrap font-black ${bin3Theme.rulerText}`}>
-              ▲ 600mm <span className="hidden sm:inline">(MÁNG 3)</span>
+              ▲ 650mm <span className="hidden sm:inline">(MÁNG 3)</span>
             </span>
           </div>
         </div>
 
-        {/* Thanh tiêu đề các trạm công nghiệp (Chuẩn hóa kích thước thực tế 10x60cm) */}
+        {/* Thanh tiêu đề các trạm công nghiệp (Chuẩn hóa kích thước thực tế 10x65cm) */}
         <div className="mt-1 grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-[10px] sm:text-xs font-bold uppercase tracking-wider">
           <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 py-1.5 px-2 text-cyan-700 dark:text-cyan-300 flex items-center justify-center gap-1.5 shadow-sm font-mono min-w-0">
             <Camera className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">1. CAM AI & S1 (90mm • 15%)</span>
+            <span className="truncate">1. CAM AI (100mm • 15%)</span>
           </div>
           <div className={`rounded-lg border py-1.5 px-2 flex items-center justify-center gap-1.5 shadow-sm font-mono min-w-0 transition-colors ${
             isJammed
@@ -218,20 +224,38 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
               : bin1Theme.stationBadge
           }`}>
             <span className="shrink-0">{isJammed ? "⚠️" : "🎛️"}</span>
-            <span className="truncate">{isJammed ? "2. ZONE A: KẸT PHÔI!" : "2. SERVO 1 (GPIO6 • 200mm • 45%)"}</span>
+            <span className="truncate">{isJammed ? "2. ZONE A: KẸT PHÔI!" : "2. SERVO 1 (GPIO6 • 250mm • 40%)"}</span>
           </div>
           <div className={`rounded-lg border py-1.5 px-2 flex items-center justify-center gap-1.5 shadow-sm font-mono min-w-0 ${bin2Theme.stationBadge}`}>
             <span className="shrink-0">🎛️</span>
-            <span className="truncate">3. SERVO 2 (GPIO7 • 400mm • 72%)</span>
+            <span className="truncate">3. SERVO 2 (GPIO7 • 400mm • 65%)</span>
           </div>
           <div className={`rounded-lg border py-1.5 px-2 flex items-center justify-center gap-1.5 shadow-sm font-mono min-w-0 ${bin3Theme.stationBadge}`}>
             <span className="shrink-0">📥</span>
-            <span className="truncate">4. MÁNG 3 (540mm • 100%)</span>
+            <span className="truncate">4. MÁNG 3 (650mm • 100%)</span>
           </div>
         </div>
 
-        {/* Thông báo trạng thái: Khay đầy tạm dừng / Đứng yên chờ phôi / Tạm dừng */}
-        {isBinFull ? (
+        {/* Thông báo trạng thái: E-Stop / Kẹt phôi / Khay đầy / Tạm dừng / Chờ phôi / Đang chạy */}
+        {telemetry.estop_pressed ? (
+          <div className="flex justify-center mt-3 mb-1">
+            <div className="rounded-full bg-rose-950/90 px-4 py-1.5 backdrop-blur border border-rose-500/60 text-[10px] sm:text-xs font-semibold text-rose-300 shadow-sm flex items-center gap-2 text-center w-fit mx-auto animate-pulse">
+              <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
+              <span>
+                🛑 Đang kích hoạt Dừng Khẩn Cấp (E-Stop) • Băng tải đã ngắt điện toàn bộ. Vui lòng mở khóa an toàn để tiếp tục!
+              </span>
+            </div>
+          </div>
+        ) : isJammed ? (
+          <div className="flex justify-center mt-3 mb-1">
+            <div className="rounded-full bg-rose-950/90 px-4 py-1.5 backdrop-blur border border-rose-500/60 text-[10px] sm:text-xs font-semibold text-rose-300 shadow-sm flex items-center gap-2 text-center w-fit mx-auto animate-pulse">
+              <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
+              <span>
+                ⚠️ Phát hiện kẹt phôi tại Zone A • Băng tải đã tự động dừng bảo vệ. Vui lòng gỡ phôi để tiếp tục vận hành!
+              </span>
+            </div>
+          </div>
+        ) : isBinFull ? (
           <div className="flex justify-center mt-3 mb-1">
             <div className="rounded-full bg-amber-950/90 px-4 py-1.5 backdrop-blur border border-amber-500/50 text-[10px] sm:text-xs font-semibold text-amber-300 shadow-sm flex items-center gap-2 text-center w-fit mx-auto animate-pulse">
               <span className="h-2 w-2 rounded-full bg-amber-400 shrink-0" />
@@ -240,11 +264,11 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
               </span>
             </div>
           </div>
-        ) : !isRunning ? (
+        ) : !isActualRunning ? (
           <div className="flex justify-center mt-3 mb-1">
             <div className="rounded-full bg-slate-900/90 px-4 py-1.5 backdrop-blur border border-amber-500/40 text-[10px] sm:text-xs font-semibold text-amber-300 shadow-sm flex items-center gap-2 text-center w-fit mx-auto">
               <span className="h-2 w-2 rounded-full bg-amber-400 shrink-0" />
-              <span>Băng tải đang tạm dừng • Nhấn Khởi động để tiếp tục vận hành</span>
+              <span>Băng tải đang tạm dừng • Nhấn Khởi động hoặc bật nút phần cứng để tiếp tục vận hành</span>
             </div>
           </div>
         ) : !isBeltMoving ? (
@@ -263,7 +287,11 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
             <div className="rounded-full bg-slate-900/90 px-4 py-1.5 backdrop-blur border border-emerald-500/40 text-[10px] sm:text-xs font-semibold text-emerald-300 shadow-sm flex items-center gap-2 text-center w-fit mx-auto">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
               <span>
-                Băng tải đang chạy • Đang vận chuyển {activeItemsCount} phôi mẫu qua các trạm phân loại
+                {activeItemsCount > 0 ? (
+                  <>Băng tải đang chạy đồng bộ • Đang vận chuyển {activeItemsCount} phôi mẫu qua các trạm phân loại</>
+                ) : (
+                  <>Băng tải đang chạy đồng bộ • Sẵn sàng tiếp nhận phôi từ Cảm biến S1 & Camera AI</>
+                )}
               </span>
             </div>
           </div>
@@ -280,6 +308,11 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
               className={`h-9 w-9 rounded-full border-2 border-amber-500/80 bg-slate-900 shadow-md flex items-center justify-center ${
                 isBeltMoving ? "roller-rotating" : ""
               }`}
+              style={
+                isBeltMoving
+                  ? { animationDuration: `${Math.max(0.25, (110 - speed) / 70)}s` }
+                  : undefined
+              }
             >
               <div className="relative h-6 w-6 rounded-full border border-slate-400/50 bg-gradient-to-tr from-slate-800 to-slate-700 flex items-center justify-center">
                 {/* 4 Chấu ốc cố định trục quay */}
@@ -350,6 +383,11 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
               className={`h-9 w-9 rounded-full border-2 border-amber-500/80 bg-slate-900 shadow-md flex items-center justify-center ${
                 isBeltMoving ? "roller-rotating" : ""
               }`}
+              style={
+                isBeltMoving
+                  ? { animationDuration: `${Math.max(0.25, (110 - speed) / 70)}s` }
+                  : undefined
+              }
             >
               <div className="relative h-6 w-6 rounded-full border border-slate-400/50 bg-gradient-to-tr from-slate-800 to-slate-700 flex items-center justify-center">
                 {/* 4 Chấu ốc cố định trục quay */}
@@ -416,10 +454,10 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
                   </span>
                   <div className="min-w-0">
                     <span className="text-xs font-bold text-slate-900 dark:text-white truncate block">
-                      Máng 1: {bin1Brands.length > 0 ? bin1Brands.map((b) => CATALOG_BRANDS[b]?.name || b).join(", ") : "Bơm kim tiêm / Dao mổ"}
+                      Máng 1: {bin1Brands.length > 0 ? bin1Brands.map((b) => CATALOG_BRANDS[b]?.name || b).join(", ") : "Kim tiêm"}
                     </span>
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono block">
-                      Servo 1 (MG996R - GPIO6) • 200mm (45%)
+                      Servo 1 (MG996R - GPIO6) • 250mm (38%)
                     </span>
                   </div>
                 </div>
@@ -508,10 +546,10 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
                   </span>
                   <div className="min-w-0">
                     <span className="text-xs font-bold text-slate-900 dark:text-white truncate block">
-                      Máng 2: {bin2Brands.length > 0 ? bin2Brands.map((b) => CATALOG_BRANDS[b]?.name || b).join(", ") : "Kẹp PT / Dao mổ"}
+                      Máng 2: {bin2Brands.length > 0 ? bin2Brands.map((b) => CATALOG_BRANDS[b]?.name || b).join(", ") : "Kéo"}
                     </span>
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono block">
-                      Servo 2 (MG996R - GPIO7) • 400mm (72%)
+                      Servo 2 (MG996R - GPIO7) • 400mm (62%)
                     </span>
                   </div>
                 </div>
@@ -600,10 +638,10 @@ export const ConveyorVisualizer: React.FC<ConveyorVisualizerProps> = ({
                   </span>
                   <div className="min-w-0">
                     <span className="text-xs font-bold text-slate-900 dark:text-white truncate block">
-                      Máng 3: {bin3Brands.length > 0 ? bin3Brands.map((b) => CATALOG_BRANDS[b]?.name || b).join(", ") : "Lọ thuốc / Ống nghiệm"}
+                      Máng 3: {bin3Brands.length > 0 ? bin3Brands.map((b) => CATALOG_BRANDS[b]?.name || b).join(", ") : "Bông"}
                     </span>
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono block">
-                      Cuối băng tải • 600mm (100%)
+                      Cuối băng tải • 650mm (100%)
                     </span>
                   </div>
                 </div>

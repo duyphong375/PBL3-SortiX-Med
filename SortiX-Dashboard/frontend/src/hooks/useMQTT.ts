@@ -107,10 +107,15 @@ export function useMQTT({
 
   // Coalesce bursty telemetry packets into one React update per frame.
   // MQTT can deliver status/telemetry much faster than the UI can render.
-  const pendingTelemetryRef = useRef<unknown | null>(null);
+  const pendingTelemetryRef = useRef<Record<string, unknown> | null>(null);
   const telemetryFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduleTelemetryUpdate = useCallback((payload: unknown) => {
-    pendingTelemetryRef.current = payload;
+    if (isRecord(payload)) {
+      pendingTelemetryRef.current = {
+        ...(pendingTelemetryRef.current || {}),
+        ...payload,
+      };
+    }
     if (telemetryFlushTimerRef.current !== null) return;
 
     telemetryFlushTimerRef.current = setTimeout(() => {
@@ -154,10 +159,27 @@ export function useMQTT({
       }
 
       // 2. Status / Telemetry
-      // Config acknowledgements are status topics too, but are not telemetry.
-      if (!isConfigStatus && (topic.includes("status") || topic.includes("telemetry"))) {
-        const telemetry = TelemetrySchema.safeParse(data);
-        if (telemetry.success) scheduleTelemetryUpdate(telemetry.data);
+      // Config acknowledgements and special alert topics must not be treated as general telemetry.
+      const isSpecialTopic =
+        topic.includes("bin_status") ||
+        topic.includes("/temp") ||
+        topic.includes("/jam") ||
+        topic.includes("/estop") ||
+        topic.includes("/heartbeat");
+      const isSpecificEvent = Boolean(
+        data.event &&
+        data.event !== "telemetry" &&
+        data.event !== "status"
+      );
+
+      if (
+        !isConfigStatus &&
+        !isSpecialTopic &&
+        !isSpecificEvent &&
+        data.source !== "ai_server" &&
+        (topic.includes("status") || topic.includes("telemetry"))
+      ) {
+        scheduleTelemetryUpdate(data);
       }
 
       // 3. Vision Detection
@@ -338,6 +360,20 @@ export function useMQTT({
   }, [isClient, isSimulation]);
 
 
+  const getStoredToken = (): string | null => {
+    if (typeof window === "undefined") return null;
+    const direct = localStorage.getItem("sortix_session_token");
+    if (direct) return direct;
+    try {
+      const raw = localStorage.getItem("pbl3_auth_user");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.sessionToken) return parsed.sessionToken;
+      }
+    } catch {}
+    return null;
+  };
+
   const publishCommand = useCallback(async (cmd: string, value?: number): Promise<boolean> => {
     if (isSimulationRef.current) return false;
     const command = typeof cmd === "string" ? cmd.trim() : "";
@@ -345,7 +381,7 @@ export function useMQTT({
     if (value !== undefined && !Number.isFinite(value)) return false;
 
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("sortix_session_token") : null;
+      const token = getStoredToken();
       const res = await fetch("/api/control", {
         method: "POST",
         headers: {
@@ -366,7 +402,7 @@ export function useMQTT({
   const publishConfig = useCallback(async (config: SorterConfig): Promise<boolean> => {
     if (isSimulationRef.current) return false;
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("sortix_session_token") : null;
+      const token = getStoredToken();
       const res = await fetch("/api/config", {
         method: "POST",
         headers: {

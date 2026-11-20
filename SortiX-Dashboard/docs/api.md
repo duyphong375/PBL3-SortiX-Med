@@ -20,15 +20,19 @@ Phần đặc tả chi tiết bên dưới được giữ lại để mô tả p
 
 | Nhóm | Route backend standalone hiện tại |
 | --- | --- |
-| Health/telemetry | `GET /api/health`, `GET /api/telemetry`, `GET /api/bins` |
+| Health/telemetry | `GET /api/health`, `GET/POST /api/telemetry`, `POST /api/sensors`, `GET/DELETE /api/telemetry/history`, `GET /api/bins` |
 | Auth | `POST /api/auth/register`, `/login`, `/logout`, `/forgot-password`, `/reset-password` |
 | Core data | `GET/POST /api/config`, `GET/POST/DELETE /api/history`, `GET /api/stats`, `GET /api/notifications` |
-| Events/sync | `GET /api/events`, `GET/POST /api/sync` |
+| Events/sync/control | `GET /api/events`, `GET/POST /api/sync`, `POST /api/control` |
 | Alerts/chat | `POST /api/email-alert`, `POST /api/telegram-alert`, `GET/POST /api/chat/telegram` |
-| User | `GET /api/user/profile`, `POST /api/user/change-password`, `GET/POST /api/users`, `PUT/DELETE /api/users/:id` |
+| User | `GET/PUT /api/user/profile`, `POST /api/user/change-password`, `GET/POST /api/users`, `PUT/DELETE /api/users/:id` |
 | Safety | `GET /api/safety/status`; POST `/api/safety/estop`, `/jam`, `/bin-full`, `/temp-warning`, `/device-offline`, `/heartbeat`, `/shift-summary`, `/mqtt-disconnected`, `/mqtt-connected`, `/unlock` |
 
-Safety aliases hiện được giữ cho client/firmware: `/api/storage/bin-status`, `/api/telemetry/temp`, `/api/device/offline`, `/api/heartbeat`, `/api/telemetry/heartbeat`, `/api/shift/summary`, `/api/mqtt/disconnected` và `/api/mqtt/connected`. Frontend route handlers có thể có tập route nhỏ hơn backend standalone; không coi hai lớp là một router duy nhất.
+Ngoài ra:
+- **Next.js Route Handlers (`frontend/src/app/api`)** cung cấp thêm `/api/chat/copilot` (Google Gemini AI), `/api/telegram/webhook`, `/api/auth/heartbeat`, `/api/auth/token`, `/api/telemetry`, `/api/telemetry/history`, `/api/control`.
+- **AI Camera Server (`ai-server/server.py`, Port `8000`)** cung cấp `GET /video_feed` (luồng MJPEG trực tiếp) và `GET /health` (trạng thái camera, MQTT, ROI, FPS).
+
+Safety aliases hiện được giữ cho client/firmware: `/api/storage/bin-status`, `/api/telemetry/temp`, `/api/device/offline`, `/api/heartbeat`, `/api/telemetry/heartbeat`, `/api/shift/summary`, `/api/mqtt/disconnected` và `/api/mqtt/connected`. Frontend route handlers có thể có tập route khác backend standalone; không coi hai lớp là một router duy nhất.
 
 Persistence runtime của backend là JSON store và config in-memory. Các bảng CSDL trong phần mapping chỉ mô tả migration tham chiếu trong `backend/database`, không có driver CSDL được gọi bởi script hiện tại.
 
@@ -65,7 +69,7 @@ Mọi API trong SortiX Dashboard đều được thiết kế phân lớp nghiê
 | **Users**| `/api/users` | `GET`/`POST` | `UserModel` | `data/users.json` / Bảng `users` | Read / Atomic Write | `admin` Only |
 | **Users**| `/api/users/:id` | `PUT`/`DELETE` | `UserModel` | `data/users.json` / Bảng `users` | Atomic Write (Có kiểm tra bảo vệ Admin) | `admin` Only |
 | **Config**| `/api/config` | `GET` | `ConfigModel`| RAM / Bảng `sorter_config` | In-Memory Read | Đã đăng nhập |
-| **Config**| `/api/config` | `POST` | `ConfigModel`| RAM / MQTT Topic `sorter/01/config` | In-Memory Write & Publish MQTT | `admin` Only |
+| **Config**| `/api/config` | `POST` | `ConfigModel`| RAM / MQTT Topic `sorter/sorter_01/config/set` | In-Memory Write & Publish MQTT | `admin` Only |
 | **History**| `/api/history` | `GET` | `HistoryModel`| `data/history.json` / Bảng `history` | In-Memory Read (Phân trang) | Đã đăng nhập |
 | **History**| `/api/history` | `POST` | `HistoryModel`| `data/history.json` / Bảng `history` | Bounded Buffer (1000 items) + Atomic Write | Đã đăng nhập |
 | **History**| `/api/history` | `DELETE` | `HistoryModel`| `data/history.json` / Bảng `history` | Atomic Clear | `admin` Only |
@@ -156,7 +160,7 @@ flowchart LR
     C -- Không --> D["Trả về 403 Forbidden"]
     C -- Có --> E["2. Tăng config_version (+1)"]
     E --> F["3. Cập nhật ConfigModel trong RAM"]
-    E --> G["4. Publish MQTT:\nsorter/01/config"]
+    E --> G["4. Publish MQTT:\nsorter/sorter_01/config/set"]
     G --> H["Vi Điều Khiển ESP32-C5\n(Nạp RAM/EEPROM theo apply_mode)"]
     E --> I["5. Trả về 200 OK cho Dashboard"]
 ```
@@ -290,7 +294,7 @@ Duy trì trạng thái trực tuyến (`is_online`) và cập nhật thời gian
 ---
 
 ### 2.6. Yêu Cầu Mã OTP Quên Mật Khẩu
-Gửi mã Mock OTP xác nhận đến email người dùng để đặt lại mật khẩu (hiệu lực 5 phút).
+Tạo mã OTP 6 chữ số (hiệu lực 5 phút) theo tên đăng nhập hoặc email (`identifier`), gửi qua SMTP nếu được cấu hình và trả `demo_otp` trực tiếp trên web handler để hiển thị trong modal khôi phục nhanh.
 
 - **Method**: `POST`
 - **Path**: `/api/auth/forgot-password`
@@ -299,22 +303,22 @@ Gửi mã Mock OTP xác nhận đến email người dùng để đặt lại m�
 - **Request Body**:
 ```json
 {
-  "email": "vana@gmail.com"
+  "identifier": "vana@gmail.com"
 }
 ```
 - **Response `200 OK`**:
 ```json
 {
   "success": true,
-  "message": "Mã OTP xác thực đã được gửi tới email của bạn (Hiệu lực trong 5 phút)",
-  "data": {
-    "email": "vana@gmail.com",
-    "expires_in_seconds": 300
-  }
+  "message": "Đã tạo mã OTP demo thành công! Mã có hiệu lực trong vòng 5 phút.",
+  "expires_at": "2026-11-20T07:35:00.000Z",
+  "username": "nguyenvana",
+  "email": "v***@gmail.com",
+  "demo_otp": "839201"
 }
 ```
 > [!WARNING]
-> **Bảo mật:** Các tài khoản Quản trị viên (`role: 'admin'`) bị từ chối khôi phục mật khẩu từ bên ngoài màn hình Login để ngăn ngừa tấn công chiếm quyền.
+> **Bảo mật:** Backend standalone (`userService.ts`) chặn khôi phục mật khẩu từ bên ngoài đối với tài khoản `admin` và chỉ kèm `demo_otp` khi `!isProduction && ENABLE_DEMO_OTP === "true"`.
 
 ---
 
@@ -327,7 +331,7 @@ Xác thực mã OTP 6 chữ số và thiết lập mật khẩu mới.
 - **Request Body**:
 ```json
 {
-  "email": "vana@gmail.com",
+  "identifier": "vana@gmail.com",
   "otp": "839201",
   "new_password": "NewPassword123@",
   "confirm_password": "NewPassword123@"
@@ -413,7 +417,7 @@ Xác thực mã OTP 6 chữ số và thiết lập mật khẩu mới.
 ### 3.2. Cập Nhật Cấu Hình & Dung Lượng Khay (Admin Only)
 - **Method**: `POST`
 - **Path**: `/api/config`
-- **Database Model**: `ConfigModel` -> Cập nhật RAM & Xuất bản MQTT `sorter/01/config`
+- **Database Model**: `ConfigModel` -> Cập nhật RAM & Xuất bản MQTT `sorter/sorter_01/config/set`
 - **Headers**: `Content-Type: application/json`, `Authorization: Bearer <TOKEN>`
 - **Request Body**:
 ```json
@@ -581,28 +585,24 @@ Xác thực mã OTP 6 chữ số và thiết lập mật khẩu mới.
 - **Request Body**: Chuẩn Telegram Update Object từ Telegram Bot API.
 - **Response `200 OK`**: `{ "ok": true }`.
 
-### 6.6. Trợ Lý AI Copilot Phân Loại Dụng Cụ Y Tế (Google Gemini 3.5 Flash Lite)
-- **Method**: `POST`
+### 6.6. Trợ Lý AI Copilot Phân Loại Dụng Cụ Y Tế (Google Gemini API)
+- **Method**: `POST` (Next.js Route Handler tại `frontend/src/app/api/chat/copilot/route.ts`)
 - **Path**: `/api/chat/copilot`
-- **Mục đích**: Truy vấn trợ lý AI về trạng thái băng tải, quy trình khử trùng Autoclave, hướng dẫn an toàn sinh học và xử lý sự cố.
-- **Mô hình AI**: Trực tiếp gọi Google AI Studio API v1beta với `gemini-3.5-flash-lite` (fallback `gemini-3.5-flash`, `gemini-flash-lite-latest`).
+- **Mục đích**: Truy vấn trợ lý AI đa năng về trạng thái băng tải, telemetry, quy trình khử trùng và xử lý sự cố.
+- **Mô hình AI**: Trực tiếp gọi Google AI Studio API v1beta với `GEMINI_MODEL` hoặc mặc định `gemini-3.1-flash-lite` (fallback: `gemini-3-flash-preview`, `gemini-3.1-flash-lite-preview`, `gemini-3.5-flash-lite`, `gemini-3.5-flash`, `gemini-3.8-flash`, `gemini-flash-lite-latest`, `gemini-flash-latest`).
 - **Request Body**:
 ```json
 {
-  "message": "Nhiệt độ động cơ hiện tại là bao nhiêu và có cần dừng khẩn cấp không?",
-  "history": [
-    { "role": "user", "content": "..." },
-    { "role": "model", "content": "..." }
-  ]
+  "chatInput": "Nhiệt độ động cơ hiện tại là bao nhiêu và có cần dừng khẩn cấp không?"
 }
 ```
+*(Hỗ trợ cả trường `chatInput` hoặc `message`).*
 - **Response `200 OK`**:
 ```json
 {
   "success": true,
-  "reply": "Nhiệt độ động cơ hiện tại là 42.5°C nằm trong giới hạn an toàn (<75°C)...",
-  "model": "gemini-3.5-flash-lite",
-  "latency_ms": 1050
+  "output": "Nhiệt độ chip ESP32-C5 hiện tại là 42.5°C, nằm trong ngưỡng an toàn (<75°C)...",
+  "model": "gemini-3.1-flash-lite"
 }
 ```
 

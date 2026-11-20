@@ -16,7 +16,8 @@ export interface ActuatorTestPanelProps {
   isSimulation: boolean;
   arm1Active?: boolean;
   arm2Active?: boolean;
-  onTestActuator: (type: "servo_1" | "servo_2" | "buzzer", value?: number) => void;
+  ledActive?: boolean;
+  onTestActuator: (type: "servo_1" | "servo_2" | "buzzer" | "led_status", value?: number) => void;
   className?: string;
 }
 
@@ -24,39 +25,38 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
   isSimulation,
   arm1Active = false,
   arm2Active = false,
+  ledActive = false,
   onTestActuator,
   className = "",
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [activeBuzzer, setActiveBuzzer] = useState(false);
+  const [manualLedActive, setManualLedActive] = useState<boolean | null>(null);
 
-  // Toggle Servo 1: ON (45°) / OFF (0°)
+  // Trạng thái đèn LED: Ưu tiên lệnh test thủ công của người dùng, nếu chưa bấm test thì đồng bộ theo hệ thống
+  const isLedOn = manualLedActive !== null ? manualLedActive : ledActive;
+
+  // Toggle Servo 1: ON (360°) / OFF (0°)
   const handleToggleServo1 = (targetOn: boolean) => {
     if (targetOn) {
-      onTestActuator("servo_1", 45);
+      onTestActuator("servo_1", 360);
     } else {
       onTestActuator("servo_1", 0);
     }
   };
 
-  // Toggle Servo 2: ON (45°) / OFF (0°)
+  // Toggle Servo 2: ON (360°) / OFF (0°)
   const handleToggleServo2 = (targetOn: boolean) => {
     if (targetOn) {
-      onTestActuator("servo_2", 45);
+      onTestActuator("servo_2", 360);
     } else {
       onTestActuator("servo_2", 0);
     }
   };
 
-  // Toggle Buzzer: ON (Hú liên tục) / OFF (Tắt)
-  const handleToggleBuzzer = (targetOn: boolean) => {
-    if (targetOn) {
-      setActiveBuzzer(true);
-      onTestActuator("buzzer", 1);
-    } else {
-      setActiveBuzzer(false);
-      onTestActuator("buzzer", 0);
-    }
+  // Toggle LED Trạng Thái: ON (Sáng hoạt động) / OFF (Nghỉ)
+  const handleToggleLed = (targetOn: boolean) => {
+    setManualLedActive(targetOn);
+    onTestActuator("led_status", targetOn ? 1 : 0);
   };
 
   return (
@@ -165,7 +165,7 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
                         : "text-slate-500 dark:text-slate-400"
                     }
                   >
-                    {arm1Active ? "BẬT (45°)" : "TẮT (0°)"}
+                    {arm1Active ? "BẬT (360°)" : "TẮT (0°)"}
                   </span>
                 </span>
               </div>
@@ -195,7 +195,7 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
                 }`}
               >
                 <Power className="h-2.5 w-2.5" />
-                <span>BẬT (45°)</span>
+                <span>BẬT (360°)</span>
               </button>
             </div>
           </div>
@@ -220,7 +220,7 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
                   </span>
                 </div>
                 <span className="text-[9px] font-mono font-bold px-1 py-0.2 rounded bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/25 shrink-0">
-                  GPIO 24
+                  GPIO 7
                 </span>
               </div>
 
@@ -242,7 +242,7 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
                         : "text-slate-500 dark:text-slate-400"
                     }
                   >
-                    {arm2Active ? "BẬT (45°)" : "TẮT (0°)"}
+                    {arm2Active ? "BẬT (360°)" : "TẮT (0°)"}
                   </span>
                 </span>
               </div>
@@ -272,7 +272,7 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
                 }`}
               >
                 <Power className="h-2.5 w-2.5" />
-                <span>BẬT (45°)</span>
+                <span>BẬT (360°)</span>
               </button>
             </div>
           </div>
@@ -280,7 +280,7 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
           {/* TẢI 3: ĐÈN LED BÁO TRẠNG THÁI */}
           <div
             className={`rounded-xl border p-2 flex flex-col justify-between gap-1.5 transition-all ${
-              activeBuzzer
+              isLedOn
                 ? "border-emerald-500/60 bg-emerald-500/15 dark:bg-emerald-950/30 shadow-xs shadow-emerald-500/10"
                 : "border-slate-200/90 dark:border-white/[0.06] bg-white/95 dark:bg-[#161a26]"
             }`}
@@ -292,8 +292,8 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
                   <span className="flex h-4.5 w-4.5 items-center justify-center rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-mono text-[9px] font-black shrink-0 border border-emerald-500/30">
                     LED
                   </span>
-                  <span className="text-[11px] font-bold text-slate-900 dark:text-white truncate">
-                    Đèn LED Trạng Thái
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                    LED Trạng Thái
                   </span>
                 </div>
                 <span className="text-[9px] font-mono font-bold px-1 py-0.2 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 shrink-0">
@@ -307,19 +307,19 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
                 <span className="flex items-center gap-1 font-bold">
                   <span
                     className={`h-2 w-2 rounded-full shrink-0 ${
-                      activeBuzzer
+                      isLedOn
                         ? "bg-emerald-500 shadow-[0_0_6px_#10b981] animate-pulse"
                         : "bg-slate-300 dark:bg-slate-600"
                     }`}
                   />
                   <span
                     className={
-                      activeBuzzer
+                      isLedOn
                         ? "text-emerald-600 dark:text-emerald-400 font-bold"
                         : "text-slate-500 dark:text-slate-400"
                     }
                   >
-                    {activeBuzzer ? "BẬT (Sáng)" : "TẮT (Tối)"}
+                    {isLedOn ? "BẬT (Hoạt động)" : "TẮT (Nghỉ)"}
                   </span>
                 </span>
               </div>
@@ -329,9 +329,9 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
             <div className="grid grid-cols-2 gap-1 p-0.5 rounded-lg bg-slate-100 dark:bg-white/[0.04] border border-slate-200/90 dark:border-white/10 mt-1">
               <button
                 type="button"
-                onClick={() => handleToggleBuzzer(false)}
+                onClick={() => handleToggleLed(false)}
                 className={`py-1 px-1.5 text-[10px] font-bold rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 ${
-                  !activeBuzzer
+                  !isLedOn
                     ? "bg-white dark:bg-[#1a1e2d] text-slate-800 dark:text-slate-200 shadow-xs border border-slate-200 dark:border-white/10"
                     : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
                 }`}
@@ -341,15 +341,15 @@ export const ActuatorTestPanel: React.FC<ActuatorTestPanelProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => handleToggleBuzzer(true)}
+                onClick={() => handleToggleLed(true)}
                 className={`py-1 px-1.5 text-[10px] font-bold rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 ${
-                  activeBuzzer
+                  isLedOn
                     ? "bg-emerald-600 text-white font-black shadow-xs shadow-emerald-500/40"
                     : "text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400"
                 }`}
               >
                 <Power className="h-2.5 w-2.5" />
-                <span>BẬT (Sáng)</span>
+                <span>BẬT (ON)</span>
               </button>
             </div>
           </div>

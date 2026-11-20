@@ -42,7 +42,7 @@ const DEFAULT_SYNC_CONFIG: SorterConfig = {
   catalog_version: "catalog_01",
   bins: [
     { bin_id: 1, brand_ids: ["med_syringe"] },
-    { bin_id: 2, brand_ids: ["med_forceps", "med_scissors"] },
+    { bin_id: 2, brand_ids: ["med_scissors"] },
   ],
   default_bin: 3,
   apply_mode: "when_line_empty",
@@ -77,9 +77,8 @@ function createDefaultSyncState(): DashboardSyncState {
     binCapacities: { bin1: 50, bin2: 50, bin3: 50 },
     brandCounts: {
       med_syringe: 0,
-      med_forceps: 0,
       med_scissors: 0,
-      med_vial: 0,
+      med_cotton: 0,
     },
     config: DEFAULT_SYNC_CONFIG,
     updatedAt: new Date().toISOString(),
@@ -125,9 +124,28 @@ function saveSyncStateToFile(state: DashboardSyncState): void {
 
 const syncGlobal = globalThis as typeof globalThis & {
   sortixDashboardSyncState?: DashboardSyncState;
+  sortixSyncBootInitialized?: boolean;
 };
 
-let currentState: DashboardSyncState = (syncGlobal.sortixDashboardSyncState ??= loadSyncStateFromFile());
+function initBootSyncState(): DashboardSyncState {
+  const loaded = loadSyncStateFromFile();
+  if (!syncGlobal.sortixSyncBootInitialized) {
+    syncGlobal.sortixSyncBootInitialized = true;
+    // Mặc định mỗi lần khởi động hệ thống luôn bắt đầu ở chế độ Thực tế ("real")
+    if (loaded.mode !== "real") {
+      const bootedReal: DashboardSyncState = {
+        ...loaded,
+        mode: "real",
+        updatedAt: new Date().toISOString(),
+      };
+      saveSyncStateToFile(bootedReal);
+      return bootedReal;
+    }
+  }
+  return loaded;
+}
+
+let currentState: DashboardSyncState = (syncGlobal.sortixDashboardSyncState ??= initBootSyncState());
 if (!currentState.config) {
   currentState = { ...currentState, config: DEFAULT_SYNC_CONFIG };
   syncGlobal.sortixDashboardSyncState = currentState;

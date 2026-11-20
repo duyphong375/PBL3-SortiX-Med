@@ -22,7 +22,7 @@ export const TelemetrySchema = z.object({
   arm2_active: z.boolean().default(false),
   start_btn_pressed: z.boolean().optional().default(false),
   estop_pressed: z.boolean().default(false),
-  encoder_count: finiteNumber.nonnegative().default(0),
+  encoder_count: finiteNumber.default(0),
   active_config_version: finiteNumber.int().nonnegative().default(1),
   last_heartbeat: nonEmptyString.max(128).default(() => new Date().toISOString()),
   s2_sorter1: z.boolean().nullable().optional(),
@@ -65,7 +65,7 @@ export const ClassificationRecordSchema = z.object({
   routed_bin: finiteNumber.int().min(0).max(3).optional(),
   // 0 means firmware could not verify the physical destination with sensors.
   actual_bin: finiteNumber.int().min(0).max(3),
-  status: z.enum(["success", "diverted_default", "rejected", "jammed", "unverified", "held_timeout", "servo_failed"]),
+  status: z.enum(["success", "completed", "diverted_default", "rejected", "jammed", "unverified", "held_timeout", "servo_failed"]),
   timestamp: nonEmptyString.max(128),
 }).passthrough();
 
@@ -74,7 +74,7 @@ export const HistoryQuerySchema = z.object({
   offset: z.coerce.number().int().nonnegative().default(0),
   brand: z.string().optional(),
   bin: z.coerce.number().int().min(1).max(3).optional(),
-  status: z.enum(["success", "diverted_default", "rejected", "jammed", "unverified", "held_timeout", "servo_failed"]).optional(),
+  status: z.enum(["success", "completed", "diverted_default", "rejected", "jammed", "unverified", "held_timeout", "servo_failed"]).optional(),
   date: z.string().optional(),
 });
 
@@ -323,7 +323,7 @@ export const ShiftSummaryPayloadSchema = z.object({
 
 export const MqttDisconnectedPayloadSchema = z.object({
   event: z.literal("mqtt_disconnected"),
-  broker_url: nonEmptyString.default("not configured"),
+  broker_url: nonEmptyString.default("wss://broker.emqx.io:8084/mqtt"),
   disconnected_duration_seconds: finiteNumber.default(5),
   reconnect_attempt: finiteNumber.int().nonnegative().default(1),
   mode: z.enum(["realtime", "simulation"]).default("realtime"),

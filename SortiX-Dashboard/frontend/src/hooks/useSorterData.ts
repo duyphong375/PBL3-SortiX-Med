@@ -22,7 +22,6 @@ import {
   loadBinCapacitiesLocal,
   updateBinCountsLocal,
   loadBrandCountsLocal,
-  loadOperatingMode,
   saveOperatingMode,
   saveBinCountsLocal,
   saveBinCapacitiesLocal,
@@ -60,10 +59,9 @@ export function useSorterData({ configRef, onSpawnRealVisualItem, onPublishComma
   const [simBinCounts, setSimBinCounts] = useState<BinCounts>({ bin1: 0, bin2: 0, bin3: 0 });
   const [simBinCapacities, setSimBinCapacities] = useState<BinCapacities>({ bin1: 50, bin2: 50, bin3: 50 });
   const [simBrandCounts, setSimBrandCounts] = useState<Record<string, number>>({
-    brand_c: 0,
-    brand_a: 0,
-    brand_b: 0,
-    brand_d: 0,
+    med_syringe: 0,
+    med_scissors: 0,
+    med_cotton: 0,
   });
   const [simThroughput, setSimThroughput] = useState<ThroughputPoint[]>([]);
 
@@ -72,10 +70,9 @@ export function useSorterData({ configRef, onSpawnRealVisualItem, onPublishComma
   const [realBinCounts, setRealBinCounts] = useState<BinCounts>({ bin1: 0, bin2: 0, bin3: 0 });
   const [realBinCapacities, setRealBinCapacities] = useState<BinCapacities>({ bin1: 50, bin2: 50, bin3: 50 });
   const [realBrandCounts, setRealBrandCounts] = useState<Record<string, number>>({
-    brand_c: 0,
-    brand_a: 0,
-    brand_b: 0,
-    brand_d: 0,
+    med_syringe: 0,
+    med_scissors: 0,
+    med_cotton: 0,
   });
   const [realThroughput, setRealThroughput] = useState<ThroughputPoint[]>([]);
 
@@ -104,8 +101,9 @@ export function useSorterData({ configRef, onSpawnRealVisualItem, onPublishComma
   // Load initial data from localStorage
   useEffect(() => {
     setIsClient(true);
-    const savedMode = loadOperatingMode();
-    setIsSimulation(savedMode);
+    // Mặc định khởi động giao diện ở chế độ Thực tế ("real")
+    setIsSimulation(false);
+    saveOperatingMode(false);
 
     // 1. Sim Data
     const loadedSimRecords = loadClassificationHistory(true);
@@ -332,20 +330,6 @@ export function useSorterData({ configRef, onSpawnRealVisualItem, onPublishComma
     const newCount = currentCount + 1;
 
     if (newCount >= targetCapacity) {
-      const binIdStr = actualBin === 1 ? "BIN_RED_01" : actualBin === 2 ? "BIN_BLUE_02" : "BIN_DEFAULT_03";
-      const binName = actualBin === 1 ? "Đỏ (#01)" : actualBin === 2 ? "Xanh (#02)" : "Mặc định (#03)";
-      const alert: AlertEvent = {
-        event_id: `bin_full_${actualBin}_${Date.now()}`,
-        event_type: "bin_full",
-        severity: "warning",
-        device_id: binIdStr,
-        description: `[ĐẦY KHAY CHỨA] Khay phân loại sản phẩm ${binName} đã đạt giới hạn ${newCount}/${targetCapacity} cái. Vui lòng thay thế khay rỗng mới`,
-        timestamp: new Date().toISOString(),
-        resolved: false,
-        mode: isSim ? "simulation" : "realtime",
-      };
-      setAlerts((prev) => [alert, ...prev.filter((a) => a.event_id !== alert.event_id)].slice(0, 100));
-      triggerAlertDispatch(alert);
       onBinFullTriggerRef.current?.(actualBin as 1 | 2 | 3, newCount, targetCapacity);
     }
 
@@ -390,25 +374,42 @@ export function useSorterData({ configRef, onSpawnRealVisualItem, onPublishComma
     if (isSimulationRef.current) return;
     if (realRecordsRef.current.some((existing) => existing.id === record.id ||
       (existing.product_id === record.product_id && existing.timestamp === record.timestamp))) return;
-    const nextRecords = [record, ...realRecordsRef.current].slice(0, 500);
+
+    // Map brand_name to standard catalog name if raw ID
+    const catalogBrand = CATALOG_BRANDS[record.brand_id];
+    const mappedBrandName = catalogBrand?.name || getBrandName(record.brand_id) || record.brand_name || "Chưa phân loại";
+    const mappedRecord: ClassificationRecord = {
+      ...record,
+      brand_name: mappedBrandName,
+    };
+
+    const nextRecords = [mappedRecord, ...realRecordsRef.current].slice(0, 500);
     realRecordsRef.current = nextRecords;
     setRealRecords(nextRecords);
-    saveClassificationRecord(record, false);
+    saveClassificationRecord(mappedRecord, false);
     recentSortTimesRealRef.current.push(Date.now());
     // routed_bin is a command/route metric; only verified actual_bin feedback
     // may change occupancy and bin-full calculations.
-    if ((record.status === "success" || record.status === "diverted_default")
-      && (record.actual_bin === 1 || record.actual_bin === 2 || record.actual_bin === 3)) {
-      const key = `bin${record.actual_bin}` as keyof BinCounts;
-      const nextCounts = { ...realBinCountsRef.current, [key]: realBinCountsRef.current[key] + 1 };
+    if ((mappedRecord.status === "success" || mappedRecord.status === "completed" || mappedRecord.status === "diverted_default")
+      && (mappedRecord.actual_bin === 1 || mappedRecord.actual_bin === 2 || mappedRecord.actual_bin === 3)) {
+      const actualBin = mappedRecord.actual_bin as 1 | 2 | 3;
+      const key = `bin${actualBin}` as keyof BinCounts;
+      const capacities = realBinCapacitiesRef.current;
+      const targetCapacity = capacities[key] || 50;
+      const newCount = realBinCountsRef.current[key] + 1;
+      const nextCounts = { ...realBinCountsRef.current, [key]: newCount };
       realBinCountsRef.current = nextCounts;
       setRealBinCounts(nextCounts);
       saveBinCountsLocal(nextCounts, false);
-      void syncRecordsToServer([record], nextCounts);
+      void syncRecordsToServer([mappedRecord], nextCounts);
+
+      if (newCount >= targetCapacity) {
+        onBinFullTriggerRef.current?.(actualBin, newCount, targetCapacity);
+      }
     } else {
-      void syncRecordsToServer([record], realBinCountsRef.current);
+      void syncRecordsToServer([mappedRecord], realBinCountsRef.current);
     }
-    setRealBrandCounts((prev) => ({ ...prev, [record.brand_id]: (prev[record.brand_id] || 0) + 1 }));
+    setRealBrandCounts((prev) => ({ ...prev, [mappedRecord.brand_id]: (prev[mappedRecord.brand_id] || 0) + 1 }));
   }, []);
 
   const handleHardwareBinCounts = useCallback((payload: unknown) => {
@@ -435,7 +436,7 @@ export function useSorterData({ configRef, onSpawnRealVisualItem, onPublishComma
     if (isSimulationRef.current) {
       setSimRecords([]);
       setSimBinCounts({ bin1: 0, bin2: 0, bin3: 0 });
-      setSimBrandCounts({ brand_c: 0, brand_a: 0, brand_b: 0, brand_d: 0 });
+      setSimBrandCounts({ med_syringe: 0, med_scissors: 0, med_cotton: 0 });
       recentSortTimesSimRef.current = [];
       if (typeof window !== "undefined") {
         localStorage.removeItem("pbl3_product_seq");
@@ -443,7 +444,7 @@ export function useSorterData({ configRef, onSpawnRealVisualItem, onPublishComma
     } else {
       setRealRecords([]);
       setRealBinCounts({ bin1: 0, bin2: 0, bin3: 0 });
-      setRealBrandCounts({ brand_c: 0, brand_a: 0, brand_b: 0, brand_d: 0 });
+      setRealBrandCounts({ med_syringe: 0, med_scissors: 0, med_cotton: 0 });
       recentSortTimesRealRef.current = [];
     }
 
@@ -691,12 +692,12 @@ export function useSorterData({ configRef, onSpawnRealVisualItem, onPublishComma
     if (isSimulationRef.current) {
       setSimRecords([]);
       setSimBinCounts({ bin1: 0, bin2: 0, bin3: 0 });
-      setSimBrandCounts({ brand_c: 0, brand_a: 0, brand_b: 0, brand_d: 0 });
+      setSimBrandCounts({ med_syringe: 0, med_scissors: 0, med_cotton: 0 });
       clearClassificationHistory(true);
     } else {
       setRealRecords([]);
       setRealBinCounts({ bin1: 0, bin2: 0, bin3: 0 });
-      setRealBrandCounts({ brand_c: 0, brand_a: 0, brand_b: 0, brand_d: 0 });
+      setRealBrandCounts({ med_syringe: 0, med_scissors: 0, med_cotton: 0 });
       clearClassificationHistory(false);
     }
   }, []);

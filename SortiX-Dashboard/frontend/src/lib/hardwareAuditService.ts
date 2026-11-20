@@ -39,7 +39,7 @@ export const DEFAULT_HARDWARE_AUDIT_LOGS: HardwareAuditEntry[] = [
     timestamp: "08:45:20",
     actor: "Edge AI Box",
     action: "Kiểm tra cảm biến IR S1 & Encoder 2 pha",
-    target: "GPIO 0 (IR S1), GPIO 1 & 4 (Encoder A/B)",
+    target: "GPIO 3 (IR S1), GPIO 1 & 4 (Encoder A/B)",
     category: "sensor",
     status: "success",
     details: "Đo độ trễ phản hồi IR < 2.0ms, hệ số Encoder 31.5 xung/mm",

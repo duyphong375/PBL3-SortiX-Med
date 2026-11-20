@@ -16,8 +16,8 @@ typedef struct {
 } s1_event_t;
 
 /**
- * @brief Khởi tạo Cảm biến hồng ngoại S1 (GPIO0) và Cảm biến quang trở LDR (GPIO5).
- *        Gắn ngắt cạnh xuống vào GPIO0 và đẩy các sự kiện phát hiện vật thể vào hàng đợi (queue).
+ * @brief Khởi tạo Cảm biến hồng ngoại S1 (GPIO3) và Cảm biến quang trở LDR (GPIO5).
+ *        Gắn ngắt cạnh xuống vào GPIO3 và đẩy các sự kiện phát hiện vật thể vào hàng đợi (queue).
  * @param event_queue Handle hàng đợi để nhận các cấu trúc s1_event_t.
  * @return ESP_OK nếu khởi tạo thành công.
  */
@@ -37,6 +37,9 @@ int sensors_get_ldr_level(void);
 
 /** Đọc và xóa cờ báo hiệu xảy ra tràn hàng đợi sự kiện S1 trong ngắt ISR. */
 bool sensors_take_s1_queue_overflow(void);
+
+/** Đặt lại trạng thái chốt (latch) của cảm biến S1 để phát hiện lại ngay nếu có vật đang đặt sẵn. */
+void sensors_rearm_s1(void);
 
 #ifdef __cplusplus
 }

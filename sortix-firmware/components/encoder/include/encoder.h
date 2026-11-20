@@ -27,7 +27,7 @@ int64_t encoder_get_count(void);
 esp_err_t encoder_get_count_checked(int64_t *count);
 
 /** Đọc nhanh giá trị đếm xung dành riêng cho các trình xử lý ngắt GPIO trong IRAM. */
-int64_t IRAM_ATTR encoder_get_count_isr(void);
+int64_t encoder_get_count_isr(void);
 
 /**
  * @brief Đặt lại giá trị bộ đếm xung encoder về 0.

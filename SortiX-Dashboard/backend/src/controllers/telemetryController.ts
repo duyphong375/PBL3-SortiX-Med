@@ -55,7 +55,11 @@ export const TelemetryController = {
     const isSimMode = syncState.mode === "sim";
 
     if (!isSimMode) {
-      const expectedToken = process.env.DEVICE_TOKEN || process.env.SORTIX_DEVICE_TOKEN;
+      const expectedToken =
+        process.env.DEVICE_TOKEN ||
+        process.env.SORTIX_DEVICE_TOKEN ||
+        process.env.SORTIX_CONTROL_SECRET ||
+        "sortix_sec_control_2026";
       if (!expectedToken) {
         return {
           status: 500,

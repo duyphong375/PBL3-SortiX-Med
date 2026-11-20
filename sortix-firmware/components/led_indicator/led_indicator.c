@@ -1,4 +1,6 @@
 #include "led_indicator.h"
+#include "sensors.h"
+#include "app_config.h"
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #include "esp_log.h"
@@ -8,12 +10,22 @@
 static const char *TAG = "LED_INDICATOR";
 
 #define LED_PIN_STATUS          GPIO_NUM_10
-#define LED_TIMER_PERIOD_US     100000  // Chu kỳ timer 100 ms
+#define LED_TIMER_PERIOD_US     100000  // Chu kỳ timer 100 ms (10 Hz)
 
-static led_mode_t s_current_mode = LED_MODE_OFF;
+#ifndef LDR_DARK_LEVEL
+#define LDR_DARK_LEVEL          1       // Mức 1 = Trời tối (thiếu sáng -> BẬT LED), Mức 0 = Trời sáng (đủ sáng -> TẮT LED)
+#endif
+
+#define LDR_DEBOUNCE_TICKS      2       // 2 tick x 100ms = 200ms ổn định để chống chớp nháy quang học
+
+static led_mode_t s_current_mode = LED_MODE_IDLE;
 static esp_timer_handle_t s_led_timer = NULL;
 static SemaphoreHandle_t s_led_mutex = NULL;
 static uint32_t s_tick_counter = 0;
+
+static volatile bool s_is_illuminating = false;
+static uint8_t s_dark_ticks = 0;
+static uint8_t s_bright_ticks = 0;
 
 static void led_timer_cb(void *arg)
 {
@@ -21,26 +33,48 @@ static void led_timer_cb(void *arg)
 
     if (xSemaphoreTake(s_led_mutex, 0) == pdTRUE) {
         int level = 0;
-        switch (s_current_mode) {
-            case LED_MODE_OFF:
-                level = 0;
-                break;
 
-            case LED_MODE_RUNNING:
-                level = 1;
-                break;
+        if (s_current_mode == LED_MODE_ON) {
+            // Lệnh thủ công từ Web/Dashboard: Bật sáng liên tục
+            level = 1;
+            s_is_illuminating = true;
+        } else if (s_current_mode == LED_MODE_JAMMED || s_current_mode == LED_MODE_ERROR) {
+            // Tần số 5 Hz = 2 tick (1 tick BẬT, 1 tick TẮT) cảnh báo sự cố khẩn cấp
+            level = ((s_tick_counter % 2) == 0) ? 1 : 0;
+        } else if (s_current_mode == LED_MODE_OFF || s_current_mode == LED_MODE_IDLE) {
+            // Khi chưa kích hoạt START bằng nút GPIO23 (trạng thái IDLE hoặc OFF):
+            // Đèn LED GPIO10 TẮT HOÀN TOÀN, không chiếu sáng
+            level = 0;
+            s_is_illuminating = false;
+            s_dark_ticks = 0;
+            s_bright_ticks = 0;
+        } else if (s_current_mode == LED_MODE_RUNNING) {
+            // CHỈ KHI ĐÃ BẤM NÚT GPIO23 START (HỆ THỐNG ĐANG CHẠY RUNNING):
+            // Mới kích hoạt tự động chiếu sáng theo cảm biến quang trở LDR
+            int ldr_raw = sensors_get_ldr_level();
+            bool is_dark = (ldr_raw == LDR_DARK_LEVEL); // Mức 1 = Thiếu sáng (Tối) -> BẬT LED trợ sáng
 
-            case LED_MODE_IDLE:
-                // Tần số 1 Hz = 10 tick (5 tick BẬT, 5 tick TẮT)
-                level = ((s_tick_counter % 10) < 5) ? 1 : 0;
-                break;
+            if (is_dark) {
+                if (s_dark_ticks < LDR_DEBOUNCE_TICKS) {
+                    s_dark_ticks++;
+                }
+                s_bright_ticks = 0;
+                if (s_dark_ticks >= LDR_DEBOUNCE_TICKS) {
+                    s_is_illuminating = true;
+                }
+            } else {
+                if (s_bright_ticks < LDR_DEBOUNCE_TICKS) {
+                    s_bright_ticks++;
+                }
+                s_dark_ticks = 0;
+                if (s_bright_ticks >= LDR_DEBOUNCE_TICKS) {
+                    s_is_illuminating = false;
+                }
+            }
 
-            case LED_MODE_JAMMED:
-            case LED_MODE_ERROR:
-                // Tần số 5 Hz = 2 tick (1 tick BẬT, 1 tick TẮT)
-                level = ((s_tick_counter % 2) == 0) ? 1 : 0;
-                break;
+            level = s_is_illuminating ? 1 : 0;
         }
+
         gpio_set_level(LED_PIN_STATUS, level);
         xSemaphoreGive(s_led_mutex);
     }
@@ -48,7 +82,8 @@ static void led_timer_cb(void *arg)
 
 esp_err_t led_indicator_init(void)
 {
-    ESP_LOGI(TAG, "Initializing Status LED on GPIO%d", LED_PIN_STATUS);
+    ESP_LOGI(TAG, "Initializing Auto-Illumination LED on GPIO%d (LDR DO on GPIO5, Dark Level=%d)",
+             LED_PIN_STATUS, LDR_DARK_LEVEL);
 
     if (s_led_mutex == NULL) {
         s_led_mutex = xSemaphoreCreateMutex();
@@ -101,4 +136,9 @@ void led_indicator_set_mode(led_mode_t mode)
 led_mode_t led_indicator_get_mode(void)
 {
     return s_current_mode;
+}
+
+bool led_indicator_is_illuminating(void)
+{
+    return s_is_illuminating;
 }

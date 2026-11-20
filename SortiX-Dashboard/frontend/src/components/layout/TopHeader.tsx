@@ -99,7 +99,7 @@ const TopHeaderComponent: React.FC<TopHeaderProps> = ({
   isMqttAlertActive = false,
   reconnectAttempt = 0,
   pingMs = 24,
-  isSimulation = true,
+  isSimulation = false,
   onToggleSimulationMode,
   isDeviceOffline = false,
   onTriggerShiftSummary,

@@ -27,9 +27,9 @@ export const SYSTEM_SAFETY_STATES = {
 } as const;
 
 export const DEFAULT_BINS = [
-  { id: 1, name: "Thùng vật sắc nhọn lây nhiễm (Sharps Waste)", defaultBrand: "Bơm kim tiêm / Dao mổ" },
-  { id: 2, name: "Khay hấp tiệt trùng Autoclave (Surgical Instruments)", defaultBrand: "Kẹp phẫu thuật & Kéo mổ" },
-  { id: 3, name: "Khay vật tư y tế & Ống nghiệm (General Medical Supplies)", defaultBrand: "Lọ thuốc & Ống nghiệm" },
+  { id: 1, name: "Khay 1 - Kim tiêm (Sharps Waste)", defaultBrand: "Kim tiêm" },
+  { id: 2, name: "Khay 2 - Kéo y tế (Surgical Scissors)", defaultBrand: "Kéo" },
+  { id: 3, name: "Khay 3 - Bông y tế (Medical Cotton)", defaultBrand: "Bông" },
 ] as const;
 
 export const CLASSIFICATION_STATUSES = {

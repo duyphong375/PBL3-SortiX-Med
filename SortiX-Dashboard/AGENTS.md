@@ -16,15 +16,17 @@ Tài liệu này quy định các tiêu chuẩn kỹ thuật, ràng buộc kiế
 
 ## 1. Kiến Trúc Monorepo & Quy Chuẩn Mã Nguồn
 
-- **Mô hình Monorepo (npm workspaces)**:
+- **Mô hình Monorepo (npm workspaces) & Trạm AI đi kèm**:
   - `frontend/`: Ứng dụng Next.js 14 App Router (`frontend/src/app/`).
   - `backend/`: Máy chủ độc lập TypeScript dùng module chuẩn `node:http` (`backend/src/`).
   - `shared/`: Thư viện dùng chung (`types/`, `schemas/`, `constants/`).
-  - `scripts/`: Kịch bản dev, build, e2e, test, giải phóng cổng và nâng cấp workflow.
+  - `ai-server/`: Trạm thị giác máy tính Python (FastAPI MJPEG stream cổng `8000` + Ultralytics YOLO11 3 lớp `cotton`, `scissor`, `syringe` + MQTT publisher `sorter/sorter_01/vision`).
+  - `scripts/`: Kịch bản dev, build, e2e, test, giải phóng cổng và polling Telegram.
 - **Khởi chạy ứng dụng**:
-  - Chạy đồng thời cả Frontend và Backend: `npm run dev:all`.
+  - Chạy đồng thời cả Frontend, Backend và Telegram Poller: `npm run dev:all`.
   - Chạy riêng Frontend: `npm run dev:frontend` (Port 3000).
   - Chạy riêng Backend: `npm run dev:backend` (Port 5000).
+  - Chạy riêng AI Camera Server: `ai-server/run_camera.bat` (Port 8000).
 - **Server vs. Client Components**:
   - Mặc định ưu tiên Server Components trong Next.js.
   - Chỉ khai báo `'use client'` khi bắt buộc sử dụng Browser APIs (React state/hooks, Canvas, Web Audio API, Recharts, MQTT WebSocket Client).
@@ -33,7 +35,7 @@ Tài liệu này quy định các tiêu chuẩn kỹ thuật, ràng buộc kiế
   - Tại Backend: Luôn import từ `@shared/*` hoặc relative path chuẩn mực.
   - Tuyệt đối không dùng các đường dẫn tương đối xuyên tầng lộn xộn (ví dụ: `../../../../shared/types`).
 - **Persistence hiện tại**:
-  - Runtime sử dụng `data/history.json`, `data/notifications.json`, `data/sync_state.json` và `data/users.json`.
+  - Runtime sử dụng `data/history.json`, `data/notifications.json`, `data/sync_state.json`, `data/telemetry_logs.json` và `data/users.json`.
   - `ConfigModel` giữ cấu hình mặc định trong bộ nhớ; không tự tạo hoặc xóa `data/config.json` nếu source không yêu cầu.
   - `backend/database/migrations` và `backend/database/seeds` là artifact tham chiếu; phải giữ nguyên khi refactor.
 - **API layers**:
@@ -75,10 +77,10 @@ Tài liệu này quy định các tiêu chuẩn kỹ thuật, ràng buộc kiế
 - **Ràng Buộc An Toàn Dành Cho Admin**:
   - Admin **không được phép tự xóa tài khoản của chính mình** khi đang trong phiên đăng nhập.
   - Tuyệt đối **không được phép xóa tài khoản Admin nếu số lượng Admin trong hệ thống còn lại $\le 1$** (đảm bảo hệ thống luôn có người quản trị).
-- **Cơ Chế Mock OTP**:
+- **Cơ Chế OTP Khôi Phục Mật Khẩu**:
   - Mã OTP đặt lại mật khẩu phải là chuỗi ngẫu nhiên 6 chữ số với thời hạn hết hạn nghiêm ngặt là **5 phút (300 giây)**.
   - Chống tái sử dụng mã OTP (hủy mã ngay sau lần xác thực thành công đầu tiên).
-  - Chặn khôi phục từ bên ngoài đối với các tài khoản có role `admin`.
+  - Trên Next.js `/api/auth/forgot-password`, hỗ trợ gửi email SMTP (nếu cấu hình) đồng thời trả về `demo_otp` để hiển thị trực tiếp trên modal khôi phục nhanh; tại Backend standalone (`userService.ts`), `demo_otp` chỉ trả về khi `!isProduction && ENABLE_DEMO_OTP === "true"` và chặn khôi phục từ bên ngoài đối với tài khoản `admin`.
 
 ---
 
@@ -144,7 +146,7 @@ Tài liệu này quy định các tiêu chuẩn kỹ thuật, ràng buộc kiế
   ```powershell
   npm test
   ```
-  Tất cả các bộ kiểm thử tự động phải được bảo toàn và đạt chuẩn. Tuyệt đối không xóa hoặc bỏ qua các test.
+  Toàn bộ **27 file test suites (182/182 unit tests)** phải được bảo toàn và đạt chuẩn. Tuyệt đối không xóa hoặc bỏ qua các test.
 
 ---
 

@@ -497,7 +497,7 @@ const server = http.createServer(async (req, res) => {
         },
         trayStatus: {
           bin1: {
-            name: "Khay 1 (Dao mổ & Kéo phẫu thuật)",
+            name: "Khay 1 (Kim tiêm)",
             count: binCounts.bin1,
             capacity: binCapacities.bin1,
             rate: r1,
@@ -505,7 +505,7 @@ const server = http.createServer(async (req, res) => {
             status: binCounts.bin1 >= binCapacities.bin1 ? "100% ĐẦY (CẦN THAY NGAY)" : r1 >= 80 ? "CẢNH BÁO (>80% ĐỊNH MỨC)" : "Bình thường / An toàn",
           },
           bin2: {
-            name: "Khay 2 (Kẹp panh cầm máu)",
+            name: "Khay 2 (Kéo)",
             count: binCounts.bin2,
             capacity: binCapacities.bin2,
             rate: r2,
@@ -513,7 +513,7 @@ const server = http.createServer(async (req, res) => {
             status: binCounts.bin2 >= binCapacities.bin2 ? "100% ĐẦY (CẦN THAY NGAY)" : r2 >= 80 ? "CẢNH BÁO (>80% ĐỊNH MỨC)" : "Bình thường / An toàn",
           },
           bin3: {
-            name: "Khay 3 (Dụng cụ đặc biệt / Mặc định)",
+            name: "Khay 3 (Bông)",
             count: binCounts.bin3,
             capacity: binCapacities.bin3,
             rate: r3,

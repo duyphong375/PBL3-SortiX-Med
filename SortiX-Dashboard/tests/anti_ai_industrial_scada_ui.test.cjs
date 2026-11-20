@@ -67,7 +67,7 @@ describe("Industrial SCADA Anti-AI UX/UI Contracts (ISA-101 / IEC-62443)", () =>
     // Cảm biến quang S1 với 2 LED vật lý thật
     assert.ok(content.includes("LED PWR"), "Cảm biến S1 phải có LED báo nguồn PWR");
     assert.ok(content.includes("LED OUT"), "Cảm biến S1 phải có LED báo tín hiệu OUT");
-    assert.ok(content.includes("S1:GPIO0"), "Cảm biến S1 phải hiển thị chân GPIO0 thực tế");
+    assert.ok(content.includes("S1:GPIO3"), "Cảm biến S1 phải hiển thị chân GPIO3 thực tế");
   });
 
   test("4. TemperatureGaugeWidget.tsx & ConveyorToolbar.tsx: Chuẩn hóa màu kiểm thử mô phỏng Test Rig sang Amber", () => {

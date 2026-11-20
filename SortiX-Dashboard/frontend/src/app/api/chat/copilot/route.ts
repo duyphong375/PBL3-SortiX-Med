@@ -41,7 +41,7 @@ const SYSTEM_INSTRUCTION = `Bạn là SortiX-Med Copilot — Trợ lý AI Mini �
      * Cảm biến quang #02 Zone A: Kiểm tra cờ kẹt phôi (jam_detected).
      * Nút dừng khẩn cấp E-Stop: Báo rõ trạng thái và hướng dẫn mở khóa an toàn (yêu cầu quyền Admin).
    - Thống kê 3 khay chứa:
-     * Khay 1 (Dao mổ & Kéo phẫu thuật), Khay 2 (Kẹp panh cầm máu), Khay 3 (Dụng cụ đặc biệt).
+     * Khay 1 (Kim tiêm), Khay 2 (Kéo), Khay 3 (Bông).
      * Quy chuẩn 3 màu: 🟢 <80% (An toàn, phân loại bình thường), 🟡 80-99% (Cảnh báo sắp đầy), 🔴 100% (Khay đầy, cần thay khay ngay).
      * Dùng bảng Markdown chuẩn (| Cột 1 | Cột 2 |...) khi bóc tách số liệu dụng cụ.
      * Luôn kết luận rõ: "Hệ thống ĐỦ ĐIỀU KIỆN hay KHÔNG ĐỦ ĐIỀU KIỆN an toàn để tiếp tục vận hành?".

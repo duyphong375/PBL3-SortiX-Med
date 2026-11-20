@@ -5,6 +5,73 @@ import mqtt from "mqtt";
 
 export const dynamic = "force-dynamic";
 
+declare global {
+  // eslint-disable-next-line no-var
+  var __sortixControlMqttClient: mqtt.MqttClient | undefined;
+  // eslint-disable-next-line no-var
+  var __sortixControlMqttBroker: string | undefined;
+  // eslint-disable-next-line no-var
+  var __sortixControlConnectingPromise: Promise<mqtt.MqttClient> | undefined;
+}
+
+async function getControlMqttClient(brokerUrl: string, username?: string, password?: string): Promise<mqtt.MqttClient> {
+  const existing = globalThis.__sortixControlMqttClient;
+  if (existing && globalThis.__sortixControlMqttBroker === brokerUrl && existing.connected) {
+    return existing;
+  }
+
+  if (globalThis.__sortixControlConnectingPromise) {
+    try {
+      const client = await globalThis.__sortixControlConnectingPromise;
+      if (client.connected) return client;
+    } catch {
+      // Thử kết nối lại bên dưới nếu promise trước đó bị lỗi
+    }
+  }
+
+  if (existing) {
+    try { existing.end(true); } catch {}
+    globalThis.__sortixControlMqttClient = undefined;
+  }
+
+  globalThis.__sortixControlConnectingPromise = new Promise<mqtt.MqttClient>((resolve, reject) => {
+    const client = mqtt.connect(brokerUrl, {
+      clientId: `next_control_pub_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      connectTimeout: 5000,
+      keepalive: 60,
+      reconnectPeriod: 2000,
+      clean: true,
+      ...(username ? { username, password } : {}),
+    });
+
+    const timer = setTimeout(() => {
+      try { client.end(true); } catch {}
+      globalThis.__sortixControlConnectingPromise = undefined;
+      reject(new Error("Timeout kết nối tới MQTT Broker khi gửi lệnh điều khiển"));
+    }, 5000);
+
+    client.on("connect", () => {
+      clearTimeout(timer);
+      globalThis.__sortixControlMqttClient = client;
+      globalThis.__sortixControlMqttBroker = brokerUrl;
+      globalThis.__sortixControlConnectingPromise = undefined;
+      resolve(client);
+    });
+
+    client.on("error", (err) => {
+      clearTimeout(timer);
+      globalThis.__sortixControlConnectingPromise = undefined;
+      console.warn("[Control Route MQTT Error]:", err.message);
+    });
+
+    client.on("close", () => {
+      // Tự động kết nối lại ngầm theo reconnectPeriod
+    });
+  });
+
+  return globalThis.__sortixControlConnectingPromise;
+}
+
 export async function POST(request: Request) {
   try {
     const authUser = getAuthenticatedUser(request);
@@ -64,32 +131,17 @@ export async function POST(request: Request) {
       sender_role: authUser.role,
     });
 
-    // Xuất bản lệnh điều khiển qua MQTT Broker từ phía Server
+    // Xuất bản lệnh điều khiển qua kết nối MQTT Broker thường trực (Persistent warm connection)
+    const client = await getControlMqttClient(
+      brokerUrl,
+      mqttUsername || undefined,
+      mqttPassword || undefined
+    );
+
     await new Promise<void>((resolve, reject) => {
-      const client = mqtt.connect(brokerUrl, {
-        clientId: `next_control_pub_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        connectTimeout: 5000,
-        ...(mqttUsername ? { username: mqttUsername, password: mqttPassword } : {}),
-      });
-
-      const timer = setTimeout(() => {
-        try { client.end(true); } catch {}
-        reject(new Error("Timeout kết nối tới MQTT Broker khi gửi lệnh điều khiển"));
-      }, 5000);
-
-      client.on("connect", () => {
-        client.publish(topic, payload, { qos: 1 }, (err) => {
-          clearTimeout(timer);
-          try { client.end(true); } catch {}
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-
-      client.on("error", (err) => {
-        clearTimeout(timer);
-        try { client.end(true); } catch {}
-        reject(err);
+      client.publish(topic, payload, { qos: 1 }, (err) => {
+        if (err) reject(err);
+        else resolve();
       });
     });
 

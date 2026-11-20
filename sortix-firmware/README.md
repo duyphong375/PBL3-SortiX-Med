@@ -4,7 +4,7 @@
 ---
 
 ## 1. Giới Thiệu
-Mã nguồn firmware điều khiển hệ thống băng tải phân loại dụng cụ y tế tự động SortiX. Firmware kết nối với trạm AI thị giác máy tính (**YOLO11** chạy trên PC trong thư mục `PBL.v1i.yolov11`) và ứng dụng điều khiển trung tâm **SortiX-Dashboard** thông qua giao thức **MQTT** và **HTTP REST**.
+Mã nguồn firmware điều khiển hệ thống băng tải phân loại dụng cụ y tế tự động SortiX. Firmware kết nối với trạm AI thị giác máy tính (**YOLO11** + FastAPI MJPEG Server chạy trên PC trong thư mục `SortiX-Dashboard/ai-server`) và ứng dụng điều khiển trung tâm **SortiX-Dashboard** thông qua giao thức **MQTT** (MQTTS TLS) và **HTTP REST**.
 
 ---
 
@@ -15,41 +15,42 @@ sortix-firmware/
 ├── CMakeLists.txt                          # CMake project gốc, kết nối toolchain ESP-IDF
 ├── sdkconfig.defaults                      # Cấu hình cứng target esp32c5, Flash 8MB, PSRAM 8MB
 ├── partitions.csv                          # Bảng phân vùng Flash 8MB (NVS, Otadata, OTA_0, OTA_1, Storage)
+├── flash_firmware.bat                      # Script nạp nhanh binary firmware qua esptool (Windows Batch)
+├── flash_firmware.ps1                      # Script nạp nhanh binary firmware qua esptool (PowerShell)
 ├── README.md                               # Sổ tay kiến trúc, pinout, hướng dẫn build firmware
 │
 ├── main/                                   # THƯ MỤC CHA 1: Ứng dụng chính & Định nghĩa lõi
 │   ├── CMakeLists.txt                      # Đăng ký main.c và khai báo các component phụ thuộc
 │   ├── idf_component.yml                   # Khai báo dependency cJSON (espressif/cjson)
-│   ├── Kconfig.projbuild                   # Cấu hình menu tương tác menuconfig (Wi-Fi, MQTT, timeout)
-│   ├── main.c                              # Khởi tạo app_main(), các FreeRTOS Tasks & đăng ký Callbacks
-│   ├── app_config.h                        # Macro cấu hình toàn hệ thống, MQTT topics, HTTP endpoint
+│   ├── main.c                              # Khởi tạo app_main(), 5 FreeRTOS Tasks & đăng ký Callbacks
+│   ├── app_config.h                        # Trỏ về components/nvs_config/include/app_config.h (single source of truth)
 │   ├── pin_definitions.h                   # Sơ đồ gán chân GPIO chuẩn hóa theo BOM danh-sach-linh-kien.md
 │   └── version.h                           # Định nghĩa thông tin phiên bản firmware v1.0.0
 │
 ├── components/                             # THƯ MỤC CHA 2: Các module chức năng độc lập (14 components)
 │   ├── motor_control/                      # Điều khiển động cơ DC qua L298N (IN1: GPIO8, IN2: GPIO9)
 │   │   ├── include/motor_control.h         # Header: forward, reverse, dynamic brake, coast/stop
-│   │   ├── motor_control.c                 # Code thực thi: Mutex bảo vệ trạng thái, ghi mức GPIO
+│   │   ├── motor_control.c                 # Code thực thi: Mutex bảo vệ trạng thái, ghi mức GPIO / LEDC PWM
 │   │   └── CMakeLists.txt
 │   │
 │   ├── encoder/                            # Đọc encoder 2 pha dùng New PCNT Driver (driver/pulse_cnt.h)
-│   │   ├── include/encoder.h               # Header: đọc count 64-bit, reset, quy đổi counts <-> mm
+│   │   ├── include/encoder.h               # Header: đọc count 64-bit, reset, quy đổi counts <-> mm (63.0 counts/mm)
 │   │   ├── encoder.c                       # Code thực thi: Quadrature x4, bộ lọc nhiễu 1us, watchpoint overflow
 │   │   └── CMakeLists.txt
 │   │
-│   ├── servo/                              # Điều khiển 2 servo MG996R non-blocking qua LEDC PWM (GPIO6, GPIO7)
+│   ├── servo/                              # Điều khiển 2 servo MG996R 360° non-blocking qua LEDC PWM (GPIO6, GPIO7)
 │   │   ├── include/servo.h                 # Header: trigger non-blocking, reset, đọc FSM state
 │   │   ├── servo.c                         # Code thực thi: FSM (IDLE->OPENING->HOLDING->CLOSING->IDLE) qua esp_timer
 │   │   └── CMakeLists.txt
 │   │
 │   ├── sensors/                            # Quản lý cảm biến quang và cảm biến ánh sáng
-│   │   ├── include/sensors.h               # Header: ngắt S1 chốt xung encoder và timestamp, đọc LDR
-│   │   ├── sensors.c                       # Code thực thi: Ngắt cạnh xuống GPIO0, debounce 80ms, đọc DO GPIO5
+│   │   ├── include/sensors.h               # Header: phát hiện S1 chốt xung encoder và timestamp, đọc LDR
+│   │   ├── sensors.c                       # Code thực thi: Lấy mẫu 5ms GPIO3 (15ms blocked / 125ms clear, không cần RC), đọc DO GPIO5
 │   │   └── CMakeLists.txt
 │   │
-│   ├── button/                             # Nút nhấn Start vật lý (GPIO23)
-│   │   ├── include/button.h                # Header: callback khi nhấn nút Start
-│   │   ├── button.c                        # Code thực thi: Ngắt cạnh xuống GPIO23 kèm timer debounce 20ms
+│   ├── button/                             # Nút nhấn Start/Stop vật lý (GPIO23)
+│   │   ├── include/button.h                # Header: callback khi nhấn nút Start/Stop (toggle + 300ms cooldown)
+│   │   ├── button.c                        # Code thực thi: Lấy mẫu 10ms GPIO23 kèm debounce phần mềm 30ms (Pull-up nội)
 │   │   └── CMakeLists.txt
 │   │
 │   ├── led_indicator/                      # Đèn LED trạng thái màu xanh lá (GPIO10)
@@ -57,28 +58,28 @@ sortix-firmware/
 │   │   ├── led_indicator.c                 # Code thực thi: Quản lý nhấp nháy qua software timer 100ms
 │   │   └── CMakeLists.txt
 │   │
-│   ├── wifi_manager/                       # Quản lý kết nối Wi-Fi Station & SoftAP Fallback
+│   ├── wifi_manager/                       # Quản lý kết nối Wi-Fi Station (STA)
 │   │   ├── include/wifi_manager.h          # Header: kiểm tra trạng thái, đọc RSSI, lấy chuỗi IP và Band
-│   │   ├── wifi_manager.c                  # Code thực thi: Tự động kết nối lại, nhận diện 2.4GHz / 5GHz Wi-Fi 6
+│   │   ├── wifi_manager.c                  # Code thực thi: Tự động kết nối lại Hotspot/AP, nhận diện 2.4GHz / 5GHz Wi-Fi 6
 │   │   └── CMakeLists.txt
 │   │
 │   ├── mqtt_handler/                       # MQTT Client đồng bộ 100% schemas & topics SortiX-Dashboard
 │   │   ├── include/mqtt_handler.h          # Header: publish telemetry, heartbeat, classification, jam, temp
-│   │   ├── mqtt_handler.c                  # Code thực thi: Subscribe vision, control, config/set, backoff reconnect
+│   │   ├── mqtt_handler.c                  # Code thực thi: Subscribe vision, control, config/set, estop, TLS broker
 │   │   └── CMakeLists.txt
 │   │
 │   ├── http_telemetry/                     # Gửi HTTP POST telemetry lên backend Node.js port 5000
 │   │   ├── include/http_telemetry.h        # Header: gửi payload định kỳ 5s
-│   │   ├── http_telemetry.c                # Code thực thi: Đóng gói JSON (tuyệt đối không gửi optical_sensor)
+│   │   ├── http_telemetry.c                # Code thực thi: Đóng gói JSON kèm header X-Device-Token (không gửi optical_sensor)
 │   │   └── CMakeLists.txt
 │   │
 │   ├── sorting_engine/                     # Trọng tâm điều khiển logic phân loại
 │   │   ├── include/sorting_engine.h        # Header: queue 15 phôi, matching FIFO, apply config động
-│   │   ├── sorting_engine.c                # Code thực thi: Tính cự ly encoder, kích hoạt servo, fallback timeout
+│   │   ├── sorting_engine.c                # Code thực thi: Tạm dừng 2s tại cam (100mm), kích hoạt Servo 1 (250mm) / Servo 2 (400mm) / End (650mm)
 │   │   └── CMakeLists.txt
 │   │
 │   ├── state_machine/                      # Quản lý trạng thái hệ thống
-│   │   ├── include/state_machine.h         # Header: SYSTEM_STATE_IDLE, RUNNING, STOPPED, JAMMED
+│   │   ├── include/state_machine.h         # Header: SYSTEM_STATE_IDLE, RUNNING, STOPPED, JAMMED, ESTOP
 │   │   ├── state_machine.c                 # Code thực thi: Chuyển trạng thái, khóa an toàn E-Stop, an toàn boot
 │   │   └── CMakeLists.txt
 │   │
@@ -89,11 +90,11 @@ sortix-firmware/
 │   │
 │   ├── nvs_config/                         # Lưu trữ cấu hình bền vững vào NVS Flash
 │   │   ├── include/nvs_config.h            # Header: struct sys_config, load, save, factory reset
-│   │   ├── include/app_config.h            # Header dùng chung các topics và tham số hệ thống
-│   │   ├── nvs_config.c                    # Code thực thi: Ghi đọc NVS namespace sortix_cfg
+│   │   ├── include/app_config.h            # Nguồn chuẩn duy nhất (Single Source of Truth) về topics & hằng số
+│   │   ├── nvs_config.c                    # Code thực thi: Ghi đọc NVS namespace sortix_cfg & đồng bộ khoảng cách thực tế
 │   │   └── CMakeLists.txt
 │   │
-│   └── captive_portal/                     # Cấu hình Wi-Fi/MQTT qua trang Web SoftAP nội bộ
+│   └── captive_portal/                     # Web server nội bộ (port 80) hỗ trợ cấu hình Wi-Fi/MQTT/Token
 │       ├── include/captive_portal.h        # Header: start, stop HTTP server port 80
 │       ├── captive_portal.c                # Code thực thi: Giao diện web HTML, nhận form POST và lưu NVS
 │       └── CMakeLists.txt
@@ -111,15 +112,15 @@ sortix-firmware/
 
 | Chức năng                   | GPIO       | Vị trí Header WeAct | Chế độ / Cấu hình                 |
 |-----------------------------|------------|---------------------|-----------------------------------|
-| Cảm biến vật cản IR (S1)    | **GPIO0**  | Trái Pin 5          | Input, Pull-up, Falling Edge ISR  |
+| Cảm biến vật cản IR (S1)    | **GPIO3**  | Trái Pin 4          | Input Pull-up, Polling 5ms (15ms blocked / 125ms clear) |
 | Encoder Kênh A (Xung)       | **GPIO1**  | Trái Pin 6          | PCNT Pulse Counter (Edge Input)   |
 | Encoder Kênh B (Chiều)      | **GPIO4**  | Phải Pin 8          | PCNT Pulse Counter (Level Input)  |
-| Cảm biến quang trở LDR (DO) | **GPIO5**  | Phải Pin 9          | Input Digital                     |
+| Cảm biến quang trở LDR (DO) | **GPIO5**  | Phải Pin 9          | Input Digital Pull-up             |
 | Servo 1 - PWM (Gạt 1)       | **GPIO6**  | Trái Pin 7          | LEDC PWM 50Hz (Timer 0, Ch 0)     |
-| Driver L298N IN1            | **GPIO8**  | Trái Pin 9          | Output (FWD=1, REV=0, BRAKE=1)    |
-| Driver L298N IN2            | **GPIO9**  | Trái Pin 10         | Output (FWD=0, REV=1, BRAKE=1)    |
+| Driver L298N IN1            | **GPIO8**  | Trái Pin 9          | Output / LEDC PWM                 |
+| Driver L298N IN2            | **GPIO9**  | Trái Pin 10         | Output / LEDC PWM                 |
 | LED trạng thái (Xanh lá)    | **GPIO10** | Trái Pin 11         | Output, 100ms Software Timer      |
-| Nút Start vật lý            | **GPIO23** | Phải Pin 5          | Input Pull-up, Debounce RC + 20ms |
+| Nút Start/Stop vật lý       | **GPIO23** | Phải Pin 5          | Input Pull-up, Polling 10ms (Debounce 30ms) |
 | Servo 2 - PWM (Gạt 2)       | **GPIO7**  | Trái Pin 8          | LEDC PWM 50Hz (Timer 0, Ch 1)     |
 
 ### ⚠ CÁC CHÂN CẤM SỬ DỤNG (FORBIDDEN GPIOs):
@@ -153,24 +154,22 @@ sortix-firmware/
 ## 5. Kiến Trúc Nhiệm Vụ FreeRTOS & An Toàn
 
 1. **`task_conveyor` (Priority 6):**
-   - Quản lý điều khiển cầu H L298N (Tiến, Lùi, Thắng động cơ, Thả trôi).
-   - Đọc bộ đếm xung phần cứng từ New PCNT Driver (`driver/pulse_cnt.h`).
-   - Giám sát hiện tượng kẹt cơ khí (Encoder Stall): Khi động cơ đang chạy, nếu xung encoder không thay đổi quá 1.8s (ngoài thời gian ân hạn khởi động 1.0s), hệ thống kích hoạt phanh động cơ ngay lập tức và chuyển sang trạng thái `JAMMED`.
+   - Thực thi chu kỳ 20ms giám sát an toàn và phát hiện kẹt cơ khí (Encoder Stall): khi động cơ đang chạy, nếu xung encoder không thay đổi quá 1.8s (ngoài thời gian ân hạn khởi động 1.0s), hệ thống kích hoạt phanh động cơ qua `motor_control` và chuyển sang trạng thái `JAMMED`.
 2. **`task_sorting` (Priority 5):**
-   - Quản lý bộ đệm xoay vòng FIFO (Tracking Queue) tối đa 15 vật thể trên băng tải.
-   - Nhận ngắt từ S1 (GPIO0) kèm giá trị xung encoder và timestamp vi giây.
-   - Ghép cặp kết quả Vision AI từ MQTT (`sorter/sorter_01/vision`) theo thứ tự FIFO.
-   - Điều khiển Servo 1 (GPIO6) và Servo 2 (GPIO7) qua FSM Non-blocking (`IDLE -> OPENING -> HOLDING -> CLOSING -> IDLE`).
-   - Áp dụng `PAUSE_AND_HOLD` hoặc `DIVERT_TO_DEFAULT`; bản ghi có `routed_bin` để thống kê hướng firmware đã điều khiển, còn `actual_bin: 0` và trạng thái `unverified` nếu chưa có cảm biến xác nhận phôi vào khay.
+   - Quản lý bộ đệm xoay vòng FIFO (Tracking Queue) tối đa 15 vật thể trên băng tải, cập nhật mỗi 15ms.
+   - Nhận sự kiện từ S1 (GPIO3) kèm giá trị xung encoder (`CALIB_ENCODER_COUNTS_PER_MM = 63.0f`) và timestamp vi giây; hỗ trợ **Auto-Wakeup** khi đang ở `IDLE` (khi MCU đã awake) và **Auto-Standby** sau 15s không có vật cản.
+   - Dừng băng tải 2.0s tại buồng quét camera (`DIST_S1_TO_CAMERA_MM = 100.0f`) để DroidCam/YOLO11 nhận diện và ghép cặp kết quả Vision AI từ MQTT (`sorter/sorter_01/vision`) theo thứ tự FIFO.
+   - Điều khiển Servo 1 (GPIO6 tại `250.0f mm`) và Servo 2 (GPIO7 tại `400.0f mm`) qua FSM Non-blocking (`IDLE -> OPENING -> HOLDING -> CLOSING -> IDLE`, servo 360° 500µs/2500µs/1500µs) hoặc đưa thẳng về Khay 3 tại `650.0f mm` (dung sai kích hoạt `±15.0 mm`).
+   - Áp dụng `PAUSE_AND_HOLD` hoặc `DIVERT_TO_DEFAULT` (mặc định hiện tại: `FALLBACK_POLICY_DIVERT_TO_DEFAULT`); bản ghi có `routed_bin` để thống kê hướng firmware đã điều khiển, còn `actual_bin: 0` và trạng thái `unverified` nếu chưa có cảm biến xác nhận phôi vào khay.
 3. **`task_mqtt` (Priority 4):**
-   - Quản lý kết nối MQTT Client với cơ chế tự động kết nối lại (exponential backoff: 3s, 5s, 10s, 30s).
+   - Quản lý kết nối MQTT Client (MQTTS TLS) với cơ chế tự động kết nối lại.
    - Publish định kỳ Telemetry (1.5s), Heartbeat (2.0s), trạng thái hệ thống, kết quả phân loại, cảnh báo kẹt và cảnh báo nhiệt SoC.
 4. **`task_http_tele` (Priority 2):**
-   - Gửi HTTPS POST định kỳ 5s lên backend Node.js khi đã provision endpoint và Device API Token (`https://<DASHBOARD_HOST>/api/telemetry`).
+   - Gửi HTTP/HTTPS POST định kỳ 5s lên backend Node.js (`DEFAULT_HTTP_TELEMETRY_URL` hoặc URL cấu hình trong NVS) kèm header `X-Device-Token` (fallback sang `control_secret` nếu chưa đặt token riêng).
    - Tuyệt đối không gửi trường `optical_sensor` để tránh xung đột với logic tự động dừng của backend.
 5. **`task_safety` (Priority 5):**
-   - Đọc cảm biến nhiệt độ nội chip SoC ESP32-C5 qua `driver/temperature_sensor.h` (chu kỳ 2s). Cảnh báo lên MQTT khi nhiệt độ chip vượt 75°C.
-   - Tự động bật SoftAP + Captive Portal khi không có cấu hình MQTT hợp lệ lúc khởi động hoặc Wi-Fi mất kết nối kéo dài (>10s).
+   - Đọc cảm biến nhiệt độ nội chip SoC ESP32-C5 qua `driver/temperature_sensor.h` (chu kỳ giám sát trong `safety_monitor`). Cảnh báo lên MQTT khi nhiệt độ chip vượt 75°C.
+   - Theo dõi trạng thái Wi-Fi Station liên tục để log và tự động kết nối lại Hotspot khi có mạng.
 
 ---
 
@@ -187,30 +186,18 @@ cd d:\PBL3_NHOM5\sortix-firmware
 idf.py set-target esp32c5
 ```
 
-### 6.3 Provisioning cấu hình thiết bị
-Cấu hình Wi-Fi, MQTT và token được provision qua Captive Portal; firmware không chứa SSID/password Wi-Fi, MQTT URI, Control Secret hoặc API token mặc định. Khi chưa có cấu hình MQTT hợp lệ, thiết bị bật SoftAP với SSID `SortiX-Setup-<đuôi MAC>` và mật khẩu ngẫu nhiên 16 ký tự. Lấy mật khẩu từ console serial cục bộ, kết nối SoftAP rồi mở `http://192.168.4.1`.
+### 6.3 Cấu hình mặc định & NVS (`app_config.h` / `nvs_config.c`)
+- Nguồn cấu hình chuẩn duy nhất nằm tại `components/nvs_config/include/app_config.h` (được `main/app_config.h` include trực tiếp).
+- Firmware hiện cấu hình Wi-Fi ở chế độ **Station (STA) Hotspot** (`wifi_manager.c`; SoftAP đang tắt trong `wifi_manager_start_softap()`), sử dụng thông số mặc định từ `app_config.h` (`DEFAULT_WIFI_SSID`, `DEFAULT_WIFI_PASS`, `DEFAULT_MQTT_BROKER_URI = "mqtts://broker.emqx.io:8883"`, `DEFAULT_HTTP_TELEMETRY_URL`, `SORTIX_CONTROL_SECRET`) hoặc giá trị đã lưu trong NVS (`sortix_cfg`).
+- `nvs_config_init()` luôn đồng bộ lại các hằng số cơ khí thực tế (`CALIB_ENCODER_COUNTS_PER_MM = 63.0f`, `DIST_S1_TO_SERVO1_MM = 250.0f`, `DIST_S1_TO_SERVO2_MM = 400.0f`, `DIST_S1_TO_END_MM = 650.0f`, `SORTIX_FALLBACK_POLICY`) từ `app_config.h` để tránh lệch thông số cũ trong Flash.
+- Component `captive_portal` (port 80) vẫn sẵn sàng trong codebase để nhận form POST `/save` (Wi-Fi, MQTTS/WSS URI, `Control Secret`, `Device API Token`, `HTTPS Telemetry URL`) nếu cần mở portal cấu hình.
 
-Điền các trường sau:
-- Wi-Fi Station SSID và password. Đánh dấu tùy chọn mạng không mật khẩu nếu dùng Wi-Fi mở.
-- MQTT URI có TLS: `mqtts://<broker>:8883` hoặc `wss://<broker>:443`. Firmware từ chối `mqtt://` và `ws://` không mã hóa khi triển khai thực tế.
-- MQTT username/password của broker nếu broker yêu cầu.
-- `Control Secret` dài 16–63 ký tự, phải khớp `SORTIX_CONTROL_SECRET` của Dashboard/backend. Lệnh `START`, `STOP`, `ESTOP`, mở khóa và cấu hình sorter đều phải mang token này. Producer Vision bên ngoài (YOLO11) cũng phải gửi `auth_token` khớp với secret.
-- Nếu bật telemetry HTTP, dùng URL `https://...` và một `Device API Token` riêng, khớp `DEVICE_TOKEN` hoặc `SORTIX_DEVICE_TOKEN` ở backend. Firmware gửi token trong header `X-Device-Token`; để trống URL để tắt luồng HTTP telemetry.
-
-Thông số hiệu chuẩn có thể cập nhật trong cấu hình/NVS:
-- Chính sách an toàn khi quá hạn nhận diện Vision AI (`PAUSE_AND_HOLD` dừng băng tải an toàn hoặc `DIVERT_TO_DEFAULT`).
-- Khoảng cách hiệu chuẩn trạm phân loại lưu trong NVS (`dist_s1_servo1_mm`, `dist_s1_servo2_mm`, `dist_s1_end_mm`) và `counts_per_mm`.
-
-### 6.4 Biên dịch (Build)
+### 6.4 Biên dịch (Build) & Nạp Firmware
 ```powershell
 idf.py build
+idf.py -p COM12 flash monitor
 ```
-
-### 6.5 Nạp Firmware & Mở Console Monitor
-```powershell
-idf.py -p COM5 flash monitor
-```
-*(Thay `COM5` bằng cổng COM thực tế của bo WeAct trên máy tính).*
+*(Hoặc chạy nhanh bằng `flash_firmware.bat` / `flash_firmware.ps1`, hoặc các script `05_Build_Firmware_ESP32C5.bat` và `06_Nap_Code_Va_Monitor_ESP32C5.bat` trong thư mục `Khoidong/`).*
 
 ---
 

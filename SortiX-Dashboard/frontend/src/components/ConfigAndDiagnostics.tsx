@@ -94,12 +94,12 @@ export const ConfigAndDiagnostics: React.FC<ConfigAndDiagnosticsProps> = ({
     config.bins[0]?.brand_ids?.[0] || "med_syringe"
   );
   const [bin2Brand, setBin2Brand] = useState<string>(
-    config.bins[1]?.brand_ids?.[0] || "med_forceps"
+    config.bins[1]?.brand_ids?.[0] || "med_scissors"
   );
 
   useEffect(() => {
     setBin1Brand(config.bins[0]?.brand_ids?.[0] || "med_syringe");
-    setBin2Brand(config.bins[1]?.brand_ids?.[0] || "med_forceps");
+    setBin2Brand(config.bins[1]?.brand_ids?.[0] || "med_scissors");
   }, [config]);
 
   const bin1ConfigTheme = getBinColorTheme(bin1Brand, "amber");
@@ -163,7 +163,7 @@ export const ConfigAndDiagnostics: React.FC<ConfigAndDiagnosticsProps> = ({
 
   const executeResetDefault = () => {
     setBin1Brand("med_syringe");
-    setBin2Brand("med_forceps");
+    setBin2Brand("med_scissors");
     setStatusMsg("Đã khôi phục cấu hình v1 mặc định thành công!");
     onResetDefaultConfig?.();
     toast.success("Đã khôi phục cấu hình v1 mặc định thành công!");
@@ -335,7 +335,7 @@ export const ConfigAndDiagnostics: React.FC<ConfigAndDiagnosticsProps> = ({
               <label className={`text-xs font-bold flex items-center justify-between ${bin2ConfigTheme.widgetTitleText}`}>
                 <span className="flex items-center gap-2">
                   <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${bin2ConfigTheme.dotClass}`} />
-                  KHAY 2 (Gạt Servo 2 - GPIO 24):
+                  KHAY 2 (Gạt Servo 2 - GPIO 7):
                 </span>
                 <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">72% vị trí băng tải</span>
               </label>
@@ -422,7 +422,7 @@ export const ConfigAndDiagnostics: React.FC<ConfigAndDiagnosticsProps> = ({
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className={`font-bold ${bin1SliderTheme.brandText}`}>
-                        Khay 1 ({config.bins[0]?.brand_ids?.[0] ? (CATALOG_BRANDS[config.bins[0].brand_ids[0]]?.name || config.bins[0].brand_ids[0]) : "Bơm kim tiêm"}):
+                        Khay 1 ({config.bins[0]?.brand_ids?.[0] ? (CATALOG_BRANDS[config.bins[0].brand_ids[0]]?.name || config.bins[0].brand_ids[0]) : "Kim tiêm"}):
                       </span>
                       <BinCapacityInput
                         value={cap1}
@@ -450,7 +450,7 @@ export const ConfigAndDiagnostics: React.FC<ConfigAndDiagnosticsProps> = ({
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className={`font-bold ${bin2SliderTheme.brandText}`}>
-                        Khay 2 ({config.bins[1]?.brand_ids?.[0] ? (CATALOG_BRANDS[config.bins[1].brand_ids[0]]?.name || config.bins[1].brand_ids[0]) : "Kẹp phẫu thuật"}):
+                        Khay 2 ({config.bins[1]?.brand_ids?.[0] ? (CATALOG_BRANDS[config.bins[1].brand_ids[0]]?.name || config.bins[1].brand_ids[0]) : "Kéo"}):
                       </span>
                       <BinCapacityInput
                         value={cap2}
@@ -478,7 +478,7 @@ export const ConfigAndDiagnostics: React.FC<ConfigAndDiagnosticsProps> = ({
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className={`font-bold ${bin3SliderTheme.brandText}`}>
-                        Khay 3 ({config.bins[2]?.brand_ids?.[0] ? (CATALOG_BRANDS[config.bins[2].brand_ids[0]]?.name || config.bins[2].brand_ids[0]) : "Vật tư khác"}):
+                        Khay 3 ({config.bins[2]?.brand_ids?.[0] ? (CATALOG_BRANDS[config.bins[2].brand_ids[0]]?.name || config.bins[2].brand_ids[0]) : "Bông"}):
                       </span>
                       <BinCapacityInput
                         value={cap3}

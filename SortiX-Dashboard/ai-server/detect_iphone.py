@@ -61,8 +61,8 @@ CLASS_TO_BRAND_ID = {
     "scissor": "med_scissors",
     "scissors": "med_scissors",
     "med_scissors": "med_scissors",
-    "cotton": "med_vial",  # Tam map ve med_vial (Khay 3) de khop UI Dashboard khi chay test
-    "med_cotton": "med_vial",
+    "cotton": "med_cotton",
+    "med_cotton": "med_cotton",
 }
 
 

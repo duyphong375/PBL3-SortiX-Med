@@ -69,7 +69,7 @@ QUY TẮC PHẢN HỒI QUA TELEGRAM:
    - Trả lời tự nhiên, đầy đủ, thú vị và chính xác như một trợ lý AI thông minh toàn diện. Không ép buộc chèn số liệu y tế nếu người dùng không hỏi.
 2. TRẢ LỜI KỸ THUẬT SORTIX-MED (Khi hỏi về hệ thống, telemetry, băng chuyền, thiết bị):
    - Trả lời ngắn gọn, trực quan, chính xác dựa trên số liệu Telemetry được cung cấp.
-   - Khay 1: Bơm kim tiêm / Dao mổ | Khay 2: Kẹp phẫu thuật / Kéo | Khay 3: Dụng cụ khác.
+   - Khay 1: Kim tiêm | Khay 2: Kéo | Khay 3: Bông.
    - Ngưỡng màu: <80% (🟢 Bình thường), 80-99% (🟡 Sắp đầy), 100% (🔴 Khay đầy).
    - Ngưỡng nhiệt ESP32-C5 an toàn tối đa là 75.0°C.
    - Gợi ý các lệnh nhanh nếu liên quan: /status, /temp, /estop, /start, /stop, /clear_bin.
@@ -301,9 +301,9 @@ export const TelegramBotService = {
 • Chế độ vận hành: ${syncState?.mode === "sim" ? "MÔ PHỎNG (Simulation)" : "PHẦN CỨNG THẬT (WeAct ESP32-C5)"}
 • Trạng thái Băng Tải: ${isRunning ? "ĐANG CHẠY (RUNNING - Tốc độ " + (syncState?.speed ?? 50) + "%)" : "ĐANG DỪNG (STOPPED)"}
 • Cảm biến nhiệt độ nội vi ESP32: ${temp.toFixed(1)}°C (Ngưỡng an toàn: 75.0°C - ${isOverheat ? "QUÁ NHIỆT 🔴" : "AN TOÀN 🟢"})
-• Khay 1 (Dao mổ / Bơm tiêm): ${b1}/${cap1} SP (${rate1}%) - ${rate1 >= 100 ? "ĐẦY 🔴" : rate1 >= 80 ? "SẮP ĐẦY 🟡" : "🟢"}
-• Khay 2 (Kẹp phẫu thuật / Kéo): ${b2}/${cap2} SP (${rate2}%) - ${rate2 >= 100 ? "ĐẦY 🔴" : rate2 >= 80 ? "SẮP ĐẦY 🟡" : "🟢"}
-• Khay 3 (Dụng cụ khác): ${b3}/${cap3} SP (${rate3}%) - ${rate3 >= 100 ? "ĐẦY 🔴" : rate3 >= 80 ? "SẮP ĐẦY 🟡" : "🟢"}
+• Khay 1 (Kim tiêm): ${b1}/${cap1} SP (${rate1}%) - ${rate1 >= 100 ? "ĐẦY 🔴" : rate1 >= 80 ? "SẮP ĐẦY 🟡" : "🟢"}
+• Khay 2 (Kéo): ${b2}/${cap2} SP (${rate2}%) - ${rate2 >= 100 ? "ĐẦY 🔴" : rate2 >= 80 ? "SẮP ĐẦY 🟡" : "🟢"}
+• Khay 3 (Bông): ${b3}/${cap3} SP (${rate3}%) - ${rate3 >= 100 ? "ĐẦY 🔴" : rate3 >= 80 ? "SẮP ĐẦY 🟡" : "🟢"}
 • Nút dừng khẩn cấp E-Stop: ${isEstop ? "ĐANG BỊ NHẤN (KHÓA AN TOÀN 🔴)" : "BÌNH THƯỜNG (AN TOÀN 🟢)"}
 • Cảm biến quang kẹt phôi: ${isJammed ? "KẸT PHÔI TẠI TRẠM S1 🔴" : "THÔNG THOÁNG 🟢"}
 • Thời điểm cập nhật: ${new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
@@ -489,7 +489,7 @@ export const TelegramBotService = {
 
       return {
         success: true,
-        text: `📦 <b>ĐÃ ĐẶT LẠI SỐ ĐẾM KHAY 1 VỀ 0</b>\n\nĐã xác nhận thay khay rỗng mới cho nhóm <b>Bơm kim tiêm / Dao mổ</b>. Người xác nhận: <b>@${senderName}</b>.`,
+        text: `📦 <b>ĐÃ ĐẶT LẠI SỐ ĐẾM KHAY 1 VỀ 0</b>\n\nĐã xác nhận thay khay rỗng mới cho nhóm <b>Kim tiêm</b>. Người xác nhận: <b>@${senderName}</b>.`,
       };
     }
 

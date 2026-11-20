@@ -4,10 +4,3 @@ test: ../test/images
 
 nc: 3
 names: ['cotton', 'scissor', 'syringe']
-
-roboflow:
-  workspace: duy-phong
-  project: sortix-med-pbl3
-  version: 1
-  license: CC BY 4.0
-  url: https://universe.roboflow.com/duy-phong/sortix-med-pbl3/dataset/1

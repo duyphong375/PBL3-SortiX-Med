@@ -89,4 +89,17 @@ describe("Cross-Device Real-Time Synchronization (PC Web <-> iPhone Safari <-> A
     const pkgContent = fs.readFileSync(pkgPath, "utf8");
     assert.match(pkgContent, /-H 0\.0\.0\.0 -p 3000/, "Next.js dev script must bind to 0.0.0.0:3000");
   });
+
+  it("8. Default Startup Mode: Backend SyncService and Frontend default to Real Hardware ('real' / Thực tế)", () => {
+    const syncServiceContent = fs.readFileSync(path.resolve(__dirname, "../backend/src/services/syncService.ts"), "utf8");
+    assert.match(syncServiceContent, /mode:\s*"real"/, "SyncService must default mode to 'real'");
+    assert.match(syncServiceContent, /initBootSyncState/, "SyncService must reset startup mode to 'real' on server boot");
+
+    const sorterContent = fs.readFileSync(path.resolve(__dirname, "../frontend/src/hooks/useSorterData.ts"), "utf8");
+    assert.match(sorterContent, /useState<boolean>\(false\)/, "useSorterData must initialize isSimulation to false");
+    assert.match(sorterContent, /setIsSimulation\(false\)/, "useSorterData must boot into Thực tế mode on mount");
+
+    const headerContent = fs.readFileSync(path.resolve(__dirname, "../frontend/src/components/layout/TopHeader.tsx"), "utf8");
+    assert.match(headerContent, /isSimulation\s*=\s*false/, "TopHeader default isSimulation prop must be false");
+  });
 });

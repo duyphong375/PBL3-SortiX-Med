@@ -5,8 +5,7 @@ Phim tat trong cua so video:
   - Phim 1: Chon thu muc 'syringe'    (Kim tiem)
   - Phim 2: Chon thu muc 'scissor'    (Keo)
   - Phim 3: Chon thu muc 'cotton'     (Bong gon)
-  - Phim 4: Chon thu muc 'vial'       (Ong nghiem / Lo thuoc)
-  - Phim 5: Chon thu muc 'mixed'      (Nhieu mon dat chung)
+  - Phim 4: Chon thu muc 'mixed'      (Nhieu mon dat chung)
   - Phim 0: Chon thu muc 'background' (Nen bang tai trong)
   - Phim Space: Chup 1 anh thu cong
   - Phim A: Bat / Tat che do TU DONG CHUP moi 0.35 giay (vua xoay vat vua chup)
@@ -34,8 +33,7 @@ CLASSES = {
     ord("1"): "syringe",
     ord("2"): "scissor",
     ord("3"): "cotton",
-    ord("4"): "vial",
-    ord("5"): "mixed",
+    ord("4"): "mixed",
     ord("0"): "background",
 }
 
@@ -101,7 +99,7 @@ def main() -> None:
 
     print("\n=== SORTIX - CHUP ANH MAU THUC TE ===")
     print("Thu muc luu anh:", OUTPUT_ROOT)
-    print("Phim 1: syringe | 2: scissor | 3: cotton | 4: vial | 5: mixed | 0: background")
+    print("Phim 1: syringe | 2: scissor | 3: cotton | 4: mixed | 0: background")
     print("Phim SPACE: chup 1 tam | Phim A: bat/tat tu dong chup | Phim Q: thoat\n")
 
     while True:
@@ -149,7 +147,7 @@ def main() -> None:
                     cv2.FONT_HERSHEY_SIMPLEX, 0.72, (0, 255, 180), 2)
         cv2.putText(preview, status, (15, 62),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-        cv2.putText(preview, "1:syringe 2:scissor 3:cotton 4:vial 5:mixed 0:bg", (12, preview.shape[0] - 32),
+        cv2.putText(preview, "1:syringe 2:scissor 3:cotton 4:mixed 0:bg", (12, preview.shape[0] - 32),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 255, 255), 1)
         cv2.putText(preview, "SPACE: Chup 1 tam | A: Tu dong | Q: Thoat", (12, preview.shape[0] - 12),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.42, (200, 255, 200), 1)

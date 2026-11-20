@@ -1,0 +1,20 @@
+{
+    "folders": [
+        {
+            "name": "sortix-firmware",
+            "path": "sortix-firmware"
+        },
+        {
+            "name": "PBL3_NHOM5",
+            "path": "."
+        }
+    ],
+    "settings": {
+        "idf.currentSetup": "C:\\esp\\v5.5.4\\esp-idf\\v5.5.4\\esp-idf",
+        "idf.port": "COM12",
+        "idf.openOcdConfigs": [
+            "board/esp32c5-builtin.cfg"
+        ],
+        "C_Cpp.default.compileCommands": "${workspaceFolder:sortix-firmware}/build/compile_commands.json"
+    }
+}

@@ -17,7 +17,7 @@
  */
 
 // --- Cảm biến (Sensors) ---
-#define PIN_IR_S1               GPIO_NUM_0   // Hàng chân trái Pin 5: Cảm biến vật cản hồng ngoại S1 (Active Low)
+#define PIN_IR_S1               GPIO_NUM_3   // Hàng chân trái Pin 4: Cảm biến vật cản hồng ngoại S1 (Active Low)
 #define PIN_ENCODER_A           GPIO_NUM_1   // Hàng chân trái Pin 6: Encoder Phase A (Tín hiệu xung)
 #define PIN_ENCODER_B           GPIO_NUM_4   // Hàng chân phải Pin 8: Encoder Phase B (Tín hiệu chiều quay)
 #define PIN_LDR_DO              GPIO_NUM_5   // Hàng chân phải Pin 9: Cảm biến ánh sáng quang trở LDR (DO)

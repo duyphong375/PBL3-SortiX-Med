@@ -1,6 +1,6 @@
 # SortiX-Med — Hệ Thống Tự Động Phân Loại Dụng Cụ Y Tế & Chuẩn Bị Khử Trùng Phòng Mổ (Biomedical & Industrial IoT)
 
-> **Đồ án PBL3 / Capstone Project**: Hệ thống điều khiển, giám sát và tự động phân loại dụng cụ y tế sau phẫu thuật (Bơm kim tiêm / Dao mổ, Kẹp phẫu thuật Pean, Kéo phẫu thuật, Lọ thuốc / Ống nghiệm) theo thời gian thực trên băng tải thông minh nhằm chuẩn bị cho quy trình khử trùng Autoclave phòng mổ. Tích hợp vi điều khiển IoT (**ESP32-C5**), camera thị giác máy tính (**YOLO11 AI**), bảng điều khiển quản trị phân tầng và ứng dụng di động đa nền tảng (Android APK & iOS PWA) từ một cơ sở mã nguồn duy nhất (1-Codebase Hybrid Architecture).
+> **Đồ án PBL3 / Capstone Project**: Hệ thống điều khiển, giám sát và tự động phân loại dụng cụ y tế (Kim tiêm `med_syringe`, Kéo `med_scissors`, Bông `med_cotton`) theo thời gian thực trên băng tải thông minh nhằm chuẩn bị cho quy trình xử lý/tiệt trùng phòng mổ. Tích hợp vi điều khiển IoT (**ESP32-C5**), máy chủ AI thị giác máy tính (**YOLO11 + FastAPI MJPEG :8000**), bảng điều khiển quản trị phân tầng và ứng dụng di động đa nền tảng (Android APK & iOS PWA) từ một cơ sở mã nguồn duy nhất (1-Codebase Hybrid Architecture).
 
 ---
 
@@ -13,17 +13,22 @@ Phần mô tả chi tiết bên dưới được giữ lại để làm tài li�
 - Root dùng npm workspaces cho `frontend`, `backend` và `shared`.
 - `frontend` là Next.js 14 App Router, chạy cổng `3000`, gồm page routes và các route handlers tại `frontend/src/app/api`.
 - `backend` là HTTP server TypeScript dùng module chuẩn `node:http`, chạy cổng `5000`; không dùng Express. `backend/src/server.ts` điều phối route trực tiếp, còn controllers/routes/services/middlewares cung cấp các lớp nghiệp vụ.
+- `ai-server` là dịch vụ Python thị giác máy tính độc lập (FastAPI + Uvicorn + Ultralytics YOLO11 + Paho-MQTT), chạy cổng `8000`, phát luồng MJPEG tại `/video_feed` và publish nhận diện lên MQTT `sorter/sorter_01/vision`.
 - `shared` chứa `types`, `schemas` và `constants` được dùng ở cả hai workspace.
-- Persistence runtime hiện có là `data/history.json`, `data/notifications.json`, `data/sync_state.json` và `data/users.json`; `ConfigModel` giữ cấu hình mặc định trong bộ nhớ. Các migration/seed trong `backend/database` được giữ làm tài liệu triển khai, không được script hiện tại tự động chạy.
+- Persistence runtime hiện có là `data/history.json`, `data/notifications.json`, `data/sync_state.json`, `data/telemetry_logs.json` và `data/users.json`; `ConfigModel` giữ cấu hình mặc định trong bộ nhớ. Các migration/seed trong `backend/database` được giữ làm tài liệu triển khai, không được script hiện tại tự động chạy.
 
 ### Cây thư mục thực tế
 
 ```text
 SortiX-Dashboard/
+├─ ai-server/                     # Trạm AI Camera YOLO11 3 lớp (cotton, scissor, syringe) + FastAPI MJPEG :8000
+│  ├─ server.py, train.py, capture_samples.py, auto_label.py, detect_iphone.py
+│  ├─ data.yaml, requirements.txt, run_camera.bat, weights/best.pt
+│  └─ dataset/ (train/valid/test) & runs/sortix_med_3class/
 ├─ frontend/src/app/              # /, /alerts, /analytics, /config, /conveyor,
-│  ├─ /devices, /history, /login, /users
-│  └─ api/                        # auth, config, history, events, safety, stats,
-│                                  # sync, alerts, chat/copilot, telegram/webhook, users
+│  ├─ /devices, /history, /login, /settings, /settings/config, /settings/devices, /users
+│  └─ api/                        # auth, config, control, history, events, notifications, safety,
+│                                  # stats, sync, telemetry, email-alert, telegram-alert, chat/copilot, chat/telegram, telegram/webhook, users
 ├─ frontend/src/components/       # layout (TopHeader, Sidebar, DashboardLayout),
 │                                  # overview, conveyor, ui, users, widgets, AiCopilot
 ├─ frontend/src/hooks/            # useSorterData, useMQTT, useConveyorPhysics, useThemeAudio
@@ -34,7 +39,7 @@ SortiX-Dashboard/
 ├─ shared/                        # types, schemas, constants dùng chung giữa Frontend, Backend & Firmware
 ├─ data/                          # JSON runtime store: history, notifications, sync_state, telemetry_logs, users
 ├─ scripts/                       # dev-all.cjs, telegram-poller.cjs, e2e.cjs, free-port.cjs, dev.ps1, test.ps1
-├─ tests/                         # 26 file unit test suites tự động (175/175 unit tests PASS 100%)
+├─ tests/                         # 27 file unit test suites tự động (182/182 unit tests PASS 100%)
 ├─ docs/                          # architecture.md, api.md
 ```
 
@@ -45,17 +50,18 @@ npm run dev              # Frontend Next.js tại :3000
 npm run dev:backend      # build rồi start backend tại PORT (mặc định :5000)
 npm run dev:all          # Điều phối 3-trong-1 (Frontend :3000 + Backend :5000 + Telegram Bot Poller)
 npm run dev:telegram     # Khởi động riêng tiến trình Telegram Bot Long-Polling Gateway
-npm run build            # build tối ưu hóa frontend Next.js (33/33 routes)
+.\ai-server\run_camera.bat # Khởi động AI Camera Server YOLO11 + MJPEG stream tại :8000
+npm run build            # build tối ưu hóa frontend Next.js
 npm run lint             # next lint
 npm run build --workspace=backend
 npx tsc --noEmit --pretty false
-npm test                 # Chạy toàn bộ 26 test suites tự động (175/175 unit tests PASS 100%)
+npm test                 # Chạy toàn bộ 26 test suites tự động (182/182 unit tests PASS 100%)
 npm run test:e2e         # contract desktop/mobile/Capacitor
 npm run cap:sync
 npm run cap:open
 ```
 
-`npm test` hiện chạy toàn bộ **26 file test suites** tự động với **175/175 unit tests PASS 100%** qua lệnh `node --test tests/*.test.cjs`. Bộ kiểm thử bao phủ toàn diện: `security_audit_remediation`, `history`, `api_schemas`, `users`, `estop_safety`, `jam_detection`, `simulation_mode_guard`, `jam_simulation_audio`, `bin_full`, `temperature_warning`, `device_offline`, `shift_summary`, `bin_sliders_sync`, `mqtt_disconnected`, `temperature_gauge_simulation_vs_real`, `daily_report_sync`, `cross_device_sync`, `http_telemetry_history`, `daily_production_cumulative`, `four_user_requests_upgrade`, `mute_siren_feature`, `new_day_report_tele_email`, `anti_ai_industrial_scada_ui`, `auto_stop_on_all_items_in_trays`, `ghost_item_prevention`, và `telegram_copilot_2way_and_screenfit`.
+`npm test` hiện chạy toàn bộ **27 file test suites** tự động với **182/182 unit tests PASS 100%** qua lệnh `node --test tests/*.test.cjs`. Bộ kiểm thử bao phủ toàn diện: `security_audit_remediation`, `history`, `api_schemas`, `users`, `estop_safety`, `jam_detection`, `simulation_mode_guard`, `jam_simulation_audio`, `bin_full`, `temperature_warning`, `device_offline`, `shift_summary`, `bin_sliders_sync`, `mqtt_disconnected`, `temperature_gauge_simulation_vs_real`, `daily_report_sync`, `cross_device_sync`, `http_telemetry_history`, `daily_production_cumulative`, `four_user_requests_upgrade`, `mute_siren_feature`, `new_day_report_tele_email`, `anti_ai_industrial_scada_ui`, `auto_stop_on_all_items_in_trays`, `ghost_item_prevention`, `conveyor_3d_start_pause_sync`, và `telegram_copilot_2way_and_screenfit`.
 
 Các mục lịch sử bên dưới có thể mô tả trạng thái ở thời điểm phát hành cũ. Khi có khác biệt, phần ghi chú runtime này và source code hiện tại được ưu tiên.
 
@@ -96,7 +102,7 @@ Các mục lịch sử bên dưới có thể mô tả trạng thái ở thời 
 **SortiX-Med** là hệ thống IoT Y tế chuyên dụng phục vụ công tác thu gom, tự động nhận diện và phân loại dụng cụ phẫu thuật phòng mổ. Hệ thống giải quyết bài toán chống lây nhiễm chéo các tác nhân nguy hiểm (HIV, HBV, HCV...) và phòng chống tai nạn nghề nghiệp do vật sắc nhọn đâm phải cho đội ngũ y bác sĩ và kỹ thuật viên y tế.
 
 ### 🌟 Tính năng nổi bật:
-- 🚀 **Trực quan hóa vật lý 60fps (HTML5 Canvas & 2D Digital Twin)**: Mô phỏng chi tiết 4 nhóm dụng cụ y tế (Bơm tiêm/Dao mổ, Kẹp phẫu thuật Pean, Kéo mổ, Ống nghiệm) di chuyển trên băng tải, qua cảm biến quang và phân luồng chính xác vào 3 khay chứa y tế chuyên dụng.
+- 🚀 **Trực quan hóa vật lý 60fps (HTML5 Canvas & 2D Digital Twin) + Camera AI MJPEG trực tiếp**: Mô phỏng chi tiết 3 nhóm dụng cụ y tế chính (`med_syringe` Kim tiêm, `med_scissors` Kéo, `med_cotton` Bông; tương thích ngược với các alias cũ) di chuyển trên băng tải, qua cảm biến quang S1 và phân luồng chính xác vào 3 khay chứa chuyên dụng, đồng thời nhúng khung video thời gian thực từ `ai-server` (`:8000/video_feed`).
 - 📱 **Hỗ Trợ Di Động Đa Nền Tảng (1-Codebase Hybrid Mobile App)**:
   - **Android**: Đóng gói thành file `.apk` cài đặt trực tiếp thông qua **Capacitor 8**, tích hợp splash screen, cấu hình `usesCleartextTraffic` và webview hiệu năng cao.
   - **iOS (iPhone/iPad)**: Chế độ PWA Standalone toàn màn hình (qua Safari "Thêm vào MH chính"), tối ưu viewport chuẩn `viewportFit: "cover"`, chống zoom ngoài ý muốn (`maximumScale: 1, userScalable: false`).
@@ -109,7 +115,7 @@ Các mục lịch sử bên dưới có thể mô tả trạng thái ở thời 
   - Tự động phát hiện mất kết nối MQTT Broker quá 5 giây (`mqtt_disconnected`), đổi huy hiệu Header sang đỏ chớp nháy, phát còi cảnh báo và tự động kết nối lại theo lịch trình (3s -> 5s -> 10s).
   - Watchdog 6 giây giám sát nhịp tim định kỳ 2 giây (`conveyor/heartbeat`), cảnh báo tức thì khi vi điều khiển ESP32 ngoại tuyến (`device_offline`).
 - 🤖 **Trợ Lý AI Copilot 2 Chiều & Telegram Bot Gateway**:
-  - Tích hợp mô hình Google Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`) với độ trễ phản hồi cực thấp (~1s) trực tiếp qua API v1beta (không phụ thuộc middleware n8n).
+  - Tích hợp mô hình Google Gemini (`gemini-3.1-flash-lite` mặc định, fallback `gemini-3-flash-preview`, `gemini-3.5-flash-lite`, `gemini-3.8-flash`...) trực tiếp qua API v1beta (không phụ thuộc middleware n8n).
   - Tương tác 2 chiều thông minh qua Telegram Bot (`@SortiX_Med_Bot`): Kỹ sư và điều dưỡng có thể nhắn tin hỏi đáp phân tích telemetry thời gian thực, đồng thời điều khiển hệ thống SCADA từ xa an toàn qua bàn phím Inline Keyboard (`/status`, `/temp`, `/estop`, `/start`, `/stop`, `/clear_bin`).
   - Tích hợp tiến trình `scripts/telegram-poller.cjs` tự động chạy ngầm trong lệnh điều phối `npm run dev:all`.
 - 🖥️ **SCADA Kiosk Fullscreen & Display Density (Fit Màn Hình Zero-Scroll)**:
@@ -270,7 +276,7 @@ Xây dựng trên nền tảng **Next.js 14 App Router** kết hợp **Capacitor
   - `layout/`: `DashboardLayout` (bộ khung tổng thể, hỗ trợ chuyển đổi chế độ xem SCADA Kiosk toàn màn hình F11), `TopHeader` (nút chuyển Dark/Light, hiển thị trạng thái khẩn cấp Mobile Pill), `Sidebar` (menu điều hướng), các Banner cảnh báo (`EmergencyStopBanner`, `BinFullIncidentBanner`).
   - `overview/`: `KpiStatGrid` (lưới chỉ số sản xuất), `LiveHealthAndBinWidget` (thanh đo nhiệt độ và dung lượng khay), `RecentActivityList` (danh sách sự kiện trực tiếp).
   - `ui/`: Các cửa sổ tương tác an toàn (`EmergencyConfirmModal` xác nhận mở khóa E-Stop kèm nhập lý do, `TemperatureGaugeWidget` đồng hồ đo nhiệt độ, `ShiftSummaryModal` tổng kết ca sản xuất, và các Toast thông báo trạng thái).
-  - `AiCopilot.tsx`: Trợ lý Trí tuệ Nhân tạo thông minh tích hợp Google Gemini AI và n8n workflow, hỗ trợ hỏi đáp kỹ thuật và hướng dẫn vận hành thiết bị.
+  - `AiCopilot.tsx`: Trợ lý Trí tuệ Nhân tạo thông minh gọi trực tiếp Google Gemini API v1beta qua route `/api/chat/copilot`, hỗ trợ hỏi đáp đa năng, phân tích telemetry thời gian thực và kết nối Telegram Bot 2 chiều.
   - `ConveyorVisualizer.tsx`: Khối vẽ Canvas thời gian thực mô phỏng chuyển động vật lý của băng chuyền theo vận tốc encoder.
 - **`frontend/src/contexts/`**: `AuthContext.tsx` quản lý phiên đăng nhập của người dùng, tự động làm mới JWT token và cung cấp hook phân quyền `usePermission("user.manage")` để bảo vệ các nút chức năng nhạy cảm.
 - **`frontend/src/hooks/`**: Chứa logic xử lý tương tác độc lập:
@@ -359,7 +365,7 @@ Phần này mô tả chi tiết cách thức toàn bộ hệ thống phối hợ
 flowchart TD
     subgraph HARDWARE_LAYER["1. Tầng Phần Cứng & Thu Thập Dữ Liệu"]
         CAM["Camera AI YOLO11"] -->|"Nhận diện dụng cụ y tế"| DETECT["Kết quả Detection (loại dụng cụ, confidence)"]
-        SENSORS["Cảm Biến S1 (GPIO0) + Encoder PCNT + Cảm biến nội vi ESP32-C5"] -->|"Đo tốc độ, nhiệt độ, kẹt dụng cụ"| ESP32["Vi điều khiển ESP32-C5"]
+        SENSORS["Cảm Biến S1 (GPIO3) + Encoder PCNT + Cảm biến nội vi ESP32-C5"] -->|"Đo tốc độ, nhiệt độ, kẹt dụng cụ"| ESP32["Vi điều khiển ESP32-C5"]
         DETECT -->|"MQTT sorter/sorter_01/vision"| ESP32
     end
 
@@ -393,24 +399,23 @@ flowchart TD
 
 ### 3.2. Luồng Phân Loại Dụng Cụ Y Tế Máy Thật (Live Hardware Sorting Flow)
 
-1. **Dụng cụ đi vào băng tải**: Động cơ băng tải quay với vận tốc được giám sát qua cảm biến Encoder (`conveyor_speed`). Dụng cụ y tế sau phẫu thuật lần lượt đi qua Cảm biến S1 (IO0 - Phát hiện vật vào và kích hoạt cụm camera).
-2. **Camera AI YOLO11 nhận diện dụng cụ y tế**:
-   - Camera công nghiệp tại trạm nhận diện chụp ảnh khi dụng cụ đi qua vùng ROI của Cảm biến S1.
-   - Mô hình Vision AI YOLO11 phân loại 4 nhóm dụng cụ y tế và xuất độ tin cậy `confidence` (0.00 – 1.00):
-     - `med_syringe`: Bơm kim tiêm / Dao mổ (Vàng y tế `#EAB308`)
-     - `med_forceps`: Kẹp phẫu thuật Pean (Xanh dương y tế `#0284C7`)
-     - `med_scissors`: Kéo phẫu thuật (Xanh tím tiệt trùng `#6366F1`)
-     - `med_vial`: Lọ thuốc / Ống nghiệm (Xanh ngọc Emerald `#10B981`)
+1. **Dụng cụ đi vào băng tải**: Động cơ băng tải quay với vận tốc được giám sát qua cảm biến Encoder (`conveyor_speed`). Dụng cụ y tế lần lượt đi qua Cảm biến S1 (**GPIO3** - phát hiện vật vào và dừng băng tải 2.0s tại buồng quét `100 mm`).
+2. **Camera AI YOLO11 nhận diện dụng cụ y tế (`ai-server/server.py`)**:
+   - iPhone DroidCam / Webcam tại trạm nhận diện chụp ảnh vùng ROI băng tải xanh khi dụng cụ đi qua buồng quét, đồng thời phát video MJPEG trực tiếp tại `http://localhost:8000/video_feed`.
+   - Mô hình Vision AI YOLO11 (3 lớp `cotton`, `scissor`, `syringe`, `weights/best.pt`) phân loại dụng cụ y tế và xuất độ tin cậy `confidence` (0.00 – 1.00):
+     - `med_syringe`: Kim tiêm (Vàng y tế `#EAB308`)
+     - `med_scissors`: Kéo (Xanh dương y tế `#0284C7`; tương thích alias `med_forceps`)
+     - `med_cotton`: Bông (Xanh ngọc Emerald `#10B981`; tương thích alias `med_vial`)
    - Kết quả được đóng gói vào payload `VisionDetection` và gửi lên MQTT topic `sorter/sorter_01/vision`.
 3. **Tra cứu quy tắc phân loại & Cơ chế An toàn Fail-safe**:
    - ESP32-C5 so khớp `brand` với bảng quy tắc cấu hình `rules` hiện tại:
-     - `med_syringe` -> **Khay 1: Thùng vật sắc nhọn lây nhiễm (Sharps Waste)** (Servo 1 - PWM GPIO6 gạt vào khay)
-     - `med_forceps` / `med_scissors` -> **Khay 2: Khay hấp tiệt trùng Autoclave (Surgical Instruments)** (Servo 2 - PWM GPIO7 gạt vào khay)
-     - `med_vial` -> **Khay 3: Khay vật tư y tế & Phục hồi** (Chạy thẳng cuối băng tải qua máng trượt trọng lực, không kích hoạt servo)
-     - **Nguyên tắc An toàn Sinh học (Fail-safe)**: Mọi vật phẩm không nhận diện được hoặc độ tin cậy `confidence < 60%` (0.60) sẽ tự động chạy thẳng vào **Khay 3** để nhân viên y tế kiểm tra lại, tuyệt đối không gạt nhầm vào Khay 2 tiệt trùng.
+     - `med_syringe` -> **Khay 1: Kim tiêm (Sharps Waste)** (Servo 1 - PWM **GPIO6** gạt vào khay)
+     - `med_scissors` -> **Khay 2: Kéo y tế (Surgical Scissors)** (Servo 2 - PWM **GPIO7** gạt vào khay)
+     - `med_cotton` -> **Khay 3: Bông y tế (Medical Cotton)** (Chạy thẳng cuối băng tải qua máng trượt trọng lực, không kích hoạt servo)
+     - **Nguyên tắc An toàn Sinh học (Fail-safe)**: Mọi vật phẩm không nhận diện được hoặc độ tin cậy `confidence < 60%` (0.60) sẽ tự động chạy thẳng vào **Khay 3** để nhân viên y tế kiểm tra lại, tuyệt đối không gạt nhầm vào Khay 1/Khay 2.
 4. **Kích hoạt cơ cấu Servo gạt theo Tracking Encoder**:
-   - Bộ đếm xung phần cứng New PCNT (GPIO1 & GPIO4) kết hợp FIFO Tracking Ring Buffer (tối đa 15 phôi) tính toán khoảng cách thực tế dụng cụ di chuyển trên băng chuyền (200 mm tới Servo 1, 400 mm tới Servo 2).
-   - Khi vật thể đến đúng cửa sổ kích hoạt (cửa sổ dung sai 15 mm), vi điều khiển kích hoạt Servo tương ứng qua FSM Non-blocking LEDC PWM để gạt dụng cụ vào đúng khay.
+   - Bộ đếm xung phần cứng New PCNT (GPIO1 & GPIO4, `63.0 counts/mm`) kết hợp FIFO Tracking Ring Buffer (tối đa 15 phôi) tính toán khoảng cách thực tế dụng cụ di chuyển trên băng chuyền (`100 mm` buồng quét, `250 mm` tới Servo 1, `400 mm` tới Servo 2, `650 mm` tới Khay 3).
+   - Khi vật thể đến đúng cửa sổ kích hoạt (cửa sổ dung sai `±15 mm`), vi điều khiển kích hoạt Servo tương ứng qua FSM Non-blocking LEDC PWM để gạt dụng cụ vào đúng khay.
 5. **Cập nhật dữ liệu & Lịch sử**:
    - Số đếm khay tăng thêm 1 sản phẩm.
    - Bản ghi phân loại `ClassificationRecord` được gửi về backend qua API `POST /api/history` và lưu vào bộ nhớ đệm an toàn.
@@ -456,7 +461,7 @@ sequenceDiagram
     participant Hardware as Băng Tải & Động Cơ
 
     Note over Operator,Hardware: KỊCH BẢN 1: DỪNG KHẨN CẤP (E-STOP)
-    Operator->>Hardware: Nhấn nút E-Stop vật lý (IO10) HOẶC bấm nút E-Stop trên UI
+    Operator->>Hardware: Ngắt nút E-Stop phần cứng 12V HOẶC bấm nút E-Stop trên UI
     Hardware->>Hardware: Ngắt relay nguồn động cơ lập tức (isRunning = false)
     Hardware->>Backend: Gửi sự cố (POST /api/safety/estop)
     Backend->>DB: Ghi bản ghi sự cố (is_locked = true, severity = critical)
@@ -513,9 +518,9 @@ flowchart LR
 
 ### 3.6. Luồng Cấu Hình Quy Tắc Phân Loại (Configuration Sync Flow)
 
-1. **Người dùng điều chỉnh cấu hình**: Quản trị viên truy cập trang `/config`, gán nhóm dụng cụ y tế vào khay đích (ví dụ: `med_syringe` -> Khay 1: Sắc nhọn; `med_forceps` & `med_scissors` -> Khay 2: Tiệt trùng; Khay mặc định: Khay 3: Vật tư/Mặc định) và tùy chỉnh độ rộng/sức chứa khay (5 – 50 SP).
+1. **Người dùng điều chỉnh cấu hình**: Quản trị viên truy cập trang `/config`, gán nhóm dụng cụ y tế vào khay đích (ví dụ: `med_syringe` -> Khay 1: Kim tiêm; `med_scissors` -> Khay 2: Kéo; Khay mặc định: Khay 3: Bông y tế) và tùy chỉnh độ rộng/sức chứa khay (5 – 50 SP).
 2. **Kiểm định dữ liệu đầu vào**: Frontend đóng gói payload và gửi `POST /api/config`. Middleware Zod tại backend kiểm tra tính hợp lệ qua `SorterConfigSchema.passthrough()`.
-3. **Tăng Version & Xuất bản**: Backend tăng số hiệu `config_version` tự động, lưu vào bộ nhớ cấu hình và xuất bản thông điệp MQTT lên topic `sorter/01/config`.
+3. **Tăng Version & Xuất bản**: Backend tăng số hiệu `config_version` tự động, lưu vào bộ nhớ cấu hình và xuất bản thông điệp MQTT lên topic `sorter/sorter_01/config/set`.
 4. **Áp dụng tại phần cứng**: Vi điều khiển ESP32-C5 nhận thông điệp qua MQTT, nạp cấu hình mới vào bộ nhớ RAM/EEPROM theo chế độ `apply_mode` ("áp dụng ngay lập tức" hoặc "đợi khi băng tải trống").
 
 ---
@@ -770,13 +775,14 @@ copy backend\.env.example backend\.env
 
 | Lệnh thực thi | Mô tả | Cổng dịch vụ |
 | :--- | :--- | :--- |
-| `npm run dev:all` | **Khởi chạy đồng thời cả Frontend & Backend** | Frontend: `3000`, Backend: `5000` |
+| `npm run dev:all` | **Khởi chạy đồng thời Frontend + Backend + Telegram Poller** | Frontend: `3000`, Backend: `5000` |
 | `npm run dev` hoặc `npm run dev:frontend` | Khởi chạy riêng giao diện người dùng Next.js | `http://localhost:3000` |
 | `npm run dev:backend` | Build và khởi chạy riêng máy chủ `node:http` API | `http://localhost:5000` |
+| `.\ai-server\run_camera.bat` | Khởi chạy AI Camera Server YOLO11 + MJPEG Stream | `http://localhost:8000` |
 | `npm run cap:sync` | Đồng bộ mã nguồn Frontend vào Android Studio | — |
 | `npm run cap:open` | Mở dự án Android trong Android Studio để build APK | — |
 | `npm run build` | Biên dịch frontend Next.js; backend build riêng bằng `npm run build --workspace=backend` | — |
-| `npm test` | Chạy 17 file test được nối trong root `package.json` | — |
+| `npm test` | Chạy toàn bộ **27 test suites (182/182 unit tests PASS)** | — |
 
 Truy cập Dashboard trên máy tính tại: **[http://localhost:3000](http://localhost:3000)**.
 
@@ -876,7 +882,7 @@ Hệ thống cho phép Quản trị viên (Admin) chuyển đổi linh hoạt ch
 ## 11. Hệ Thống An Toàn, Giám Sát & Cảnh Báo
 
 1. **Dừng Khẩn Cấp (E-Stop)**:
-   - Kích hoạt qua nút bấm vật lý (IO10) hoặc nút bấm trên Web/Mobile Dashboard.
+   - Kích hoạt qua mạch ngắt cứng 12V phần cứng hoặc nút bấm E-Stop trên Web/Mobile Dashboard (phát MQTT `conveyor/safety/estop`).
    - Ngắt ngay lập tức động cơ băng tải (`isRunning = false`), còi hú liên tục, banner đỏ cảnh báo.
    - Chỉ Admin có quyền mở khóa kèm xác thực mật khẩu/lý do hiện trường; cơ chế ân hạn 5 giây chống lặp echo.
 2. **Phân Định Kẹt Phôi (`jam_detected`) vs Đầy Khay (`bin_full`)**:
@@ -898,9 +904,9 @@ Hệ thống cho phép Quản trị viên (Admin) chuyển đổi linh hoạt ch
 
 1. **Bảo mật mật khẩu**: Mọi mật khẩu người dùng đều được băm bằng thuật toán **Bcrypt (10 salt rounds)**.
 2. **Quy trình Khôi phục Mật khẩu (Forgot Password)**:
-   - Mã Mock OTP ngẫu nhiên 6 chữ số, thời gian sống **5 phút**.
+   - Mã OTP ngẫu nhiên 6 chữ số, thời gian sống **5 phút**.
    - Chống tái sử dụng mã OTP đã dùng.
-   - Chặn khôi phục từ bên ngoài đối với các tài khoản Quản trị viên.
+   - Trên Web Next.js (`/api/auth/forgot-password`), trả về `demo_otp` để hiển thị trực tiếp trên modal khôi phục nhanh (`ForgotPasswordModal.tsx`) song song gửi email nếu cấu hình SMTP; trên Backend standalone (`userService.ts`), chặn khôi phục từ bên ngoài đối với tài khoản Admin.
 3. **Phân quyền vai trò (RBAC)**:
    - `admin`: Toàn quyền thao tác trên hệ thống.
    - `user`: Giám sát và theo dõi, bị chặn mã lỗi `403 Forbidden` khi gọi API quản trị.
@@ -911,32 +917,40 @@ Hệ thống cho phép Quản trị viên (Admin) chuyển đổi linh hoạt ch
 
 ## 13. Kiểm Thử & Đảm Bảo Chất Lượng (QA)
 
-Dự án có bộ kiểm thử contract/integration cho history, schema, users, safety, MQTT, báo cáo và đồng bộ đa thiết bị. Script `npm test` hiện chạy 17 file test được liệt kê trong `package.json`; số lượng test không được hard-code vào tài liệu vì có các file bổ sung chưa nối vào script root:
+Dự án có bộ kiểm thử contract/integration toàn diện cho history, schema, users, safety, MQTT, báo cáo, SCADA UI và đồng bộ đa thiết bị. Script `npm test` thực thi `node --test tests/*.test.cjs` trên toàn bộ **27 file test suites (182/182 unit tests PASS)**:
 
 ```powershell
 npm test
 ```
 
-### Các test file được mô tả trong tài liệu:
-- **`tests/history.test.cjs` (9 tests)**: Kiểm tra lưu trữ, phân trang, migrate dữ liệu LocalStorage và cô lập dữ liệu rác.
-- **`tests/api_schemas.test.cjs` (3 tests)**: Kiểm tra tính toàn vẹn của SorterConfigSchema, ClassificationRecordSchema và HistoryQuerySchema.
-- **`tests/users.test.cjs` (14 tests)**: Kiểm tra bảo mật tài khoản, Admin Seeder, ràng buộc mật khẩu, cơ chế chống leo thang đặc quyền, RBAC, Mock OTP và bảo vệ xóa tài khoản Admin.
-- **`tests/estop_safety.test.cjs` (5 tests)**: Kiểm tra dừng khẩn cấp E-Stop, lưu bảng `notifications.json`, phân quyền mở khóa an toàn (Admin only) và cơ chế chống kẹt loop echo 5s.
-- **`tests/jam_detection.test.cjs` (6 tests)**: Kiểm tra sự cố kẹt phôi `jam_detected`, cảm biến quang học che khuất > 5s, broadcast SSE và topic MQTT `conveyor/sensor/jam`.
-- **`tests/jam_simulation_audio.test.cjs` (5 tests)**: Kiểm tra bộ phát âm thanh còi hú kẹt phôi, âm còi khay đầy và giao diện UI Guard.
-- **`tests/bin_full.test.cjs` (7 tests)**: Kiểm tra sự cố đầy khay phân loại, topic MQTT `conveyor/storage/bin_status`, thông báo `warning` và broadcast SSE.
-- **`tests/temperature_warning.test.cjs` (8 tests)**: Kiểm tra cảnh báo quá nhiệt động cơ/CPU Edge AI, topic MQTT `conveyor/telemetry/temp` và xử lý nhãn thiết bị.
-- **`tests/device_offline.test.cjs` (10 tests)**: Kiểm tra Watchdog phát hiện mất kết nối ESP32 > 6s, heartbeat ping chu kỳ 2s và phục hồi trực tuyến.
-- **`tests/shift_summary.test.cjs` (8 tests)**: Kiểm tra tổng kết ca làm việc cuối ngày, xuất file CSV có UTF-8 BOM và phân quyền tải báo cáo.
-- **`tests/bin_sliders_sync.test.cjs` (8 tests)**: Kiểm tra thanh trượt điều chỉnh độ rộng / sức chứa định mức (5 - 50 SP) và nạp phôi hiện tại đồng bộ trên toàn hệ thống.
-- **`tests/mqtt_disconnected.test.cjs` (12 tests)**: Kiểm tra watchdog mất kết nối MQTT Broker > 5s, auto-reconnect backoff 3s-5s-10s, huy hiệu Header và âm thanh cảnh báo.
-- **`tests/temperature_gauge_simulation_vs_real.test.cjs` (4 tests)**: Kiểm tra đồng hồ nhiệt độ chuyển đổi đúng giữa thanh trượt ảo (Mô phỏng) và bảng telemetry cảm biến (Thực tế).
-- **`tests/daily_report_sync.test.cjs` (6 tests)**: Kiểm tra nhãn chuẩn hóa "BÁO CÁO 1 NGÀY LÀM VIỆC" và luồng đồng bộ trực tiếp số liệu từ khay chứa và lịch sử phân loại.
-- **`tests/simulation_mode_guard.test.cjs` (3 tests)**: Kiểm tra phân định và cô lập triệt để giữa chế độ Mô Phỏng và Thực Tế, chặn các hành vi test giả lập khi chạy máy thật.
-- **`tests/cross_device_sync.test.cjs` (7 tests)**: Kiểm tra đồng bộ mode, running, speed, bin counts, history và sự kiện SSE giữa các client.
-- **`tests/http_telemetry_history.test.cjs`**: Kiểm tra lưu telemetry HTTP POST vào history, chuẩn hóa payload, truy vấn/xóa history, trạng thái HTTP trên TopHeader và SSE telemetry.
-
-Các file `daily_production_cumulative.test.cjs`, `four_user_requests_upgrade.test.cjs`, `mute_siren_feature.test.cjs` và `new_day_report_tele_email.test.cjs` vẫn tồn tại trong thư mục `tests/` nhưng chưa được nối vào lệnh `npm test` hiện tại.
+### Danh mục 27 test suites trong `tests/`:
+- **`tests/history.test.cjs`**: Lưu trữ, phân trang, migrate dữ liệu LocalStorage và cô lập dữ liệu rác.
+- **`tests/api_schemas.test.cjs`**: Tính toàn vẹn của `SorterConfigSchema`, `ClassificationRecordSchema` và `HistoryQuerySchema`.
+- **`tests/users.test.cjs`**: Bảo mật tài khoản, Admin Seeder, ràng buộc mật khẩu, chống leo thang đặc quyền, RBAC, OTP và bảo vệ xóa Admin.
+- **`tests/estop_safety.test.cjs`**: Dừng khẩn cấp E-Stop, lưu `notifications.json`, mở khóa an toàn (Admin only) và chống kẹt loop echo 5s.
+- **`tests/jam_detection.test.cjs`**: Sự cố kẹt phôi `jam_detected`, broadcast SSE và topic MQTT `conveyor/sensor/jam`.
+- **`tests/jam_simulation_audio.test.cjs`**: Âm thanh còi hú kẹt phôi, âm còi khay đầy và UI Guard.
+- **`tests/bin_full.test.cjs`**: Sự cố đầy khay phân loại, topic MQTT `conveyor/storage/bin_status`, thông báo `warning` và broadcast SSE.
+- **`tests/temperature_warning.test.cjs`**: Cảnh báo quá nhiệt động cơ/CPU, topic MQTT `conveyor/telemetry/temp` và xử lý nhãn thiết bị.
+- **`tests/device_offline.test.cjs`**: Watchdog phát hiện mất kết nối ESP32 > 6s, heartbeat ping chu kỳ 2s và phục hồi trực tuyến.
+- **`tests/shift_summary.test.cjs`**: Tổng kết ca làm việc cuối ngày, xuất CSV UTF-8 BOM và phân quyền tải báo cáo.
+- **`tests/bin_sliders_sync.test.cjs`**: Thanh trượt sức chứa định mức (5 - 50 SP) và nạp phôi đồng bộ toàn hệ thống.
+- **`tests/mqtt_disconnected.test.cjs`**: Watchdog mất kết nối MQTT Broker > 5s, auto-reconnect backoff, huy hiệu Header và âm thanh cảnh báo.
+- **`tests/temperature_gauge_simulation_vs_real.test.cjs`**: Đồng hồ nhiệt độ chuyển đổi giữa Mô phỏng và Thực tế.
+- **`tests/daily_report_sync.test.cjs`**: Nhãn chuẩn hóa "BÁO CÁO 1 NGÀY LÀM VIỆC" và đồng bộ số liệu từ khay chứa.
+- **`tests/simulation_mode_guard.test.cjs`**: Cô lập triệt để giữa Mô phỏng và Thực tế.
+- **`tests/cross_device_sync.test.cjs`**: Đồng bộ mode, running, speed, bin counts, history và SSE giữa các thiết bị.
+- **`tests/http_telemetry_history.test.cjs`**: Lưu telemetry HTTP POST, truy vấn/xóa history, trạng thái HTTP và SSE telemetry.
+- **`tests/security_audit_remediation.test.cjs`**: Kiểm thử bảo mật, `ESTOP ACK` và kiểm định config.
+- **`tests/anti_ai_industrial_scada_ui.test.cjs`**: Chuẩn giao diện SCADA công nghiệp ISA-101 / IEC-62443 và hotkeys.
+- **`tests/telegram_copilot_2way_and_screenfit.test.cjs`**: Telegram Bot 2 chiều, mật độ hiển thị & SCADA Screen-Fit.
+- **`tests/mute_siren_feature.test.cjs`**: Tắt còi báo động tạm thời.
+- **`tests/new_day_report_tele_email.test.cjs`**: Báo cáo ngày mới gửi qua Telegram và Email.
+- **`tests/daily_production_cumulative.test.cjs`**: Cộng dồn sản lượng theo ngày.
+- **`tests/auto_stop_on_all_items_in_trays.test.cjs`**: Tự động chạy/dừng khi phôi vào hết các khay.
+- **`tests/ghost_item_prevention.test.cjs`**: Chống tạo phôi ma trên băng tải.
+- **`tests/conveyor_3d_start_pause_sync.test.cjs`**: Đồng bộ băng tải 3D, Start/Pause và `TelemetrySchema`.
+- **`tests/four_user_requests_upgrade.test.cjs`**: Bộ 4 tính năng nâng cấp trải nghiệm vận hành.
 
 Kiểm tra kiểu dữ liệu TypeScript:
 ```powershell
@@ -951,15 +965,18 @@ Xem chi tiết tại [`.env.example`](.env.example):
 
 | Biến môi trường | Mục đích | Ví dụ |
 | :--- | :--- | :--- |
-| `NEXT_PUBLIC_MQTT_BROKER_URL` | WSS URL của MQTT broker riêng | Chưa cấu hình |
+| `MQTT_BROKER_URL` / `NEXT_PUBLIC_MQTT_BROKER_URL` | URL TLS/WSS của MQTT Broker | `mqtts://broker.emqx.io:8883` / `wss://...:8084/mqtt` |
 | `NEXT_PUBLIC_DEFAULT_DEVICE_ID` | Mã định danh thiết bị máy phân loại | `sorter_01` |
-| `NEXT_PUBLIC_MQTT_TOPIC_TELEMETRY` | Topic nhận telemetry cảm biến | `sorter/01/telemetry` |
-| `NEXT_PUBLIC_MQTT_TOPIC_VISION` | Topic nhận kết quả nhận diện camera | `sorter/01/vision` |
-| `NEXT_PUBLIC_MQTT_TOPIC_CONTROL` | Topic gửi lệnh điều khiển | `sorter/01/control` |
-| `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_BACKEND_URL` | Địa chỉ Backend API | `http://localhost:5000` |
-| `TELEGRAM_BOT_TOKEN` | Token Bot gửi thông báo cảnh báo | `123456789:ABCdefGhI...` |
-| `TELEGRAM_CHAT_ID` | ID phòng chat nhận cảnh báo Telegram | `-100123456789` |
-| `SMTP_HOST` / `SMTP_PORT` | Máy chủ SMTP gửi email khẩn cấp | `smtp.gmail.com` / `587` |
+| `NEXT_PUBLIC_MQTT_TOPIC_TELEMETRY` | Topic nhận telemetry cảm biến | `sorter/sorter_01/telemetry` |
+| `NEXT_PUBLIC_MQTT_TOPIC_VISION` | Topic nhận kết quả nhận diện camera | `sorter/sorter_01/vision` |
+| `NEXT_PUBLIC_MQTT_TOPIC_CONTROL` | Topic gửi lệnh điều khiển | `sorter/sorter_01/control` |
+| `NEXT_PUBLIC_AI_STREAM_URL` | URL luồng MJPEG của AI Camera Server | `http://localhost:8000/video_feed` |
+| `NEXT_PUBLIC_API_URL` | Địa chỉ Backend API | `http://localhost:5000` |
+| `SORTIX_CONTROL_SECRET` / `DEVICE_TOKEN` | Secret điều khiển phần cứng & token HTTP telemetry | `your_secret_key_here` |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | Khóa API và model cho AI Copilot & Telegram Bot | `gemini-3.1-flash-lite` |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Token Bot & ID phòng chat Telegram | `123456789:ABC...` / `-100...` |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | Máy chủ SMTP gửi email khẩn cấp & OTP | `smtp.gmail.com` / `587` |
+| `BOOTSTRAP_ADMIN_PASSWORD` / `ENABLE_DEMO_OTP` | Mật khẩu khởi tạo Admin & bật OTP demo | `...` / `false` |
 | `INTERNAL_API_SECRET` | Khóa xác thực nội bộ cho các API quan trọng | `your_secret_key_here` |
 
 ---
@@ -967,7 +984,7 @@ Xem chi tiết tại [`.env.example`](.env.example):
 ## 15. Xử Lý Sự Cố Thường Gặp (Troubleshooting)
 
 - **Không thấy nút Chế độ Mô phỏng trên Điện thoại**:
-  - *Nguyên nhân 1*: Bạn đang đăng nhập bằng tài khoản Người vận hành (`role: 'user'`). Theo quy chuẩn an toàn, tài khoản `user` bị khóa cứng ở chế độ Thực tế. Hãy đăng nhập bằng tài khoản Quản trị viên (`admin1` / `123456`) để có quyền chuyển sang Mô phỏng.
+  - *Nguyên nhân 1*: Bạn đang đăng nhập bằng tài khoản Người vận hành (`role: 'user'`). Theo quy chuẩn an toàn, tài khoản `user` bị khóa cứng ở chế độ Thực tế. Hãy đăng nhập bằng tài khoản Quản trị viên (`admin1`, mật khẩu thiết lập qua `BOOTSTRAP_ADMIN_PASSWORD`) để có quyền chuyển sang Mô phỏng.
   - *Nguyên nhân 2*: Trình duyệt chưa tải phiên bản mới nhất. Hãy vuốt xuống để tải lại trang (Pull to refresh). Nút viên nang `[🧪 Mô phỏng]` sẽ hiện ngay cạnh tiêu đề trang, hoặc bấm vào nút Menu 3 gạch để thấy mục chuyển đổi to rõ trong ngăn kéo Sidebar.
 - **Máy ảo Android Emulator báo lỗi kết nối / trang trắng**:
   - Máy ảo Android không dùng `localhost` được (vì `localhost` trỏ vào chính máy ảo). Phải cấu hình trỏ tới IP máy chủ host: `http://10.0.2.2:3000`.

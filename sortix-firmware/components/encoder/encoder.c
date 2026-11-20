@@ -16,7 +16,7 @@ static pcnt_unit_handle_t s_pcnt_unit = NULL;
 static pcnt_channel_handle_t s_pcnt_chan_a = NULL;
 static pcnt_channel_handle_t s_pcnt_chan_b = NULL;
 
-static float s_counts_per_mm = 31.5f;
+static float s_counts_per_mm = 63.0f;
 
 #define PCNT_CHECK(call) do { \
     ret = (call); \
@@ -40,6 +40,10 @@ esp_err_t encoder_init(void)
 {
     ESP_LOGI(TAG, "Initializing PCNT Quadrature Encoder (Phase A: GPIO%d, Phase B: GPIO%d)",
              ENCODER_PIN_A, ENCODER_PIN_B);
+
+    // Kích hoạt điện trở kéo lên nội Pull-up cho 2 pha Encoder
+    gpio_set_pull_mode(ENCODER_PIN_A, GPIO_PULLUP_ONLY);
+    gpio_set_pull_mode(ENCODER_PIN_B, GPIO_PULLUP_ONLY);
 
     pcnt_unit_config_t unit_config = {
         .high_limit = PCNT_HIGH_LIMIT,
@@ -151,7 +155,8 @@ float encoder_get_counts_per_mm(void)
 float encoder_counts_to_mm(int64_t counts)
 {
     if (s_counts_per_mm <= 0.001f) return 0.0f;
-    return (float)counts / s_counts_per_mm;
+    int64_t abs_counts = (counts < 0) ? -counts : counts;
+    return (float)abs_counts / s_counts_per_mm;
 }
 
 int64_t encoder_mm_to_counts(float mm)

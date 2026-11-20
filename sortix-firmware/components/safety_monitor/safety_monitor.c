@@ -11,6 +11,7 @@
 
 static const char *TAG = "SAFETY_MONITOR";
 
+#define ENABLE_JAM_DETECTION        0       // 0: Tạm tắt kiểm tra kẹt cơ khí để thử nghiệm; 1: Bật bảo vệ kẹt băng tải
 #define JAM_STARTUP_GRACE_US        1000000 // Thời gian trễ 1.0s sau khi bật động cơ để tránh báo động giả lúc khởi động
 #define JAM_DETECTION_WINDOW_US     1800000 // Khoảng thời gian 1.8s không có xung khi động cơ đang chạy -> Kẹt băng tải (JAM)
 #define TEMP_CHECK_INTERVAL_US      2000000 // Kiểm tra nhiệt độ định kỳ mỗi 2.0s
@@ -187,6 +188,7 @@ void safety_monitor_check(void)
     }
 
     // 2. Kiểm tra dừng encoder / kẹt cơ khí băng tải
+#if ENABLE_JAM_DETECTION
     bool is_running = motor_control_is_running();
     if (is_running) {
         if (!s_was_running) {
@@ -209,16 +211,20 @@ void safety_monitor_check(void)
                 // Số xung encoder không thay đổi (băng tải bị đứng im)
                 int64_t stall_duration_us = now_us - s_last_movement_time_us;
                 if (stall_duration_us >= JAM_DETECTION_WINDOW_US) {
-                    float duration_sec = (float)stall_duration_us / 1000000.0f;
-                    ESP_LOGE(TAG, "ENCODER STALL DETECTED! Conveyor stationary for %.2fs while motor running!",
-                             duration_sec);
+                    // Chỉ kích hoạt ngắt dừng nếu encoder có đấu nối và từng hoạt động (current_count != 0).
+                    // Nếu encoder luôn = 0 (chưa gắn phần cứng encoder), bỏ qua để không ngắt dừng sau 5s.
+                    if (current_count != 0) {
+                        float duration_sec = (float)stall_duration_us / 1000000.0f;
+                        ESP_LOGE(TAG, "ENCODER STALL DETECTED! Conveyor stationary for %.2fs while motor running!",
+                                 duration_sec);
 
-                    // Kích hoạt máy trạng thái xử lý sự kiện kẹt băng tải khẩn cấp
-                    state_machine_process_event(SYSTEM_EVENT_JAM_DETECTED);
-                    s_was_running = false;
+                        // Kích hoạt máy trạng thái xử lý sự kiện kẹt băng tải khẩn cấp
+                        state_machine_process_event(SYSTEM_EVENT_JAM_DETECTED);
+                        s_was_running = false;
 
-                    if (s_jam_cb != NULL) {
-                        s_jam_cb(duration_sec, s_jam_user_ctx);
+                        if (s_jam_cb != NULL) {
+                            s_jam_cb(duration_sec, s_jam_user_ctx);
+                        }
                     }
                 }
             }
@@ -226,4 +232,13 @@ void safety_monitor_check(void)
     } else {
         s_was_running = false;
     }
+#else
+    // Tạm thời vô hiệu hóa kiểm tra kẹt cơ khí theo yêu cầu để chạy thử nghiệm phần cứng
+    (void)s_was_running;
+    (void)s_motor_start_time_us;
+    (void)s_last_encoder_count;
+    (void)s_last_movement_time_us;
+    (void)s_jam_cb;
+    (void)s_jam_user_ctx;
+#endif
 }

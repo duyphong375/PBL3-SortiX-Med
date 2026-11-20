@@ -143,14 +143,13 @@ export function getBrandColorScheme(brandId?: string): BinColorScheme | null {
   if (!brandId) return null;
   const normalized = brandId.toLowerCase();
   if (normalized === "med_syringe" || normalized.includes("syringe") || normalized.includes("kim") || normalized.includes("dao")) return "amber";
-  if (normalized === "med_forceps" || normalized.includes("forceps") || normalized.includes("panh") || normalized.includes("pean") || normalized.includes("kep")) return "blue";
-  if (normalized === "med_scissors" || normalized.includes("scissors") || normalized.includes("keo")) return "blue";
-  if (normalized === "med_vial" || normalized.includes("vial") || normalized.includes("tube") || normalized.includes("nghiem") || normalized.includes("thuoc")) return "cyan";
+  if (normalized === "med_scissors" || normalized.includes("scissor") || normalized.includes("keo") || normalized === "med_forceps" || normalized.includes("forceps")) return "blue";
+  if (normalized === "med_cotton" || normalized.includes("cotton") || normalized.includes("bong") || normalized.includes("gon") || normalized === "med_vial" || normalized.includes("vial")) return "cyan";
 
   // Legacy fallback mappings
   if (normalized === "brand_c" || normalized.includes("coca")) return "amber";
   if (normalized === "brand_a" || normalized.includes("pepsi")) return "blue";
-  if (normalized === "brand_b" || normalized.includes("redbull") || normalized.includes("red bull")) return "amber";
+  if (normalized === "brand_b" || normalized.includes("redbull") || normalized.includes("red bull")) return "blue";
   if (normalized === "brand_d" || normalized.includes("aqua")) return "cyan";
 
   // Kiểm tra CATALOG_BRANDS nếu có

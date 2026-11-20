@@ -7,4 +7,6 @@ __pycache__/
 *.cache
 runs/
 raw_captures/
+raw_captures_bo_sung/
 auto_labeled_for_review/
+auto_labeled_bo_sung_for_review/

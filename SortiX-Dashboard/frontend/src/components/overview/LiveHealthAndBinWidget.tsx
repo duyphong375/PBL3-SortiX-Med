@@ -226,7 +226,7 @@ export function LiveHealthAndBinWidget({
                     K1
                   </span>
                   <span className="text-sm font-semibold truncate">
-                    Máng 1: {bin1Brands.length > 0 ? bin1Brands.map((b: string) => CATALOG_BRANDS[b]?.name || b).join(", ") : "Lọ thuốc / Ống nghiệm"}
+                    Máng 1: {bin1Brands.length > 0 ? bin1Brands.map((b: string) => CATALOG_BRANDS[b]?.name || b).join(", ") : "Kim tiêm"}
                   </span>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -236,7 +236,7 @@ export function LiveHealthAndBinWidget({
                     </TooltipTrigger>
                     <TooltipContent side="top">
                       <p className="font-mono text-xs">
-                        Gạt Servo 1 (GPIO6 • MG996R) • Góc: 45° • Trạm 200mm
+                        Gạt Servo 1 (GPIO6 • MG996R) • Góc: 360° • Trạm 200mm
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -331,7 +331,7 @@ export function LiveHealthAndBinWidget({
                     K2
                   </span>
                   <span className="text-sm font-semibold truncate">
-                    Máng 2: {bin2Brands.length > 0 ? bin2Brands.map((b: string) => CATALOG_BRANDS[b]?.name || b).join(", ") : "Bơm kim tiêm / Dao mổ"}
+                    Máng 2: {bin2Brands.length > 0 ? bin2Brands.map((b: string) => CATALOG_BRANDS[b]?.name || b).join(", ") : "Kéo"}
                   </span>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -341,7 +341,7 @@ export function LiveHealthAndBinWidget({
                     </TooltipTrigger>
                     <TooltipContent side="top">
                       <p className="font-mono text-xs">
-                        Gạt Servo 2 (GPIO7 • MG996R) • Góc: 45° • Trạm 400mm
+                        Gạt Servo 2 (GPIO7 • MG996R) • Góc: 360° • Trạm 400mm
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -435,7 +435,7 @@ export function LiveHealthAndBinWidget({
                     K3
                   </span>
                   <span className="text-sm font-semibold truncate">
-                    Máng 3: {bin3Brands.length > 0 ? bin3Brands.map((b: string) => CATALOG_BRANDS[b]?.name || b).join(", ") : "Lọ thuốc / Ống nghiệm (Thủy tinh)"}
+                    Máng 3: {bin3Brands.length > 0 ? bin3Brands.map((b: string) => CATALOG_BRANDS[b]?.name || b).join(", ") : "Bông"}
                   </span>
                   <Tooltip>
                     <TooltipTrigger asChild>

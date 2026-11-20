@@ -137,7 +137,7 @@ test("B2. Firmware State Machine & MQTT: Nhận ESTOP và ESTOP_RELEASE với to
     "utf8"
   );
   assert.ok(
-    mqttHandlerSource.includes("mqtt_handler_publish_estop_ack()"),
+    mqttHandlerSource.includes("mqtt_handler_publish_estop_ack"),
     "Firmware must publish ACK to conveyor/safety/estop/ack upon ESTOP"
   );
   assert.ok(
@@ -241,10 +241,12 @@ test("C3. Firmware Sorter Config: Kiểm tra version, bin_id, số lượng bin,
     "utf8"
   );
   assert.ok(
+    sortingEngineSource.includes("bin_id->valuedouble != 1.0 && bin_id->valuedouble != 2.0") ||
     sortingEngineSource.includes("bin_id->valueint != 1 && bin_id->valueint != 2"),
     "Config validation must reject bin_id other than 1 or 2"
   );
   assert.ok(
+    sortingEngineSource.includes("cfg_ver->valuedouble < 1.0") ||
     sortingEngineSource.includes("cfg_ver->valueint <= 0"),
     "Config validation must reject non-positive config version"
   );

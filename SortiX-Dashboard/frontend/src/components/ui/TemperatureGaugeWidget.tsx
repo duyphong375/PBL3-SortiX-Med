@@ -92,7 +92,7 @@ export const TemperatureGaugeWidget: React.FC<TemperatureGaugeWidgetProps> = ({
     {
       id: "s1_entry",
       name: "Cảm biến vật cản IR LM393",
-      pin: "GPIO0",
+      pin: "GPIO3",
       category: "sensor",
       type: "sensor",
       isOn: false,

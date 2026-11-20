@@ -29,11 +29,31 @@ static const char *TAG = "MAIN_APP";
 
 static QueueHandle_t s_s1_queue = NULL;
 
-// Hàm Callback: Nút nhấn Start vật lý được nhấn trên GPIO23
+// Hàm Callback: Nút nhấn vật lý GPIO23 được bấm (Cơ chế Toggle đa năng: Bấm 1 = CHẠY, Bấm 2 = DỪNG)
+// Phần mềm lọc rung debounce 30ms, không cần mạch lọc RC phần cứng
 static void on_start_button_pressed(void *user_ctx)
 {
-    ESP_LOGI(TAG, "Hardware Start button pressed -> Processing SYSTEM_EVENT_START");
-    state_machine_process_event(SYSTEM_EVENT_START);
+    static int64_t s_last_toggle_us = 0;
+    int64_t now_us = esp_timer_get_time();
+    const int64_t toggle_cooldown_us = 300000; // Khóa 300ms chống nảy kép
+
+    if ((now_us - s_last_toggle_us) < toggle_cooldown_us) {
+        return;
+    }
+    s_last_toggle_us = now_us;
+
+    if (state_machine_is_awake()) {
+        ESP_LOGI(TAG, "Hardware Button GPIO23 pressed -> Toggling MCU to SLEEP/OFF (STOPPED)");
+        state_machine_process_event(SYSTEM_EVENT_STOP);
+    } else {
+        ESP_LOGI(TAG, "Hardware Button GPIO23 pressed -> Waking up MCU to START (RUNNING)");
+        if (s_s1_queue != NULL) {
+            xQueueReset(s_s1_queue);
+        }
+        (void)sensors_take_s1_queue_overflow();
+        sensors_rearm_s1();
+        state_machine_process_event(SYSTEM_EVENT_START);
+    }
 }
 
 // Hàm Callback: Chuyển đổi trạng thái trong máy trạng thái FSM
@@ -43,6 +63,7 @@ static void on_state_changed(system_state_t old_state, system_state_t new_state,
     ESP_LOGI(TAG, "System state changed: %s -> %s",
              state_machine_get_state_str(old_state), state_str);
     mqtt_handler_publish_status(state_str);
+    mqtt_handler_publish_telemetry(); // Đồng bộ ngay tức thì sang Dashboard Web (<50ms)
 }
 
 // Hàm Callback: Hoàn thành phân loại vật thể trong động cơ phân loại
@@ -82,25 +103,91 @@ static void task_conveyor(void *pvParameters)
 }
 
 // Task 2: task_sorting (Độ ưu tiên 5)
-// Theo dõi vị trí vật thể trên băng tải, ghép nối kết quả AI và kích hoạt servo gạt
+// Theo dõi vị trí vật thể trên băng tải, ghép nối kết quả AI, kích hoạt servo gạt
+// và điều phối tự động: Tự động đánh thức (Auto Wake-up) / Tự động ngủ (Auto Standby)
 static void task_sorting(void *pvParameters)
 {
     ESP_LOGI(TAG, "task_sorting started (Priority %d)", uxTaskPriorityGet(NULL));
     s1_event_t s1_evt;
+    int64_t last_active_time_us = esp_timer_get_time();
+    system_state_t prev_state = SYSTEM_STATE_IDLE;
 
     while (1) {
-        // Lấy tất cả sự kiện phát hiện vật thể từ cảm biến S1 trong hàng đợi ISR
+        system_state_t cur_state = state_machine_get_state();
+
+        // Nếu vừa chuyển sang RUNNING từ trạng thái khác -> Reset mốc thời gian hoạt động
+        if (cur_state == SYSTEM_STATE_RUNNING && prev_state != SYSTEM_STATE_RUNNING) {
+            last_active_time_us = esp_timer_get_time();
+        }
+        prev_state = cur_state;
+
+        // 1. Nhận sự kiện từ cảm biến vật cản S1
         while (xQueueReceive(s_s1_queue, &s1_evt, 0) == pdTRUE) {
-            sorting_engine_on_s1_entry(s1_evt.encoder_count, s1_evt.timestamp_us);
+            cur_state = state_machine_get_state();
+
+            if (!state_machine_is_awake()) {
+                // Khi MCU ở trạng thái Ngủ hoàn toàn (mới cắm nguồn hoặc đã bấm GPIO23 tắt):
+                // Bỏ qua mọi tín hiệu từ cảm biến S1
+                ESP_LOGD(TAG, "S1 trigger ignored because MCU is sleeping/OFF in [%s]",
+                         state_machine_get_state_str(cur_state));
+                continue;
+            }
+
+            // Nếu MCU đã được bật (awake = true) nhưng băng tải đang tạm dừng sau 15s không có vật cản (IDLE):
+            // Ngay khi có vật cản chạm S1 -> TỰ ĐỘNG KHỞI ĐỘNG LẠI BĂNG TẢI NGAY LẬP TỨC!
+            if (cur_state == SYSTEM_STATE_IDLE) {
+                ESP_LOGI(TAG, "Obstacle detected at S1 during 15s Standby -> Auto-restarting conveyor!");
+                state_machine_process_event(SYSTEM_EVENT_START);
+                cur_state = state_machine_get_state();
+                prev_state = cur_state;
+            }
+
+            if (cur_state == SYSTEM_STATE_RUNNING) {
+                // Đưa vật thể vào pipeline theo dõi của sorting engine
+                sorting_engine_on_s1_entry(encoder_get_count(), s1_evt.timestamp_us);
+                last_active_time_us = esp_timer_get_time();
+            }
         }
 
-        if (sensors_take_s1_queue_overflow()) {
+        // Trường hợp vật cản đã đặt đè sẵn lên mắt S1 trong lúc băng tải đang tạm dừng 15s (IDLE):
+        cur_state = state_machine_get_state();
+        if (cur_state == SYSTEM_STATE_IDLE && state_machine_is_awake() && sensors_is_s1_blocked()) {
+            ESP_LOGI(TAG, "Obstacle blocking S1 during 15s Standby -> Auto-restarting conveyor!");
+            state_machine_process_event(SYSTEM_EVENT_START);
+            cur_state = state_machine_get_state();
+            prev_state = cur_state;
+            if (cur_state == SYSTEM_STATE_RUNNING && sorting_engine_is_line_empty()) {
+                sorting_engine_on_s1_entry(encoder_get_count(), esp_timer_get_time());
+                last_active_time_us = esp_timer_get_time();
+            }
+        }
+
+        if (sensors_take_s1_queue_overflow() && cur_state == SYSTEM_STATE_RUNNING) {
             ESP_LOGE(TAG, "S1 event queue overflow: stopping conveyor and requiring operator clearance");
             sorting_engine_note_tracking_overflow();
         }
 
-        // Cập nhật vị trí di chuyển theo encoder, kiểm tra cửa sổ kích hoạt servo và timeout nhận diện AI
+        // 3. Cập nhật vị trí di chuyển theo encoder, kiểm tra cửa sổ kích hoạt servo và timeout nhận diện AI
         sorting_engine_update();
+
+        // 4. Quản lý Chế độ ngủ tự động (Auto Standby / Auto-Sleep - 15s)
+        cur_state = state_machine_get_state();
+        if (cur_state == SYSTEM_STATE_RUNNING) {
+            // Nếu băng tải vẫn còn vật thể đang trôi, S1 đang bị che, hoặc Servo đang bận hoạt động (tự động hoặc test tay từ Web):
+            // Luôn giữ mốc thời gian hoạt động mới nhất (không tính thời gian gạt servo vào thời gian rảnh rỗi)
+            if (!sorting_engine_is_line_empty() || sensors_is_s1_blocked() ||
+                servo_is_busy(SERVO_ID_1) || servo_is_busy(SERVO_ID_2)) {
+                last_active_time_us = esp_timer_get_time();
+            } else {
+                // Băng tải đã gạt hết đồ, S1 thông thoáng và toàn bộ tay gạt đã nghỉ: Kiểm tra thời gian không hoạt động (15s)
+                int64_t idle_time_ms = (esp_timer_get_time() - last_active_time_us) / 1000;
+                if (idle_time_ms >= AUTO_STANDBY_TIMEOUT_MS) {
+                    ESP_LOGI(TAG, "Auto Standby: Inactive for %lld ms with clear line -> Entering IDLE safe sleep",
+                             idle_time_ms);
+                    state_machine_process_event(SYSTEM_EVENT_STANDBY);
+                }
+            }
+        }
 
         vTaskDelay(pdMS_TO_TICKS(15));
     }
@@ -157,20 +244,18 @@ static void task_http_tele(void *pvParameters)
 }
 
 // Task 5: task_safety (Độ ưu tiên 5)
-// Giám sát sức khỏe hệ thống và tự động bật SoftAP nếu mất mạng kéo dài
+// Giám sát sức khỏe hệ thống và trạng thái kết nối Wi-Fi Station
 static void task_safety(void *pvParameters)
 {
     ESP_LOGI(TAG, "task_safety started (Priority %d)", uxTaskPriorityGet(NULL));
 
     while (1) {
-        // Kiểm tra trạng thái Wi-Fi; nếu mất kết nối kéo dài và SoftAP chưa bật thì khởi động SoftAP
+        // Giám sát trạng thái Wi-Fi Station (tự động kết nối lại khi có Hotspot)
         static int disconnect_counter = 0;
         if (!wifi_manager_is_connected()) {
             disconnect_counter++;
-            if (disconnect_counter == SOFTAP_TRIGGER_TIMEOUT_SEC) { // 10 giây không có kết nối Wi-Fi
-                ESP_LOGW(TAG, "Wi-Fi disconnected for >%ds. Starting SoftAP + Captive portal...", SOFTAP_TRIGGER_TIMEOUT_SEC);
-                wifi_manager_start_softap();
-                captive_portal_start();
+            if (disconnect_counter % 5 == 0) {
+                ESP_LOGW(TAG, "Wi-Fi Station is waiting for Hotspot connection (%ds)...", disconnect_counter);
             }
         } else {
             disconnect_counter = 0;
@@ -227,7 +312,7 @@ void app_main(void)
         return;
     }
 
-    // 8. Khởi tạo cảm biến (IR S1 trên GPIO0, LDR DO trên GPIO5)
+    // 8. Khởi tạo cảm biến (IR S1 trên GPIO3, LDR DO trên GPIO5)
     ESP_ERROR_CHECK(sensors_init(s_s1_queue));
 
     // 9. Khởi tạo nút bấm Start (GPIO23 với lọc nhiễu debounce 20ms)
@@ -249,11 +334,8 @@ void app_main(void)
     // 13. Khởi tạo MQTT Client (Giao thức SortiX-Dashboard)
     esp_err_t mqtt_ret = mqtt_handler_init();
     if (mqtt_ret != ESP_OK) {
-        ESP_LOGW(TAG, "MQTT is not active (%s); starting setup AP for secure provisioning",
+        ESP_LOGW(TAG, "MQTT client not initialized (%s); will auto-connect when Wi-Fi Hotspot is available",
                  esp_err_to_name(mqtt_ret));
-        if (wifi_manager_start_softap() != ESP_OK || captive_portal_start() != ESP_OK) {
-            ESP_LOGE(TAG, "Could not start setup portal after MQTT configuration failure");
-        }
     }
 
     // 14. Khởi tạo HTTP Telemetry Client (Backend cổng 5000)

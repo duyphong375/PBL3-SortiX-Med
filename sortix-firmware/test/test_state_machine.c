@@ -31,6 +31,18 @@ TEST_CASE("State Machine Normal Transitions", "[state_machine]")
     ret = state_machine_process_event(SYSTEM_EVENT_START);
     TEST_ASSERT_EQUAL(ESP_OK, ret);
     TEST_ASSERT_EQUAL(SYSTEM_STATE_RUNNING, state_machine_get_state());
+
+    // RUNNING -> IDLE qua SYSTEM_EVENT_STANDBY (Chế độ ngủ tự động)
+    ret = state_machine_process_event(SYSTEM_EVENT_STANDBY);
+    TEST_ASSERT_EQUAL(ESP_OK, ret);
+    TEST_ASSERT_EQUAL(SYSTEM_STATE_IDLE, state_machine_get_state());
+    TEST_ASSERT_FALSE(motor_control_is_running());
+
+    // IDLE -> RUNNING lại sau khi thức dậy
+    ret = state_machine_process_event(SYSTEM_EVENT_START);
+    TEST_ASSERT_EQUAL(ESP_OK, ret);
+    TEST_ASSERT_EQUAL(SYSTEM_STATE_RUNNING, state_machine_get_state());
+    TEST_ASSERT_TRUE(motor_control_is_running());
 }
 
 TEST_CASE("State Machine Jam and E-Stop Safety Logic", "[state_machine]")

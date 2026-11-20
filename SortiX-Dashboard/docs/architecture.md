@@ -10,9 +10,9 @@ Các sơ đồ và phân tích chi tiết trong tài liệu này được giữ 
 
 - Backend runtime là HTTP server dùng `node:http` trong `backend/src/server.ts`, không phải Express. `routes/`, `controllers/`, `middlewares/` và `services/` vẫn giữ cách phân lớp tương ứng.
 - Frontend có hai lớp phục vụ API: Next.js route handlers tại `frontend/src/app/api` và backend standalone tại cổng `5000`. Các route tương thích có thể xuất hiện ở cả hai lớp.
-- JSON là persistence đang chạy: `data/history.json`, `data/notifications.json`, `data/sync_state.json`, `data/users.json`. `ConfigModel` giữ config hiện tại trong memory. Các DDL trong `backend/database/migrations` và seed là artifact tham chiếu, không phải adapter database đang được gọi bởi runtime.
-- Script root `npm test` hiện chạy toàn bộ **26 file test suites** tự động qua lệnh `node --test tests/*.test.cjs`.
-- Tích hợp thêm kênh Telegram Bot Gateway hai chiều (`/api/telegram/webhook`) và trợ lý AI Copilot gọi trực tiếp mô hình `gemini-3.5-flash-lite` qua Google AI Studio API v1beta.
+- JSON là persistence đang chạy: `data/history.json`, `data/notifications.json`, `data/sync_state.json`, `data/telemetry_logs.json`, `data/users.json`. `ConfigModel` giữ config hiện tại trong memory. Các DDL trong `backend/database/migrations` và seed là artifact tham chiếu, không phải adapter database đang được gọi bởi runtime.
+- Script root `npm test` hiện chạy toàn bộ **27 file test suites** tự động (**182/182 unit tests PASS**) qua lệnh `node --test tests/*.test.cjs`.
+- Tích hợp trạm thị giác AI `SortiX-Dashboard/ai-server/` (FastAPI MJPEG stream `:8000` + YOLO11 3 lớp `cotton`, `scissor`, `syringe`), kênh Telegram Bot Gateway hai chiều (`/api/telegram/webhook`) và trợ lý AI Copilot gọi trực tiếp mô hình `gemini-3.1-flash-lite` (kèm fallback chain) qua Google AI Studio API v1beta.
 
 ## 📌 Mục Lục
 1. [Tổng Quan Kiến Trúc (High-Level Architecture)](#1-tổng-quan-kiến-trúc-high-level-architecture)
@@ -76,20 +76,20 @@ Hệ thống **SortiX-Med** được thiết kế theo mô hình kiến trúc ph
 ┌─────────────────────────────────────────────┐   ┌────────────────────────┐
 │            BACKEND (Server Layer)           │   │    MQTT BROKER / IoT   │
 │  - Routes: /api/auth, /api/safety, ...      │   │  (EMQX / Mosquitto)    │
-│  - Controllers: safetyController, user, ... │   │  Topics:               │
-│  - Services: safetyService, sseService, ... │   │  - sorter/01/telemetry │
-│  - Models: notificationModel, userModel     │   │  - sorter/01/vision    │
-│  - Security: Bcrypt, OTP, RBAC Middleware   │   │  - sorter/01/control   │
-│  - Migration references (SQL / NoSQL)       │   │  - sorter/01/estop     │
-│  - Email (SMTP) & Telegram Bot Integration  │   │  - conveyor/sensor/jam │
-│  - MQTT Watchdog (5s Debounce, Backoff)     │   │  - conveyor/storage/*  │
-│  - Device Heartbeat Watchdog (6s Timeout)   │   │  - conveyor/heartbeat  │
-│  - In-Memory Rate Limiting & Safe Bounding  │   │  - conveyor/telemetry/*│
-└──────────────────────┬──────────────────────┘   └───────────▲────────────┘
+│  - Controllers: safetyController, user, ... │   │  Topics:                    │
+│  - Services: safetyService, sseService, ... │   │  - sorter/sorter_01/telemetry│
+│  - Models: notificationModel, userModel     │   │  - sorter/sorter_01/vision  │
+│  - Security: Bcrypt, OTP, RBAC Middleware   │   │  - sorter/sorter_01/control │
+│  - Migration references (SQL / NoSQL)       │   │  - conveyor/safety/estop    │
+│  - Email (SMTP) & Telegram Bot Integration  │   │  - conveyor/sensor/jam      │
+│  - MQTT Watchdog (5s Debounce, Backoff)     │   │  - conveyor/storage/*       │
+│  - Device Heartbeat Watchdog (6s Timeout)   │   │  - conveyor/heartbeat       │
+│  - In-Memory Rate Limiting & Safe Bounding  │   │  - conveyor/telemetry/*     │
+└──────────────────────┬──────────────────────┘   └───────────▲─────────────────┘
                        │                                      │ Wi-Fi 6
-                       ▼                          ┌───────────┴────────────┐
-┌─────────────────────────────────────────────┐   │     ESP32-C5 Hardware  │
-│          PERSISTENCE & DATA STORE           │   │(Sensors S1-S3, Servo)  │
+                       ▼                          ┌───────────┴─────────────────┐
+┌─────────────────────────────────────────────┐   │     ESP32-C5 Hardware       │
+│          PERSISTENCE & DATA STORE           │   │(S1 GPIO3, Encoder, 2x Servo)│
 │  - data/users.json (User Accounts Store)    │   └────────────────────────┘
 │  - data/notifications.json (Safety Events)  │
 │  - JSON runtime store; DDL references       │
@@ -104,7 +104,7 @@ Hệ thống **SortiX-Med** được thiết kế theo mô hình kiến trúc ph
 Đóng vai trò là nguồn sự thật duy nhất (Single Source of Truth) giữa Client và Server:
 - **`types/index.ts`**:
   - `TelemetryData`: Vận tốc encoder, nhiệt độ vi điều khiển, trạng thái cảm biến S1–S3.
-  - `VisionDetection`: Nhãn dụng cụ y tế (`med_syringe`, `med_forceps`, `med_scissors`, `med_vial`), độ tin cậy confidence (0.0 – 1.0), timestamp.
+  - `VisionDetection`: Nhãn dụng cụ y tế (`med_syringe`, `med_scissors`, `med_cotton`; kèm alias tương thích ngược `med_forceps`, `med_vial`, `brand_a..d`), độ tin cậy confidence (0.0 – 1.0), timestamp.
   - `SorterConfig`: Cấu hình quy tắc phân loại dụng cụ vào 3 khay chứa, versioning và cơ chế áp dụng.
   - `ClassificationRecord`: Bản ghi phân loại lịch sử (id, product_id, brand, khay đích, khay thực tế, trạng thái).
   - `User`, `SafeUser`, `AuthCredentials`: Kiểu dữ liệu xác thực và quản lý tài khoản.
@@ -112,17 +112,16 @@ Hệ thống **SortiX-Med** được thiết kế theo mô hình kiến trúc ph
 - **`schemas/index.ts`**:
   - Toàn bộ validation schemas viết bằng **Zod**.
   - **Quy tắc `.passthrough()`**: Tất cả schema tương tác với thiết bị và sự kiện ngoại vi đều kích hoạt `.passthrough()` để firmware ESP32-C5 có thể bổ sung các trường chẩn đoán mới mà không gây crash ứng dụng.
-- **`constants/index.ts`**:
+- **`constants/index.ts` & `types/index.ts`**:
   - Danh sách MQTT Topics (`TELEMETRY`, `VISION`, `CONTROL`, `ESTOP`, `JAM`, `BIN_STATUS`, `TEMP`, `HEARTBEAT`).
-  - Danh mục nhận diện dụng cụ y tế:
-    - `med_syringe`: "Bơm kim tiêm / Dao mổ" (Vàng y tế `#EAB308`, Khay 1)
-    - `med_forceps`: "Kẹp phẫu thuật (Pean)" (Xanh dương y tế `#0284C7`, Khay 2)
-    - `med_scissors`: "Kéo phẫu thuật" (Xanh tím tiệt trùng `#6366F1`, Khay 2)
-    - `med_vial`: "Lọ thuốc / Ống nghiệm" (Xanh ngọc Emerald `#10B981`, Khay 3)
-  - Tên 3 Khay phân loại:
-    - Khay 1: "Thùng vật sắc nhọn lây nhiễm (Sharps Waste)"
-    - Khay 2: "Khay hấp tiệt trùng Autoclave (Surgical Instruments)"
-    - Khay 3: "Khay vật tư y tế & Phục hồi / Khay mặc định (General Supplies)"
+  - Danh mục nhận diện 3 nhóm dụng cụ y tế chính (`CATALOG_BRANDS`):
+    - `med_syringe`: "Kim tiêm" (Vàng y tế `#EAB308`, Khay 1)
+    - `med_scissors`: "Kéo" (Xanh dương y tế `#0284C7`, Khay 2)
+    - `med_cotton`: "Bông" (Xanh ngọc Emerald `#10B981`, Khay 3)
+  - Tên 3 Khay phân loại mặc định (`DEFAULT_BINS`):
+    - Khay 1: "Khay 1 - Kim tiêm (Sharps Waste)"
+    - Khay 2: "Khay 2 - Kéo y tế (Surgical Scissors)"
+    - Khay 3: "Khay 3 - Bông y tế (Medical Cotton)"
   - Định mức dung lượng mặc định (50 SP, dải điều chỉnh [5, 50]).
   - Ngưỡng Fail-safe an toàn sinh học: Độ tin cậy `< 60%` tự động đưa về Khay 3.
 
@@ -181,7 +180,7 @@ Xây dựng trên nền tảng Next.js 14 App Router với hiệu năng tối ư
 - **Mô hình 1-Codebase Hybrid Bridge**:
   - Đóng gói giao diện Next.js 14 thành ứng dụng Native Android qua **Capacitor 8**.
   - Không sử dụng chế độ tĩnh `output: 'export'` để bảo vệ các dynamic API route handlers và SSE stream `/api/events`.
-  - `webDir: "out"` là thư mục output mà Capacitor mong đợi khi sync; thư mục này được tạo bởi quy trình đóng gói và không phải source runtime cố định trong repository hiện tại.
+  - `webDir: "capacitor-shell"` là thư mục web shell tối thiểu trong `frontend/capacitor-shell/`; ứng dụng thực tế tải giao diện từ `server.url` (`CAPACITOR_SERVER_URL` hoặc URL triển khai trong `frontend/capacitor.config.ts`).
 - **Cấu hình Quyền & Mạng (`AndroidManifest.xml`)**:
   - Kích hoạt `android:usesCleartextTraffic="true"` cho phép giao tiếp HTTP nội bộ trong quá trình phát triển. URL cụ thể lấy từ `CAPACITOR_SERVER_URL` hoặc fallback trong `frontend/capacitor.config.ts`.
   - Cấp các quyền mạng cần thiết: `INTERNET`, `ACCESS_NETWORK_STATE`.
@@ -197,17 +196,17 @@ Xây dựng trên nền tảng Next.js 14 App Router với hiệu năng tối ư
 ### 2.5. IoT & Hardware Layer (ESP32-C5, Sensors & Actuators)
 - **Vi điều khiển ESP32-C5**: Lõi RISC-V 240MHz, hỗ trợ Wi-Fi 6 tần số 2.4GHz & 5GHz, đảm bảo độ trễ thấp và tính ổn định cao trong môi trường phòng mổ / y tế.
 - **Cảm biến đầu vào**:
-  - Cảm biến quang học S1 (GPIO0): Phát hiện dụng cụ bắt đầu đi vào băng tải, kích hoạt chốt xung Encoder và gọi camera AI.
-  - Bộ mã hóa Encoder 2 pha New PCNT: Kênh A (GPIO1) & Kênh B (GPIO4) đo xung phần cứng chính xác (~31.5 counts/mm) để tracking vị trí phôi theo thời gian thực và phát hiện kẹt cơ khí (Encoder Stall > 1.8s).
+  - Cảm biến quang học S1 (GPIO3): Phát hiện dụng cụ bắt đầu đi vào băng tải, kích hoạt chốt xung Encoder và dừng 2.0s tại buồng quét camera (`100mm`).
+  - Bộ mã hóa Encoder 2 pha New PCNT: Kênh A (GPIO1) & Kênh B (GPIO4) đo xung phần cứng chính xác (`63.0 counts/mm` theo cấu hình `CALIB_ENCODER_COUNTS_PER_MM` trong `app_config.h`) để tracking vị trí phôi theo thời gian thực và phát hiện kẹt cơ khí (Encoder Stall > 1.8s).
   - Cảm biến quang trở LDR DO (GPIO5): Giám sát cường độ sáng buồng quét AI.
   - Cảm biến nhiệt độ nội vi ESP32-C5: Tích hợp sẵn trên vi điều khiển ESP32-C5 (`driver/temperature_sensor.h`), giám sát nhiệt độ vi điều khiển (>75°C kích hoạt cảnh báo).
-  - Nút nhấn Start vật lý (GPIO23): Kèm mạch lọc RC chống rung phím (debounce 20ms).
+  - Nút nhấn Start/Stop vật lý (GPIO23): Lấy mẫu phần mềm chu kỳ 10ms, debounce 30ms + cooldown 300ms.
 - **Cơ cấu chấp hành (Actuators)**:
   - Động cơ DC kéo băng tải điều khiển qua mạch cầu H L298N: IN1 (GPIO8) và IN2 (GPIO9).
-  - 2 Cơ cấu Servo gạt phôi: Servo 1 (PWM GPIO6) cho Khay 1; Servo 2 (PWM GPIO7) cho Khay 2 điều khiển qua LEDC PWM non-blocking.
-  - Máng trượt trọng lực cuối băng tải: Cho Khay 3 (Lọ thuốc / fail-safe không cần servo).
+  - 2 Cơ cấu Servo gạt phôi: Servo 1 (PWM GPIO6 tại `250mm`) cho Khay 1; Servo 2 (PWM GPIO7 tại `400mm`) cho Khay 2 điều khiển qua LEDC PWM non-blocking 360°.
+  - Máng trượt trọng lực cuối băng tải (`650mm`): Cho Khay 3 (Bông y tế / fail-safe không cần servo).
   - LED chỉ báo trạng thái (GPIO10): Xanh lá chớp theo FSM (1Hz IDLE, ON RUNNING, 5Hz JAMMED).
-  - Nút dừng khẩn cấp vật lý E-Stop: Mạch ngắt cứng nguồn 12V trước tiếp điểm relay/driver bảo vệ toàn diện.
+  - Nút dừng khẩn cấp vật lý E-Stop: Mạch ngắt cứng nguồn 12V trước tiếp điểm relay/driver bảo vệ toàn diện (cùng E-Stop phần mềm qua MQTT `conveyor/safety/estop`).
 
 ---
 
@@ -216,33 +215,34 @@ Xây dựng trên nền tảng Next.js 14 App Router với hiệu năng tối ư
 ### 3.1. Sơ Đồ Tuần Tự: Luồng Phân Loại Dụng Cụ Y Tế Thực Tế (End-to-End Sorting Pipeline)
 
 > [!NOTE]
-> **Trạng thái Dữ liệu Trạm AI Hiện Tại:** Mô hình AI trong thư mục `PBL.v1i.yolov11` hiện đang dùng **tập dữ liệu thử nghiệm nội bộ (Pilot / Sandbox Trial Dataset)** với 2 nhãn `HH` và `T` để phục vụ việc tập dượt quy trình train và kiểm chứng đường truyền MQTT với ESP32-C5 / Dashboard. Bộ dữ liệu mẫu vật y tế chính thức đầy đủ 4 nhóm sẽ được gán nhãn và tích hợp khi hoàn tất thu thập mẫu vật thực tế.
+> **Trạng thái Dữ liệu Trạm AI Hiện Tại:** Mô hình AI trong thư mục `SortiX-Dashboard/ai-server/` đã được huấn luyện với bộ dữ liệu **1.205 ảnh 3 lớp chính thức** (`cotton`, `scissor`, `syringe`, 80 epochs, trọng số `weights/best.pt`), phục vụ nhận diện trực tiếp từ iPhone DroidCam / Webcam và phát luồng MJPEG tại `http://localhost:8000/video_feed` song song publish kết quả lên MQTT `sorter/sorter_01/vision`.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Belt as Băng Tải & Cảm Biến S1
-    participant Cam as Camera & Vision AI (YOLO11)
+    participant Cam as Camera & Vision AI (YOLO11 :8000)
     participant ESP as Vi Điều Khiển ESP32-C5
     participant Broker as MQTT Broker
     participant Servo as Cơ Cấu Gạt Servo
     participant Server as node:http Backend
     participant UI as Dashboard Web/Mobile
 
-    Belt->>ESP: Dụng cụ kích hoạt S1 (GPIO0) - Chốt xung Encoder
-    Cam->>Cam: Chụp ảnh & Chạy mô hình YOLO11 nhận diện dụng cụ
-    Cam->>Broker: Publish: sorter/sorter_01/vision { brand: "med_syringe", confidence: 0.96 }
+    Belt->>ESP: Dụng cụ kích hoạt S1 (GPIO3) - Chốt xung Encoder
+    ESP->>Belt: Dừng 2.0s tại buồng quét (100mm) để camera lấy nét
+    Cam->>Cam: Chụp ảnh & Chạy mô hình YOLO11 (cotton/scissor/syringe)
+    Cam->>Broker: Publish: sorter/sorter_01/vision { brand_id: "med_syringe", confidence: 0.96 }
     Broker->>ESP: Forward vision payload (Ghép cặp FIFO Queue)
     Broker->>UI: WSS Telemetry update (Vẽ dụng cụ trên Canvas 60fps)
     
     ESP->>ESP: Tra cứu rules: med_syringe -> Bin 1 (Sharps Waste)
-    ESP->>Belt: Encoder PCNT đếm xung tracking đến cự ly 200mm (Servo 1)
+    ESP->>Belt: Encoder PCNT đếm xung tracking đến cự ly 250mm (Servo 1) / 400mm (Servo 2)
     
-    ESP->>Servo: Kích hoạt Servo #1 (GPIO6) gạt phôi non-blocking
-    Servo->>Servo: Gạt dụng cụ sắc nhọn vào Khay 1 an toàn
+    ESP->>Servo: Kích hoạt Servo #1 (GPIO6) hoặc Servo #2 (GPIO7) non-blocking
+    Servo->>Servo: Gạt dụng cụ vào Khay 1 / Khay 2 (hoặc đi thẳng 650mm vào Khay 3)
     
-    ESP->>Broker: Publish: sorter/sorter_01/telemetry { bin_1_count: +1, speed: 1.2 }
-    Broker->>UI: Cập nhật số đếm Khay 1 & Phát âm thanh phân loại
+    ESP->>Broker: Publish: sorter/sorter_01/telemetry & sorter/sorter_01/classification
+    Broker->>UI: Cập nhật số đếm Khay & Phát âm thanh phân loại
     
     UI->>Server: POST /api/history (Ghi bản ghi phân loại)
     Server->>Server: Lưu vào HistoryModel (Bounded Buffer 1000 items)
@@ -264,7 +264,7 @@ sequenceDiagram
     participant Alerts as Telegram Bot & SMTP
     participant Hardware as Relay Động Cơ Băng Tải
 
-    Op->>UI: Bấm nút E-Stop (hoặc ấn nút vật lý IO10)
+    Op->>UI: Bấm nút E-Stop (hoặc ngắt E-Stop phần cứng)
     UI->>Hardware: Ngắt relay động cơ lập tức (isRunning = false)
     UI->>Server: POST /api/safety/estop { station_id: "STATION_01", triggered_by: "Operator" }
     
@@ -540,24 +540,36 @@ function saveUsersToDisk(users: UserAccount[]): void {
 
 ## 6. Kiến Trúc Kiểm Thử & Cổng Chất Lượng (Quality Gates & Testing)
 
-Dự án áp dụng kiểm định tự động theo script `npm test`. Script hiện nối 16 test file; bảng dưới giữ mô tả chức năng của các suite và bổ sung kiểm thử đồng bộ đa thiết bị. Không dùng một tổng số test cố định trong tài liệu vì các test file bổ sung có thể tồn tại ngoài script root:
+Dự án áp dụng kiểm định tự động theo script `npm test` (`node --test tests/*.test.cjs`). Hiện tại thư mục `tests/` gồm **27 file test suites** với tổng cộng **182 unit tests PASS 100%**:
 
-```
+```text
 tests/
-├── api_schemas.test.cjs               # Zod validation & passthrough
-├── bin_full.test.cjs                  # Sự cố đầy khay & cảnh báo
-├── bin_sliders_sync.test.cjs          # Đồng bộ dung lượng khay (5-50 SP)
-├── daily_report_sync.test.cjs         # Chuẩn hóa Báo Cáo 1 Ngày Làm Việc
-├── device_offline.test.cjs            # Watchdog mất kết nối ESP32 (6s)
-├── estop_safety.test.cjs              # Dừng khẩn cấp E-Stop & mở khóa
-├── history.test.cjs                   # Quản lý bộ nhớ đệm lịch sử
-├── jam_detection.test.cjs             # Sự cố kẹt phôi cảm biến quang
-├── jam_simulation_audio.test.cjs      # Âm thanh còi hú & UI Guard
-├── mqtt_disconnected.test.cjs         # Watchdog mất kết nối MQTT (5s)
-├── shift_summary.test.cjs             # Tổng kết ca & xuất báo cáo CSV
-├── simulation_mode_guard.test.cjs     # Cô lập chế độ Mô phỏng & Thực tế
+├── anti_ai_industrial_scada_ui.test.cjs          # Chuẩn SCADA ISA-101 / IEC-62443 & hotkeys
+├── api_schemas.test.cjs                          # Zod validation & passthrough
+├── auto_stop_on_all_items_in_trays.test.cjs      # Tự động chạy/dừng khi phôi vào khay
+├── bin_full.test.cjs                             # Sự cố đầy khay & cảnh báo
+├── bin_sliders_sync.test.cjs                     # Đồng bộ dung lượng khay (5-50 SP)
+├── conveyor_3d_start_pause_sync.test.cjs         # Đồng bộ băng tải 3D, Start/Pause & TelemetrySchema
+├── cross_device_sync.test.cjs                    # Đồng bộ trạng thái giữa các client qua API/SSE
+├── daily_production_cumulative.test.cjs          # Cộng dồn sản lượng theo ngày
+├── daily_report_sync.test.cjs                    # Chuẩn hóa Báo Cáo 1 Ngày Làm Việc
+├── device_offline.test.cjs                       # Watchdog mất kết nối ESP32 (6s)
+├── estop_safety.test.cjs                         # Dừng khẩn cấp E-Stop & mở khóa
+├── four_user_requests_upgrade.test.cjs           # Bộ 4 tính năng nâng cấp trải nghiệm vận hành
+├── ghost_item_prevention.test.cjs                # Chống tạo phôi ma trên băng tải
+├── history.test.cjs                              # Quản lý bộ nhớ đệm lịch sử
+├── http_telemetry_history.test.cjs               # Lưu trữ & truy vấn HTTP POST telemetry
+├── jam_detection.test.cjs                        # Sự cố kẹt phôi cảm biến quang
+├── jam_simulation_audio.test.cjs                 # Âm thanh còi hú & UI Guard
+├── mqtt_disconnected.test.cjs                    # Watchdog mất kết nối MQTT (5s)
+├── mute_siren_feature.test.cjs                   # Tắt còi báo động tạm thời
+├── new_day_report_tele_email.test.cjs            # Báo cáo ngày mới Telegram/Email
+├── security_audit_remediation.test.cjs           # Kiểm thử bảo mật, ESTOP ACK & config validation
+├── shift_summary.test.cjs                        # Tổng kết ca & xuất báo cáo CSV
+├── simulation_mode_guard.test.cjs                # Cô lập chế độ Mô phỏng & Thực tế
+├── telegram_copilot_2way_and_screenfit.test.cjs  # Telegram Bot 2 chiều & SCADA Screen-Fit
 ├── temperature_gauge_simulation_vs_real.test.cjs # Đồng hồ nhiệt độ 2 chế độ
-├── temperature_warning.test.cjs       # Cảnh báo quá nhiệt động cơ/CPU
-├── users.test.cjs                     # Bảo mật tài khoản, Bcrypt & RBAC
-└── cross_device_sync.test.cjs         # Đồng bộ trạng thái giữa các client qua API/SSE
+├── temperature_warning.test.cjs                  # Cảnh báo quá nhiệt động cơ/CPU
+└── users.test.cjs                                # Bảo mật tài khoản, Bcrypt & RBAC
 ```
+*(Lệnh `npm test` thực thi tự động toàn bộ 27 file `tests/*.test.cjs`).*

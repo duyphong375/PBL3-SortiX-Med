@@ -8,10 +8,12 @@
 
 extern bool sorting_engine_has_unresolved_items(void);
 extern esp_err_t sorting_engine_clear_unresolved(void);
+extern void sorting_engine_reset(void);
 
 static const char *TAG = "STATE_MACHINE";
 
 static system_state_t s_state = SYSTEM_STATE_IDLE;
+static bool s_mcu_awake = false;
 static SemaphoreHandle_t s_state_mutex = NULL;
 static state_change_cb_t s_cb = NULL;
 static void *s_cb_user_ctx = NULL;
@@ -37,12 +39,14 @@ esp_err_t state_machine_init(void)
 
     xSemaphoreTake(s_state_mutex, portMAX_DELAY);
     s_state = SYSTEM_STATE_IDLE; // Luôn khởi động mặc định ở trạng thái an toàn IDLE
+    s_mcu_awake = false;         // Khi mới cắm nguồn: MCU ở trạng thái ngủ (chờ nút nhấn GPIO23)
     esp_err_t motor_ret = motor_control_stop();
-    led_indicator_set_mode(LED_MODE_IDLE);
+    servo_emergency_stop(); // Tắt toàn bộ xung PWM servo
+    led_indicator_set_mode(LED_MODE_IDLE); // Tắt đèn LED và chưa kích hoạt LDR
     xSemaphoreGive(s_state_mutex);
     if (motor_ret != ESP_OK) return motor_ret;
 
-    ESP_LOGI(TAG, "State Machine initialized in safe state: IDLE");
+    ESP_LOGI(TAG, "State Machine initialized in safe sleep state: IDLE (mcu_awake=false)");
     return ESP_OK;
 }
 
@@ -65,15 +69,17 @@ esp_err_t state_machine_process_event(system_event_t event)
             } else if (old_state == SYSTEM_STATE_JAMMED) {
                 ESP_LOGW(TAG, "START rejected: System is JAMMED! Release/clear jam first.");
                 ret = ESP_ERR_INVALID_STATE;
-            } else if (sorting_engine_has_unresolved_items()) {
+            } else if (sorting_engine_has_unresolved_items() && old_state == SYSTEM_STATE_STOPPED && !s_mcu_awake) {
                 ESP_LOGW(TAG, "START rejected: Unresolved held/timeout items on conveyor! Clear belt before restarting.");
                 ret = ESP_ERR_INVALID_STATE;
             } else if (old_state == SYSTEM_STATE_IDLE || old_state == SYSTEM_STATE_STOPPED) {
+                sorting_engine_reset();
                 ret = motor_control_forward();
                 if (ret == ESP_OK) {
+                    s_mcu_awake = true;
                     new_state = SYSTEM_STATE_RUNNING;
                     led_indicator_set_mode(LED_MODE_RUNNING);
-                    ESP_LOGI(TAG, "Transition [%s] -> [RUNNING]: Motor started",
+                    ESP_LOGI(TAG, "Transition [%s] -> [RUNNING]: Motor started (mcu_awake=true)",
                              state_machine_get_state_str(old_state));
                 }
             } else {
@@ -89,20 +95,42 @@ esp_err_t state_machine_process_event(system_event_t event)
                 ret = motor_control_stop();
                 if (ret == ESP_OK) {
                     esp_err_t servo_ret = servo_emergency_stop();
-                    if (old_state == SYSTEM_STATE_RUNNING) {
+                    if (!sorting_engine_has_unresolved_items()) {
+                        sorting_engine_reset();
+                    }
+                    s_mcu_awake = false; // Tắt toàn bộ hệ thống về trạng thái ngủ (khóa S1, LDR, Servo, Motor)
+                    if (old_state == SYSTEM_STATE_RUNNING || old_state == SYSTEM_STATE_IDLE) {
                         new_state = SYSTEM_STATE_STOPPED;
-                        ESP_LOGI(TAG, "Transition [RUNNING] -> [STOPPED]: Motor stopped");
+                        ESP_LOGI(TAG, "Transition [%s] -> [STOPPED]: All actuators & sensors OFF (mcu_awake=false)",
+                                 state_machine_get_state_str(old_state));
                     }
                     led_indicator_set_mode(LED_MODE_IDLE);
                     if (servo_ret != ESP_OK) ret = servo_ret;
                 }
             }
-            if (old_state != SYSTEM_STATE_RUNNING && ret == ESP_OK) {
-                ESP_LOGD(TAG, "STOP ignored: Not currently RUNNING");
+            break;
+
+        case SYSTEM_EVENT_STANDBY:
+            if (old_state == SYSTEM_STATE_RUNNING) {
+                ret = motor_control_stop();
+                if (ret == ESP_OK) {
+                    esp_err_t servo_ret = servo_emergency_stop();
+                    sorting_engine_reset();
+                    // LƯU Ý QUAN TRỌNG: Giữ s_mcu_awake = true!
+                    // Chỉ tạm dừng băng tải sau 15s không có vật cản; cảm biến S1 và LDR vẫn thức
+                    // để ngay khi có vật cản mới đi vào S1 thì băng tải tự động chạy lại ngay!
+                    new_state = SYSTEM_STATE_IDLE;
+                    led_indicator_set_mode(LED_MODE_RUNNING);
+                    ESP_LOGI(TAG, "Transition [RUNNING] -> [IDLE]: 15s Auto Standby (Conveyor paused, waiting for next obstacle at S1)");
+                    if (servo_ret != ESP_OK) ret = servo_ret;
+                }
+            } else {
+                ESP_LOGD(TAG, "STANDBY ignored: Not currently RUNNING");
             }
             break;
 
         case SYSTEM_EVENT_JAM_DETECTED:
+            s_mcu_awake = false;
             new_state = SYSTEM_STATE_JAMMED;
             ret = motor_control_brake(); // Kích hoạt hãm động năng khi phát hiện kẹt cơ khí
             {
@@ -115,6 +143,7 @@ esp_err_t state_machine_process_event(system_event_t event)
             break;
 
         case SYSTEM_EVENT_ESTOP:
+            s_mcu_awake = false;
             new_state = SYSTEM_STATE_ESTOP;
             ret = motor_control_brake(); // Kích hoạt hãm động năng khi dừng khẩn cấp
             {
@@ -170,6 +199,15 @@ system_state_t state_machine_get_state(void)
     system_state_t state = s_state;
     xSemaphoreGive(s_state_mutex);
     return state;
+}
+
+bool state_machine_is_awake(void)
+{
+    if (s_state_mutex == NULL) return s_mcu_awake;
+    xSemaphoreTake(s_state_mutex, portMAX_DELAY);
+    bool awake = s_mcu_awake;
+    xSemaphoreGive(s_state_mutex);
+    return awake;
 }
 
 void state_machine_register_callback(state_change_cb_t cb, void *user_ctx)

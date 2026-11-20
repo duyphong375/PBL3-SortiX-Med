@@ -7,9 +7,10 @@ Tài liệu này cung cấp hướng dẫn đầy đủ từ cơ bản đến n�
 ## 📌 PHẦN 1: Cấu Trúc Nhánh Của Dự Án Hiện Tại
 
 - **Repository:** `https://github.com/duyphong375/PBL3-SortiX-Med.git`
-- **`main`:** Nhánh chính chứa toàn bộ mã nguồn mới nhất (gồm cả Firmware ESP32, Next.js Dashboard và Dataset YOLO).
+- **`main`:** Nhánh chính chứa toàn bộ mã nguồn mới nhất (gồm `sortix-firmware/`, `SortiX-Dashboard/` cùng `ai-server/` & Dataset YOLO11 3 lớp, và `Khoidong/`).
 - **`backup-v1`:** Nhánh sao lưu đóng băng trạng thái phiên bản cũ trước đợt cập nhật lớn (commit `700f779`).
 - **`backup/stable-pre-ui-upgrade`:** Nhánh sao lưu đợt nâng cấp giao diện trước đó.
+- **Tag `v1.0.0-stable-backup`:** Thẻ đánh dấu mốc ổn định đã lưu trên GitHub.
 
 ---
 

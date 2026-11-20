@@ -21,6 +21,7 @@ export interface UseConveyorPhysicsProps {
   isJammed?: boolean;
   isBinFull?: boolean;
   onBinFullDetected?: (binIdx: 1 | 2 | 3) => void;
+  lastUserCommandTimeRef?: React.MutableRefObject<number>;
 }
 
 export function useConveyorPhysics({
@@ -38,6 +39,7 @@ export function useConveyorPhysics({
   isJammed = false,
   isBinFull = false,
   onBinFullDetected,
+  lastUserCommandTimeRef: externalLastUserCommandTimeRef,
 }: UseConveyorPhysicsProps) {
   const onItemSortedRef = useRef(onItemSorted);
 
@@ -54,7 +56,7 @@ export function useConveyorPhysics({
   onBinFullDetectedRef.current = onBinFullDetected;
   const sensor2BlockedSinceRef = useRef<number | null>(null);
 
-  const [isRunning, setIsRunning] = useState(true);
+  const [isRunning, setIsRunning] = useState(false);
   const [conveyorSpeed, setConveyorSpeed] = useState(65);
   const [arm1Active, setArm1Active] = useState(false);
   const [arm2Active, setArm2Active] = useState(false);
@@ -78,6 +80,9 @@ export function useConveyorPhysics({
   const lastRenderTimeRef = useRef<number>(0);
   const hadActiveItemsRef = useRef<boolean>(false);
   const prevBeltMovingRef = useRef<boolean>(false);
+  const isUserPausedRef = useRef<boolean>(false);
+  const internalLastUserCommandTimeRef = useRef<number>(0);
+  const lastUserCommandTimeRef = externalLastUserCommandTimeRef ?? internalLastUserCommandTimeRef;
 
   // BUG-03: Helper to schedule tracked timeouts (auto-cleaned on unmount)
   const scheduleTimeout = useCallback((fn: () => void, ms: number) => {
@@ -114,6 +119,7 @@ export function useConveyorPhysics({
         sorted: false,
         isSim: true,
       };
+      isUserPausedRef.current = false;
       setVisualItems((prev) => [...prev, newItem]);
       hadActiveItemsRef.current = true;
       if (!isRunningRef.current) {
@@ -131,18 +137,39 @@ export function useConveyorPhysics({
 
   // Controls
   const handleToggleRun = useCallback(() => {
+    const isSim = isSimulationRef.current;
+    const currentActualRunning = isRunningRef.current;
+    const nextState = !currentActualRunning;
+
+    // Không cho phép khởi động khi đang khóa an toàn (E-Stop, Kẹt phôi, Đầy khay)
+    if (
+      nextState &&
+      (telemetryRef.current.estop_pressed || isJammedRef.current || isBinFullRef.current)
+    ) {
+      return;
+    }
+
     industrialAudio.playClick();
-    const nextState = !isRunningRef.current;
-    if (nextState && visualItemsRef.current.length > 0) {
+    lastUserCommandTimeRef.current = Date.now();
+    isRunningRef.current = nextState;
+    isUserPausedRef.current = !nextState;
+    const hasActive = visualItemsRef.current.some(
+      (it) => !it.sorted && !it.deflected && (it.progress ?? 0) < 96
+    );
+    if (nextState && hasActive) {
       hadActiveItemsRef.current = true;
     }
     setIsRunning(nextState);
-    setTelemetry((prev) => ({ ...prev, conveyor_running: nextState }));
+    setTelemetry((prev) => ({
+      ...prev,
+      conveyor_running: isSim ? (nextState && hasActive) : nextState,
+    }));
     onPublishCommand?.(nextState ? "START" : "STOP");
     void updateSyncState({ isRunning: nextState });
-  }, [onPublishCommand, setTelemetry]);
+  }, [onPublishCommand, setTelemetry, telemetryRef, isSimulationRef, lastUserCommandTimeRef]);
 
   const handleEmergencyStop = useCallback(() => {
+    lastUserCommandTimeRef.current = Date.now();
     if (telemetryRef.current.estop_pressed) {
       industrialAudio.silenceAll();
       industrialAudio.playClick();
@@ -153,6 +180,7 @@ export function useConveyorPhysics({
       onPublishCommand?.("ESTOP_RELEASE");
     } else {
       industrialAudio.playEmergencyAlarm();
+      isRunningRef.current = false;
       setIsRunning(false);
       setTelemetry((prev) => ({
         ...prev,
@@ -160,8 +188,9 @@ export function useConveyorPhysics({
         conveyor_running: false,
       }));
       onPublishCommand?.("ESTOP");
+      void updateSyncState({ isRunning: false });
     }
-  }, [onPublishCommand, setTelemetry, telemetryRef]);
+  }, [onPublishCommand, setTelemetry, telemetryRef, lastUserCommandTimeRef]);
 
   const handleSpeedChange = useCallback(
     (newSpeed: number) => {
@@ -199,39 +228,48 @@ export function useConveyorPhysics({
         (it) => !it.sorted && !it.deflected && (it.progress ?? 0) < 96
       );
 
-      // TỰ ĐỘNG KÍCH HOẠT LẠI KHI CÓ PHÔI MẪU ĐẶT LÊN BĂNG TẢI
-      if (hasActiveItems && !isRunningRef.current && !telemetryRef.current.estop_pressed) {
+      // TỰ ĐỘNG KÍCH HOẠT LẠI KHI CÓ PHÔI MẪU ĐẶT LÊN BĂNG TẢI (chỉ trong chế độ mô phỏng)
+      if (
+        isSimulationRef.current &&
+        hasActiveItems &&
+        !isRunningRef.current &&
+        !telemetryRef.current.estop_pressed &&
+        !isJammedRef.current &&
+        !isBinFullRef.current &&
+        !isUserPausedRef.current
+      ) {
         setIsRunning(true);
         isRunningRef.current = true;
         void updateSyncState({ isRunning: true });
       }
 
-      // Yêu cầu: Có mẫu vật thì băng chuyền mới chạy (ở cả User & Admin, cả Mô phỏng và Thực tế)
+      // Đồng bộ trạng thái chạy 2 chiều giữa phần cứng ESP32 và Web
+      // Chống đè trạng thái (Debounce 2500ms): Sau khi người dùng ấn nút trên Web, chờ thiết bị phản hồi
       const isSimulation = isSimulationRef.current;
+      const isRecentUserCmd = Date.now() - lastUserCommandTimeRef.current < 2500;
+      if (!isSimulation && !isRecentUserCmd && typeof telemetryRef.current.conveyor_running === "boolean") {
+        if (telemetryRef.current.conveyor_running !== isRunningRef.current) {
+          isRunningRef.current = telemetryRef.current.conveyor_running;
+          setIsRunning(telemetryRef.current.conveyor_running);
+        }
+      }
+
+      // ĐỒNG BỘ BĂNG TẢI THỰC TẾ & TRÊN WEB: Lúc chạy thì chạy chung, lúc dừng thì dừng chung
+      const isActualRunning = isRunningRef.current;
+
       const isBeltMoving =
-        isRunningRef.current &&
-        (isSimulation ? hasActiveItems : hasActiveItems) &&
+        isActualRunning &&
+        (isSimulation ? hasActiveItems : true) &&
         !telemetryRef.current.estop_pressed &&
         !isJammedRef.current &&
         !isBinFullRef.current;
 
-      // Đồng bộ trạng thái chuyển động của băng tải vào telemetry
-      if (telemetryRef.current.conveyor_running !== isBeltMoving) {
+      // Ở chế độ Mô phỏng: đồng bộ trạng thái chuyển động của băng tải vào telemetry
+      if (isSimulation && telemetryRef.current.conveyor_running !== isBeltMoving) {
         setTelemetry((prev) => (prev.conveyor_running === isBeltMoving ? prev : { ...prev, conveyor_running: isBeltMoving }));
       }
 
-      // TỰ ĐỘNG CHẠY KHI ĐẶT THÊM MẪU VẬT LÊN - TỰ ĐỘNG DỪNG KHI TOÀN BỘ PHÔI VÀO KHAY HẾT
-      if (prevBeltMovingRef.current !== isBeltMoving) {
-        if (isBeltMoving) {
-          // BĂNG TẢI TỰ ĐỘNG CHẠY TIẾP KHI ĐẶT THÊM MẪU VẬT LÊN
-          onPublishCommandRef.current?.("START");
-          industrialAudio.playClick();
-        } else if (!telemetryRef.current.estop_pressed && !isJammedRef.current && !isBinFullRef.current) {
-          // BĂNG TẢI TỰ ĐỘNG DỪNG KHI TOÀN BỘ PHÔI MẪU ĐÃ VÀO KHAY HẾT
-          onPublishCommandRef.current?.("STOP");
-        }
-        prevBeltMovingRef.current = isBeltMoving;
-      }
+      prevBeltMovingRef.current = isBeltMoving;
 
       // Kiểm tra phôi bị tắc nghẽn liên tục tại Cảm biến #02 / Zone A (Chỉ chạy ở chế độ Mô phỏng ảo)
       // Ở chế độ Thực tế: Tín hiệu kẹt phôi hoàn toàn phụ thuộc vào cảm biến quang học vật lý qua MQTT
@@ -452,7 +490,7 @@ export function useConveyorPhysics({
       timeoutIdsRef.current.forEach((id) => clearTimeout(id));
       timeoutIdsRef.current = [];
     };
-  }, [scheduleTimeout, setTelemetry, telemetryRef, isSimulationRef, realBinCountsRef, setVisualItems, simBinCountsRef, binCapacitiesRef]);
+  }, [scheduleTimeout, setTelemetry, telemetryRef, isSimulationRef, realBinCountsRef, setVisualItems, simBinCountsRef, binCapacitiesRef, lastUserCommandTimeRef]);
 
   // Kích hoạt giả lập kẹt phôi thủ công (Demo & Test - Chỉ cho phép ở Chế độ Mô phỏng)
   const triggerJamDemo = useCallback(

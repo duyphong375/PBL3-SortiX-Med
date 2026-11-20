@@ -139,7 +139,7 @@ Dựa trên dữ liệu cảm biến thực tế, hãy đưa ra kết luận: "H
     id: "cssd",
     title: "2. Báo Cáo 1 Ngày Làm Việc - Khoa Kiểm Soát Nhiễm Khuẩn (CSSD)",
     shortTitle: "Ca trực & CSSD",
-    subtitle: "Tổng số lượng dụng cụ, phân loại kéo, kẹp panh, cán dao mổ, độ tin cậy AI Vision",
+    subtitle: "Tổng số lượng dụng cụ, phân loại kim tiêm, kéo, bông, độ tin cậy AI Vision",
     categoryTag: "Khoa CSSD",
     categoryColor: "cyan",
     icon: Stethoscope,
@@ -148,15 +148,15 @@ Dựa trên dữ liệu cảm biến thực tế, hãy đưa ra kết luận: "H
         id: "cssd_full",
         title: "[BÁO CÁO 1 NGÀY LÀM VIỆC - KHOA KIỂM SOÁT NHIỄM KHUẨN]",
         badge: "Báo cáo đầy đủ",
-        summary: "Báo cáo 4 phần: tổng dụng cụ, bóc tách 3 nhóm phẫu thuật, độ tin cậy AI Vision và tỷ lệ chính xác chuẩn bị phòng mổ.",
+        summary: "Báo cáo 4 phần: tổng dụng cụ, bóc tách 3 nhóm (kim tiêm, kéo, bông), độ tin cậy AI Vision và tỷ lệ chính xác.",
         prompt: `[BÁO CÁO 1 NGÀY LÀM VIỆC - KHOA KIỂM SOÁT NHIỄM KHUẨN]
 Tôi là Điều dưỡng trưởng Khoa Khử trùng & Chuẩn bị phòng mổ (CSSD). Hãy kiểm tra toàn bộ lịch sử phân loại từ hệ thống SortiX-Med hôm nay và tổng hợp báo cáo chi tiết:
 
-1. Tổng số lượng dụng cụ phẫu thuật đã đi qua hệ thống phân loại là bao nhiêu?
-2. Hãy bóc tách và phân loại chi tiết số lượng thực tế cho từng nhóm dụng cụ:
-   - Kéo phẫu thuật (Surgical Scissors)
-   - Kẹp panh cầm máu (Hemostatic Forceps)
-   - Cán dao mổ (Scalpel Handles)
+1. Tổng số lượng dụng cụ y tế đã đi qua hệ thống phân loại là bao nhiêu?
+2. Hãy bóc tách và phân loại chi tiết số lượng thực tế cho từng nhóm:
+   - Kim tiêm (Syringe)
+   - Kéo (Scissors)
+   - Bông (Cotton)
    - Các vật thể lỗi / không xác định (nếu có)
 3. Tính toán độ tin cậy nhận diện (Confidence Score) trung bình của mô hình Camera AI Vision trên các lượt phân loại gần nhất.
 4. Tỷ lệ phân loại chính xác đạt bao nhiêu % so với yêu cầu chuẩn bị dụng cụ phòng mổ?
@@ -167,15 +167,15 @@ Hãy trình bày số liệu dưới dạng bảng tóm tắt ngắn gọn và d
         id: "cssd_total",
         title: "Tổng số lượng dụng cụ đã qua phân loại hôm nay",
         badge: "Tổng sản lượng",
-        summary: "Xem tổng số lượng dụng cụ phẫu thuật đã đi qua hệ thống phân loại SortiX-Med trong ca trực hôm nay.",
-        prompt: "Tổng số lượng dụng cụ phẫu thuật đã đi qua hệ thống phân loại SortiX-Med hôm nay là bao nhiêu sản phẩm?",
+        summary: "Xem tổng số lượng dụng cụ y tế đã đi qua hệ thống phân loại SortiX-Med trong ca trực hôm nay.",
+        prompt: "Tổng số lượng dụng cụ y tế đã đi qua hệ thống phân loại SortiX-Med hôm nay là bao nhiêu sản phẩm?",
       },
       {
         id: "cssd_breakdown",
-        title: "Bóc tách chi tiết: Kéo, Kẹp panh, Cán dao mổ",
+        title: "Bóc tách chi tiết: Kim tiêm, Kéo, Bông",
         badge: "Bóc tách nhóm",
-        summary: "Thống kê số lượng thực tế cho từng nhóm dụng cụ: Kéo phẫu thuật, Kẹp panh cầm máu và Cán dao mổ.",
-        prompt: "Hãy bóc tách và phân loại chi tiết số lượng thực tế cho từng nhóm dụng cụ: Kéo phẫu thuật, Kẹp panh cầm máu và Cán dao mổ.",
+        summary: "Thống kê số lượng thực tế cho từng nhóm: Kim tiêm, Kéo và Bông.",
+        prompt: "Hãy bóc tách và phân loại chi tiết số lượng thực tế cho từng nhóm: Kim tiêm, Kéo và Bông.",
       },
       {
         id: "cssd_confidence",
@@ -211,19 +211,19 @@ Hãy trình bày số liệu dưới dạng bảng tóm tắt ngắn gọn và d
 Tôi là Kỹ thuật viên phụ trách khâu thu gom dụng cụ sau phân loại. Hãy đọc cấu hình và dữ liệu thời gian thực của 3 khay chứa trên băng chuyền:
 
 1. Liệt kê số lượng hiện tại (current_count) và sức chứa định mức tối đa (max_capacity) của từng khay:
-   - Khay 1 (Kéo phẫu thuật)
-   - Khay 2 (Kẹp panh)
-   - Khay 3 (Dao mổ)
+   - Khay 1 (Kim tiêm)
+   - Khay 2 (Kéo)
+   - Khay 3 (Bông)
 2. Tính tỷ lệ lấp đầy (%) của từng khay.
 3. Hiện tại có khay nào đã đầy hoặc vượt quá 80% định mức sức chứa cần điều dưỡng chuẩn bị khay rỗng mới để thay thế không?
-4. Nếu có khay đầy, hãy nhắc nhở quy trình thao tác an toàn khi thay khay để tránh làm va đập mẻ lưỡi dao hoặc cong đầu kẹp vi phẫu.`,
+4. Nếu có khay đầy, hãy nhắc nhở quy trình thao tác an toàn khi thay khay để tránh tai nạn vật sắc nhọn hoặc lây nhiễm.`,
       },
       {
         id: "trays_counts",
         title: "Số lượng hiện tại & Sức chứa tối đa 3 khay",
         badge: "Số lượng khay",
-        summary: "Liệt kê current_count và max_capacity của Khay 1 (Kéo), Khay 2 (Kẹp panh), Khay 3 (Dao mổ).",
-        prompt: "Liệt kê số lượng hiện tại (current_count) và sức chứa định mức tối đa (max_capacity) của từng khay: Khay 1 (Kéo phẫu thuật), Khay 2 (Kẹp panh), Khay 3 (Dao mổ).",
+        summary: "Liệt kê current_count và max_capacity của Khay 1 (Kim tiêm), Khay 2 (Kéo), Khay 3 (Bông).",
+        prompt: "Liệt kê số lượng hiện tại (current_count) và sức chứa định mức tối đa (max_capacity) của từng khay: Khay 1 (Kim tiêm), Khay 2 (Kéo), Khay 3 (Bông).",
       },
       {
         id: "trays_fill_rate",
@@ -471,9 +471,9 @@ const generateOfflineFallbackResponse = (
 
 | Khay chứa | Nhóm dụng cụ | Số lượng | Sức chứa | Tỷ lệ (%) | Trạng thái hiện tại |
 | :--- | :--- | :---: | :---: | :---: | :--- |
-| **Khay 1** | Kéo & Dao mổ | ${b1} SP | ${cap1} SP | ${t1.rate}% | ${t1.emoji} ${t1.statusText} |
-| **Khay 2** | Kẹp panh cầm máu | ${b2} SP | ${cap2} SP | ${t2.rate}% | ${t2.emoji} ${t2.statusText} |
-| **Khay 3** | Dụng cụ khác | ${b3} SP | ${cap3} SP | ${t3.rate}% | ${t3.emoji} ${t3.statusText} |
+| **Khay 1** | Kim tiêm | ${b1} SP | ${cap1} SP | ${t1.rate}% | ${t1.emoji} ${t1.statusText} |
+| **Khay 2** | Kéo | ${b2} SP | ${cap2} SP | ${t2.rate}% | ${t2.emoji} ${t2.statusText} |
+| **Khay 3** | Bông | ${b3} SP | ${cap3} SP | ${t3.rate}% | ${t3.emoji} ${t3.statusText} |
 
 #### 💡 Tóm tắt & Hướng dẫn:
 - **Đánh giá ngưỡng**: ${
@@ -546,9 +546,9 @@ const generateOfflineFallbackResponse = (
 
 - **Tổng số lượng dụng cụ đã phân loại**: **${totalSorted} sản phẩm**
 - **Dung lượng 3 khay hiện tại**:
-  - Khay 1 (Kéo & Dao mổ): **${b1}/${cap1} SP** (${t1.rate}%)
-  - Khay 2 (Kẹp panh cầm máu): **${b2}/${cap2} SP** (${t2.rate}%)
-  - Khay 3 (Dụng cụ khác): **${b3}/${cap3} SP** (${t3.rate}%)
+  - Khay 1 (Kim tiêm): **${b1}/${cap1} SP** (${t1.rate}%)
+  - Khay 2 (Kéo): **${b2}/${cap2} SP** (${t2.rate}%)
+  - Khay 3 (Bông): **${b3}/${cap3} SP** (${t3.rate}%)
 - **Độ tin cậy Camera AI Vision**: **~98.5%** (Mô hình YOLOv8 phân loại chuẩn)
 *(Dữ liệu ca trực cập nhật từ Local Database & Telemetry)*`;
   }
@@ -793,9 +793,9 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
 ------------------------------------------------------------
 [TRẠNG THÁI DÂY CHUYỀN & PHÂN LOẠI DỤNG CỤ]:
 - Tổng sản lượng ca hiện tại: ${totalSorted} SP (Hiện trong 3 khay: K1: ${b1} | K2: ${b2} | K3: ${b3})
-- Khay 1 (Dao mổ & Kéo phẫu thuật): ${b1}/${cap1} SP (${t1.rate}%) - Màu hiển thị: ${t1.colorCode} - ${t1.statusText}
-- Khay 2 (Kẹp panh cầm máu): ${b2}/${cap2} SP (${t2.rate}%) - Màu hiển thị: ${t2.colorCode} - ${t2.statusText}
-- Khay 3 (Dụng cụ đặc biệt / Mặc định): ${b3}/${cap3} SP (${t3.rate}%) - Màu hiển thị: ${t3.colorCode} - ${t3.statusText}
+- Khay 1 (Kim tiêm): ${b1}/${cap1} SP (${t1.rate}%) - Màu hiển thị: ${t1.colorCode} - ${t1.statusText}
+- Khay 2 (Kéo): ${b2}/${cap2} SP (${t2.rate}%) - Màu hiển thị: ${t2.colorCode} - ${t2.statusText}
+- Khay 3 (Bông): ${b3}/${cap3} SP (${t3.rate}%) - Màu hiển thị: ${t3.colorCode} - ${t3.statusText}
 - Quy chuẩn đồng bộ màu sắc 3 mức (Web Dashboard, Mobile App, AI Copilot):
   * 🟢 Xanh lá: Dưới 80% định mức (An toàn, phân loại bình thường)
   * 🟡 Vàng cam: Từ 80% đến 99% định mức (Cảnh báo sắp đầy, chuẩn bị khay mới)
@@ -1784,7 +1784,7 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                     ? "bg-white text-slate-700 border-slate-200 shadow-2xs"
                     : "bg-slate-800/60 text-slate-300 border-slate-700/50"
                 }`}
-                title={`Khay 1 (Kéo & Dao): ${b1}/${cap1} SP (${liveK1.rate}%) - ${liveK1.statusText}`}
+                title={`Khay 1 (Kim tiêm): ${b1}/${cap1} SP (${liveK1.rate}%) - ${liveK1.statusText}`}
               >
                 <span>{liveK1.emoji}</span>
                 <span>K1: {b1}/{cap1}</span>
@@ -1804,7 +1804,7 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                     ? "bg-white text-slate-700 border-slate-200 shadow-2xs"
                     : "bg-slate-800/60 text-slate-300 border-slate-700/50"
                 }`}
-                title={`Khay 2 (Kẹp panh): ${b2}/${cap2} SP (${liveK2.rate}%) - ${liveK2.statusText}`}
+                title={`Khay 2 (Kéo): ${b2}/${cap2} SP (${liveK2.rate}%) - ${liveK2.statusText}`}
               >
                 <span>{liveK2.emoji}</span>
                 <span>K2: {b2}/{cap2}</span>
@@ -1824,7 +1824,7 @@ Trợ lý kỹ thuật thông minh kết nối trực tiếp với **Next.js Das
                     ? "bg-white text-slate-700 border-slate-200 shadow-2xs"
                     : "bg-slate-800/60 text-slate-300 border-slate-700/50"
                 }`}
-                title={`Khay 3 (Dụng cụ khác): ${b3}/${cap3} SP (${liveK3.rate}%) - ${liveK3.statusText}`}
+                title={`Khay 3 (Bông): ${b3}/${cap3} SP (${liveK3.rate}%) - ${liveK3.statusText}`}
               >
                 <span>{liveK3.emoji}</span>
                 <span>K3: {b3}/{cap3}</span>

@@ -81,15 +81,20 @@ export default function DashboardPage() {
   const cap3 = binCapacities.bin3 || 50;
   const isBinFull = binCounts.bin1 >= cap1 || binCounts.bin2 >= cap2 || binCounts.bin3 >= cap3;
   // Trạng thái phần cứng, cơ cấu chấp hành và cảm biến (ON / OFF)
-  const isConveyorActive = isRunning || telemetry.conveyor_running;
+  const activeVisualItemsCount = visualItems.filter(
+    (it) => !it.sorted && !it.deflected && (it.progress ?? 0) < 96
+  ).length;
+  const isConveyorActive = isSimulation
+    ? Boolean(telemetry.conveyor_running)
+    : Boolean(isRunning && !telemetry.estop_pressed && !isJammed && !isBinFull);
   const isArm1On = arm1Active || telemetry.arm1_active;
   const isArm2On = arm2Active || telemetry.arm2_active;
   const isS1Detected = telemetry.s1_entry || visualItems.some((item) => item.s1Triggered || (item.progress >= 5 && item.progress <= 20));
   const isEstopActive = isSystemLocked || telemetry.estop_pressed;
   const isEncoderActive = isConveyorActive && (telemetry.encoder_count ?? 0) > 0;
   const isLdrActive = Boolean(telemetry.ldr_active);
-  const isStartBtnActive = Boolean(telemetry.start_btn_pressed);
-  const isLedStatusActive = isConveyorActive || isEstopActive;
+  const isStartBtnActive = isSimulation ? isRunning : Boolean(telemetry.start_btn_pressed);
+  const isLedStatusActive = isRunning || isEstopActive;
 
   const hardwareDeviceList: HardwareDeviceStatus[] = useMemo(() => [
     {
@@ -122,7 +127,7 @@ export default function DashboardPage() {
     {
       id: "s1_entry",
       name: "Cảm biến vật cản IR LM393",
-      pin: "GPIO0",
+      pin: "GPIO3",
       category: "sensor",
       type: "sensor",
       isOn: isS1Detected,
@@ -209,7 +214,7 @@ export default function DashboardPage() {
         isSimulation={isSimulation}
         isRunning={isRunning}
         conveyorSpeed={conveyorSpeed}
-        visualItemsCount={visualItems.length}
+        visualItemsCount={activeVisualItemsCount}
         avgConfidence={avgConfidence}
         sampleCount={validRecords.length}
         pingMs={pingMs}

@@ -6,8 +6,10 @@ const path = require("node:path");
 const { TelemetryModel } = require("../backend/dist/backend/src/models/telemetryModel.js");
 const { TelemetryController } = require("../backend/dist/backend/src/controllers/telemetryController.js");
 const { SafetyService } = require("../backend/dist/backend/src/services/safetyService.js");
+const { SyncService } = require("../backend/dist/backend/src/services/syncService.js");
 
 test("HTTP Telemetry & Database History Test Suite", async (t) => {
+  SyncService.updateState({ mode: "sim" });
   await t.test("1. TelemetryModel stores and persists records into telemetry_logs.json with Atomic Write", () => {
     TelemetryModel.clear();
     assert.equal(TelemetryModel.getCount(), 0);

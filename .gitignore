@@ -72,4 +72,7 @@ pnpm-debug.log*
 runs/
 **/runs/
 
+# Local raw capture zip archives
+raw_captures*.zip
+
 .vercel

@@ -12,7 +12,7 @@ if exist "%FREE_PORT_SCRIPT%" (
     )
 )
 
-set "DEFAULT_CAM_URL=http://192.168.137.231:4747/video"
+set "DEFAULT_CAM_URL=http://192.168.137.155:4747/video"
 if "%~1"=="" if not defined CAMERA_SOURCE set "CAMERA_SOURCE=%DEFAULT_CAM_URL%"
 if not defined CAMERA_ROTATE set "CAMERA_ROTATE=90"
 set "DISPLAY_CAM=%CAMERA_SOURCE%"

@@ -23,23 +23,24 @@ export function cleanTelemetryPayload(raw: unknown, prev: TelemetryData): Teleme
       rawOptical === "1" ||
       rawOptical === true;
     candidate.s1_entry = isBlocked;
-
-    // QUY TẮC CỐT LÕI (FE): CÒN VẬT THÌ CHẠY, HẾT VẬT DỪNG NGAY
-    // Băng tải chỉ chạy khi có vật cản trước cảm biến S1. Không có vật cản -> Băng tải dừng ngay!
-    candidate.conveyor_running = isBlocked;
-    if (!isBlocked) {
-      candidate.conveyor_speed = 0;
-    }
   }
   if (candidate.temperature !== undefined && candidate.cpu_temp === undefined) {
     candidate.cpu_temp = typeof candidate.temperature === "number" ? candidate.temperature : Number(candidate.temperature);
   }
-  if (candidate.is_running !== undefined && candidate.conveyor_running === undefined) {
+  if (candidate.conveyor_running !== undefined) {
+    candidate.conveyor_running = Boolean(candidate.conveyor_running);
+  } else if (candidate.is_running !== undefined) {
     candidate.conveyor_running = Boolean(candidate.is_running);
+  } else if (typeof candidate.status === "string") {
+    const st = candidate.status.trim().toUpperCase();
+    if (st === "RUNNING") candidate.conveyor_running = true;
+    else if (st === "STOPPED" || st === "IDLE" || st === "ESTOP" || st === "ESTOPPED" || st === "JAMMED") {
+      candidate.conveyor_running = false;
+    }
   }
 
   const numericKeys = [
-    "uptime", "cpu_temp", "wifi_rssi", "conveyor_speed", "encoder_count",
+    "uptime", "cpu_temp", "wifi_rssi", "conveyor_speed", "conveyor_speed_mm_s", "encoder_count",
     "active_config_version",
   ] as const;
   for (const key of numericKeys) {
@@ -55,7 +56,7 @@ export function cleanTelemetryPayload(raw: unknown, prev: TelemetryData): Teleme
   }
   const booleanKeys = [
     "online", "conveyor_running", "s1_entry", "s2_sorter1", "s3_sorter2",
-    "arm1_active", "arm2_active", "estop_pressed",
+    "arm1_active", "arm2_active", "estop_pressed", "ldr_active", "start_btn_pressed",
   ] as const;
   for (const key of booleanKeys) {
     if (!(key in candidate)) continue;
@@ -70,8 +71,8 @@ export function cleanTelemetryPayload(raw: unknown, prev: TelemetryData): Teleme
     const merged = { ...prev } as TelemetryData;
     const telemetryKeys: (keyof TelemetryData)[] = [
       "device_id", "online", "uptime", "cpu_temp", "wifi_rssi", "wifi_band",
-      "conveyor_running", "conveyor_speed", "s1_entry", "s2_sorter1", "s3_sorter2",
-      "arm1_active", "arm2_active", "estop_pressed", "encoder_count", "active_config_version",
+      "conveyor_running", "conveyor_speed", "conveyor_speed_mm_s", "s1_entry", "s2_sorter1", "s3_sorter2",
+      "arm1_active", "arm2_active", "estop_pressed", "ldr_active", "start_btn_pressed", "encoder_count", "active_config_version",
     ];
     for (const key of telemetryKeys) {
       if (Object.prototype.hasOwnProperty.call(candidate, key) && parsed.data[key] !== undefined) {
@@ -90,10 +91,9 @@ export function cleanTelemetryPayload(raw: unknown, prev: TelemetryData): Teleme
 
 export function normalizeBrandId(rawBrand: string): string {
   const lower = String(rawBrand || "").toLowerCase().trim();
-  if (lower.includes("coca") || lower === "brand_c") return "brand_c";
-  if (lower.includes("pepsi") || lower === "brand_a") return "brand_a";
-  if (lower.includes("red") || lower.includes("bull") || lower === "brand_b") return "brand_b";
-  if (lower.includes("aqua") || lower === "brand_d") return "brand_d";
+  if (lower === "med_syringe" || lower === "syringe" || lower.includes("kim") || lower === "brand_c" || lower.includes("coca")) return "med_syringe";
+  if (lower === "med_scissors" || lower === "scissor" || lower === "scissors" || lower.includes("keo") || lower === "med_forceps" || lower === "brand_a" || lower === "brand_b" || lower.includes("pepsi") || lower.includes("red")) return "med_scissors";
+  if (lower === "med_cotton" || lower === "cotton" || lower.includes("bong") || lower === "med_vial" || lower === "brand_d" || lower.includes("aqua")) return "med_cotton";
   return lower;
 }
 
@@ -146,11 +146,12 @@ export function determineTargetBin(brandId: string, config: SorterConfig, confid
   return config.default_bin || 3;
 }
 
-export function detectAnomalies(telemetry: TelemetryData): AlertEvent[] {
+export function detectAnomalies(telemetry: TelemetryData, prev?: TelemetryData): AlertEvent[] {
   const alerts: AlertEvent[] = [];
 
-  // 1. Cảnh báo Nút Dừng Khẩn Cấp (E-stop)
-  if (telemetry.estop_pressed) {
+  // 1. Cảnh báo Nút Dừng Khẩn Cấp (E-stop): Kích hoạt khi chuyển sườn từ an toàn sang E-Stop
+  const isEstopNew = prev ? (telemetry.estop_pressed && !prev.estop_pressed) : telemetry.estop_pressed;
+  if (isEstopNew) {
     alerts.push({
       event_id: `estop_${Date.now()}`,
       event_type: "emergency_stop",
@@ -161,8 +162,9 @@ export function detectAnomalies(telemetry: TelemetryData): AlertEvent[] {
     });
   }
 
-  // 2. Cảnh báo Nhiệt độ vi xử lý ESP32-C5 quá cao
-  if (telemetry.cpu_temp >= 75) {
+  // 2. Cảnh báo Nhiệt độ vi xử lý ESP32-C5 quá cao: Kích hoạt khi chuyển sườn vượt ngưỡng 75°C
+  const isTempNew = prev ? (telemetry.cpu_temp >= 75 && prev.cpu_temp < 75) : telemetry.cpu_temp >= 75;
+  if (isTempNew) {
     alerts.push({
       event_id: `temp_${Date.now()}`,
       event_type: "temperature_warning",
